@@ -93,14 +93,21 @@ def main():
     mats = materials.build_all()
     infos = street.build_block()
     poles_and_wires()
+    street.bench("bench0", 6.15, 78.6)
+    street.kiosk("kiosk0", -5.2, 67.0, 1)
+    import random
+    srng = random.Random(21)
+    for k, yy in enumerate((45.6, 48.6)):
+        street.umbrella_stall(f"umb{k}", 5.2, yy, srng)
     people = [
         # (person, position, heading). A person faces -Y at heading 0; heading pi faces +Y.
         ("trader_f", (4.7, 33.0, BASE + 0.002), 0.0),
         ("stand_m", (5.7, 42.2, BASE + 0.002), math.pi / 2),
-        ("walker_m", (-4.7, 41.0, BASE + 0.002), math.pi),
+        ("walker_m2", (-4.7, 41.0, BASE + 0.002), math.pi),
         ("talk_f", (-4.2, 66.6, BASE + 0.002), -math.pi / 2 + 0.3),
         ("walker_f", (5.0, 58.0, BASE + 0.002), 0.0),
-        ("walker_m2", (-5.0, 82.0, BASE + 0.002), math.pi),
+        ("walker_m", (4.75, 39.4, BASE + 0.002), 0.15),          # shot (b) foreground pedestrian
+        ("seated_m", (6.05, 78.6, BASE - 0.43), math.pi / 2),     # on the bench by the shop
     ]
     if trees:
         trees.build_all()
