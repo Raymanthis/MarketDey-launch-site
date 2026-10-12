@@ -55,3 +55,8 @@ next-env.d.ts
 /tools/fidelity/diff2/
 /tools/fidelity/candidate3/
 /tools/fidelity/diff3/
+
+# Blender look-development renders and large vendor downloads (see blender/ASSETS.md)
+/blender/lookdev/out/
+/blender/assets/vendor/makehuman-system-assets-cc0/
+/blender/assets/vendor/mpfb-extension/
