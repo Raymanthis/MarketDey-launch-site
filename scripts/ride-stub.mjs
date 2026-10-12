@@ -2,11 +2,12 @@
 //
 //   node scripts/ride-stub.mjs [count=61]
 //
-// Writes public/media/ride-stub/ in the format of docs/plans/ride-frames-format.md (WebP only).
+// Writes public/media/ride-stub/ in the format of docs/plans/ride-frames-format.md rev 2 (WebP only,
+// lossless; per-variant cameras, the portrait one yawed).
 // Every frame is drawn through that frame's own camera, sampled from the section's camera code
 // (src/lib/rideCamera.js) exactly as the contract specifies: a ground grid, the road centreline
 // and kerbs, and a coloured marker at each of the five landmark pin positions (MK) plus the coin
-// pin's resting point. In-scene overlays rendered with manifest.camera[i] must land on the markers.
+// pin's resting point. In-scene overlays rendered with manifest.camera[variant][i] must land on the markers.
 // View with /?ride=stub.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -80,6 +81,14 @@ ${mk}
 </svg>`;
 }
 
+// Contract rev 2: per-variant cameras. The real portrait camera yaws toward landmarks; the stub
+// gives it a small, varying yaw about world Y (same position) so the per-variant path is exercised.
+const PORTRAIT_YAW = p => 0.12 * Math.sin(p * 40);
+function yawed(cam, a) {
+  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a).multiply(new THREE.Quaternion().fromArray(cam.quat));
+  return { pos: cam.pos.slice(), quat: q.toArray() };
+}
+
 function coarseToFine(n) {
   const order = [], seen = new Set();
   for (let step = 64; step >= 1; step /= 2) for (let i = 0; i < n; i += step) if (!seen.has(i)) { seen.add(i); order.push(i); }
@@ -88,13 +97,14 @@ function coarseToFine(n) {
 
 fs.rmSync(OUT, { recursive: true, force: true });
 for (const v of Object.keys(VARIANTS)) fs.mkdirSync(path.join(OUT, v), { recursive: true });
-const pAt = [], camera = [], bytes = { l: { avif: 0, webp: 0 }, p: { avif: 0, webp: 0 } };
+const pAt = [], camera = { l: [], p: [] }, bytes = { l: { avif: 0, webp: 0 }, p: { avif: 0, webp: 0 } };
 for (let i = 0; i < COUNT; i++) {
   const p = i === COUNT - 1 ? P1 : P0 + (P1 - P0) * i / (COUNT - 1);
   const cam = frameCamera(THREE, rig, p, probe);
-  pAt.push(p); camera.push(cam);
+  pAt.push(p);
   for (const v of Object.keys(VARIANTS)) {
-    const buf = await sharp(Buffer.from(drawFrame(i, p, cam, v))).webp({ quality: 80 }).toBuffer();
+    const vc = v === 'p' ? yawed(cam, PORTRAIT_YAW(p)) : cam; camera[v].push(vc);
+    const buf = await sharp(Buffer.from(drawFrame(i, p, vc, v))).webp({ lossless: true }).toBuffer(); // lossless: marker colours stay exact for pixel checks
     fs.writeFileSync(path.join(OUT, v, pad(i) + '.webp'), buf); bytes[v].webp += buf.length;
   }
 }
