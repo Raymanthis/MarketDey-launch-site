@@ -41,6 +41,22 @@ def _blob(b, c, rx, ry, rz, seed, nu=22, nv=12, amp=0.16, mat="foliage"):
     b.loft(rings, True, mat, smooth=True)
 
 
+def cluster(Fo, Lc, c, r, rz, rng, seed, mat="foliage", cards=1.0):
+    """A leafy mass: a flattened main clump ringed by smaller lobes (so its outline is lobed and
+    its inside shows leaf clusters), dressed with leaf cards."""
+    c = Vector(c)
+    _blob(Fo, c, r, r * 0.92, rz, seed, amp=0.2, mat=mat)
+    n = rng.randint(5, 8)
+    for k in range(n):
+        a = 2 * math.pi * k / n + rng.uniform(-0.3, 0.3)
+        rr = r * rng.uniform(0.3, 0.45)
+        p = c + Vector((math.cos(a) * r * 0.85, math.sin(a) * r * 0.8, rz * rng.uniform(-0.35, 0.25)))
+        _blob(Fo, p, rr, rr, rr * rng.uniform(0.45, 0.6), seed * 13 + k, nu=14, nv=8, amp=0.25,
+              mat="foliage_dark" if p.z < c.z - rz * 0.2 else mat)
+        leaf_cards(Lc, p, rr, rr, rr * 0.7, rng, int(110 * rr * rr * cards), size=0.17)
+    leaf_cards(Lc, c, r, r * 0.92, rz, rng, int(160 * r * r * cards), size=0.19)
+
+
 def leaf_cards(C, c, rx, ry, rz, rng, n, size=0.17):
     """Small leaf quads scattered over a clump's surface, poking a little outward. Each card lies
     nearly tangent to the clump (normal close to the clump's own), so it takes the clump's tone
@@ -97,20 +113,15 @@ def almond(tag, x, y, scale=1.0, seed=1):
             for j, f in enumerate((0.45, 0.8)):
                 side = d.cross(Vector((0, 0, 1))) * rng.uniform(-0.3, 0.3) * ln
                 pc = c + d * ln * f + side + Vector((0, 0, (0.25 + rng.uniform(-0.1, 0.15)) * scale))
-                r = rng.uniform(0.75, 1.15) * (1.15 - 0.15 * k) * scale
-                rz = r * rng.uniform(0.3, 0.42)
-                _blob(Fo, pc, r * 1.1, r * 0.95, rz, seed * 100 + k * 10 + i * 2 + j, amp=0.25,
-                      mat="foliage" if (i + j) % 3 else "foliage_dark")
-                leaf_cards(Lc, pc, r * 1.1, r * 0.95, rz, rng, int(260 * r * r), size=0.2 * scale)
-            # a drooping clump hanging under the tier edge
+                r = rng.uniform(0.7, 1.05) * (1.1 - 0.15 * k) * scale
+                cluster(Fo, Lc, pc, r, r * rng.uniform(0.32, 0.42), rng, seed * 100 + k * 10 + i * 2 + j,
+                        mat="foliage" if (i + j) % 3 else "foliage_dark")
             if rng.random() < 0.5:
                 pc = c + d * ln * 0.95 + Vector((0, 0, -0.1 * scale))
-                r = rng.uniform(0.45, 0.65) * scale
-                _blob(Fo, pc, r, r, r * 0.55, seed * 1000 + k * 10 + i, amp=0.25, mat="foliage_dark")
-                leaf_cards(Lc, pc, r, r, r * 0.55, rng, int(220 * r * r), size=0.2 * scale)
-        rc = reach * 0.42
-        _blob(Fo, c + Vector((0, 0, 0.3 * scale)), rc, rc, 0.35 * scale, seed * 100 + k * 10 + 9, amp=0.22)
-        leaf_cards(Lc, c + Vector((0, 0, 0.3 * scale)), rc, rc, 0.35 * scale, rng, int(180 * rc * rc), size=0.2 * scale)
+                r = rng.uniform(0.4, 0.6) * scale
+                cluster(Fo, Lc, pc, r, r * 0.55, rng, seed * 1000 + k * 10 + i, mat="foliage_dark")
+        rc = reach * 0.4
+        cluster(Fo, Lc, c + Vector((0, 0, 0.3 * scale)), rc, 0.35 * scale, rng, seed * 100 + k * 10 + 9)
 
 
 def rounded_tree(tag, x, y, scale=1.0, seed=5):
