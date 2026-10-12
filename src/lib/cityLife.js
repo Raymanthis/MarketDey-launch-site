@@ -892,10 +892,29 @@ export class CityLife {
   }
 
   // ---------- drawing ----------
+  // fire due lightning events before clouds update, so the source cloud lights on the strike frame
+  fireLightning() {
+    const w = this.wx;
+    if (w.storm) {
+      w.storm.events.forEach(e => {
+        if (!e.fired && this.viewTime >= e.t) {
+          e.fired = true;
+          if (this.stormClouds.length) {
+            e.src = Math.floor(this.rV() * this.stormClouds.length);
+            const sc = this.stormClouds[e.src];
+            e.sx = sc.cx + 66 * sc.S;
+          }
+          if (e.bolt) { this.boltEv = e; this.showBolt(this.genBolt(e.t, e.src)); }
+        }
+      });
+    }
+  }
+
   render(dt) {
     this.deriveTraffic();
     this.deriveWeather();
     this.syncWeather();
+    this.fireLightning();
     this.updateStormClouds();
     this.applyVehicles();
     this.stepRain(dt);
@@ -923,20 +942,6 @@ export class CityLife {
     const ctx = this.ctx;
     if (!ctx) return;
     const w = this.wx, W = this.W, H = this.H;
-    // fire lightning events
-    if (w.storm) {
-      w.storm.events.forEach(e => {
-        if (!e.fired && this.viewTime >= e.t) {
-          e.fired = true;
-          if (this.stormClouds.length) {
-            e.src = Math.floor(this.rV() * this.stormClouds.length);
-            const sc = this.stormClouds[e.src];
-            e.sx = sc.cx + 66 * sc.S;
-          }
-          if (e.bolt) { this.boltEv = e; this.showBolt(this.genBolt(e.t, e.src)); }
-        }
-      });
-    }
     this.updateBolt();
     const flash = this.flashAlpha();
     // dim eases off while a strike is lit so the clouds and bolt are not buried
