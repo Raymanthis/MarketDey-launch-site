@@ -30,6 +30,33 @@ const FAR_CLOUD_D = 'M0 0H120Q132 0 130 -5Q128 -11 112 -10Q108 -20 86 -19Q76 -28
 const DARK_FILL = '#2a4f33';     // ≈15% darker than the hero skyline green #386641
 const PHONE_W = 600;             // skyline container width under which storm clouds are drawn smaller
 const PHONE_S = 0.6;             // their scale on phones, relative to desktop
+
+// ---- day/night cycle (loading splash only: launching page + the full site's opening intro) ----
+const SKY_DAY = '#386641';       // hero sky by day (same green as today)
+const SKY_NIGHT = '#0f1c2e';     // hero sky at night
+const SKY_DUSK = '#4a3b4f';      // warm dusky mid-tone the sky passes through at dusk/dawn
+const FILL_DAY = '#386641';      // hero skyline fill by day
+// night palette: like the footer skyline at night, but neither the buildings nor the clouds may go black —
+// they stay a shade lighter than the night sky with their light outlines and window lines kept as by day
+const FILL_NIGHT = '#16263b';    // skyline buildings / vehicles at night
+const CLOUD_FILL_DAY = '#386641';
+const CLOUD_FILL_NIGHT = '#1b2c43';   // normal (and storm) clouds at night: dark blue-grey
+const SKY_STORM_NIGHT = mixHex(SKY_NIGHT, '#000000', 0.15);   // night blue, ~15% darker in a storm
+const FILL_STORM_NIGHT = mixHex(FILL_NIGHT, '#000000', 0.15);
+const CLOUD_STORM_NIGHT = mixHex(CLOUD_FILL_NIGHT, '#000000', 0.15);
+const DN_DAY = 90, DN_DUSK = 12, DN_NIGHT = 90, DN_DAWN = 12, DN_TOTAL = DN_DAY + DN_DUSK + DN_NIGHT + DN_DAWN;
+const SUN_COL = '#f4d35e', MOON_COL = '#f1ede0', WIN_COL = '#f6c453', STAR_COL = '#eef3ff';
+// Splash skyline styles: the dn rules are looked up by selector, so their colours are rewritten from JS
+// (see setDnColors). The sky background itself is *not* driven from here — an !important stylesheet rule
+// loses to the hero section's own inline `background`, so setDnColors writes the section inline instead.
+// Clouds ([data-cl-cld]) take their own night fill; everything else green is skyline (buildings, vehicles).
+const DN_SEL_FILL = '[data-cl-sky][data-cl-dn] [fill="#386641"]:not([data-cl-wxc]):not([data-cl-cld])';
+const DN_SEL_CLD = '[data-cl-sky][data-cl-dn] [data-cl-cld]';
+const DN_CSS = DN_SEL_FILL + '{fill:#386641!important}'
+  + DN_SEL_CLD + '{fill:#386641!important}'
+  + '[data-cl-sky][data-cl-dnj] [fill="#386641"]:not([data-cl-wxc]){transition:none!important}'
+  + '[data-cl-sky][data-cl-dnj] [data-cl-cld]{transition:none!important}'
+  + '@keyframes clStar{0%,100%{opacity:.08}50%{opacity:.6}}';
 // splash surface indices for the rolling state() counter
 const SP_ROAD = 0, SP_VEH = 1, SP_NEAR = 2, SP_FARB = 3, SP_FARA = 4;
 
@@ -93,6 +120,28 @@ export class CityLife {
     this.rV = mulberry32(seed * 7 + 3);
     this.rR = mulberry32(seed * 7 + 4);
 
+    // day/night cycle. Off by default: HomePage turns it on for the launching page (setSplash(true))
+    // and for the full site's opening intro (on at mount, off when the intro ends). ?splash=1 forces it
+    // on for testing. The footer skyline (night:true) never takes part.
+    this.splash = !this.night && typeof window !== 'undefined' && !!window.location
+      && /[?&]splash=1(&|$)/.test(window.location.search);
+    this.dnT = 0;              // seconds into the cycle (viewing time)
+    this.dnKey = null;         // phase step already applied
+    this.dnNight = false;      // window/bird/headlight state
+    this.dnJump = false;       // apply the next phase without easing (debug)
+    this.dnRules = null;       // dn stylesheet rules
+    this.dnStyle = null;
+    this.dnGeo = null;         // measured splash geometry
+    this.dnPos = null; this.dnTf = null; this.dnW = -1; this.dnVh = -1;  // layout drift watch
+    this.dnWins = null;        // the ~30% of windows that light at night
+    this.dnPend = false;       // windows waiting for their twinkle animation back
+    this.dnTimer = 0;
+    this.dnReT = [];
+    this.dnLights = false;     // vehicle night lights (on regardless of rain)
+    this.dnLightsAt = -1e9;
+    this.sunEl = null; this.moonEl = null; this.starsEl = null;
+    this.birdGs = null;
+
     this.viewTime = 0;
     this.simTime = 0;
     this.last = -1;
@@ -144,6 +193,9 @@ export class CityLife {
     this.skyEls = Array.from(svgEl.querySelectorAll('[data-sky]'));
     this.cloudEls = Array.from(svgEl.querySelectorAll('[data-cloud]'));
     this.cloudInk = this.readCloudInk();
+    // clouds take the night sky's own dark blue-grey (never the buildings' fill), so mark them
+    this.cloudEls.forEach(g => Array.from(g.querySelectorAll('[fill="' + CLOUD_FILL_DAY + '"]'))
+      .forEach(p => p.setAttribute('data-cl-cld', '1')));
     // day skyline: the hero section behind the city is the "sky" that darkens when a storm gathers
     if (!this.night && this.el && this.el.closest) {
       const host = this.el.closest('section');
@@ -186,6 +238,39 @@ export class CityLife {
     this.makeCanvas();
     if (this.night) { this.addLights(); this.lightWindows(); } else this.addLights(true);
     this.buildProfiles();
+    if (!this.night) {
+      this.readBirds();
+      this.buildNightWindows();
+      if (this.splash) this.splashOn();
+    }
+  }
+
+  // the three bird flocks are the only [data-sky] groups flying with a flapping path: they are hidden
+  // at night (planes and the helicopter keep their nav lights and stay in the sky)
+  readBirds() {
+    this.birdGs = Array.from(this.svg.querySelectorAll('[data-sky]'))
+      .filter(g => g.querySelector('path[d^="M-7 -3Q"]'));
+  }
+
+  // ~30% of the hero windows, chosen with the footer's seeded per-window rule so the three tiled copies
+  // of a row always light the same windows. Only the state is prepared here; nothing is shown until night.
+  buildNightWindows() {
+    this.dnWins = [];
+    const rw = mulberry32(this.seed * 8000009 + 13);
+    this.el.querySelectorAll('[data-scroll]').forEach((sc, tile) => {
+      Array.from(sc.children).filter(c => c.tagName.toLowerCase() === 'g').slice(0, 3).forEach(copy => {
+        copy.querySelectorAll('rect[data-w]').forEach((r, k) => {
+          if (mulberry32(this.seed * 1000003 ^ tile * 7919 ^ k * 104729)() >= 0.30) return;
+          const dur = +(r.getAttribute('data-w') || 3);
+          this.dnWins.push({
+            r, on: false, pend: false, anim: '',
+            d1: (rw() * 1.4).toFixed(2),      // stagger: fading up as dusk falls
+            d2: (rw() * 6).toFixed(2),        // stagger: fading back out as dawn breaks
+            tw: 'mdTwinkle ' + dur + 's ease-in-out ' + ((k * 0.37) % 4).toFixed(2) + 's infinite',
+          });
+        });
+      });
+    });
   }
 
   // ---------- setup ----------
@@ -436,7 +521,8 @@ export class CityLife {
   }
 
   // day lights: off when clear; in the storm each driver switches on after a 0–1.5 s stagger (0.5 s fade, all on
-  // within ~2 s of the rain starting); after the rain has stopped (clearing ends) they switch off the same way
+  // within ~2 s of the rain starting); after the rain has stopped (clearing ends) they switch off the same way.
+  // On the splash the same lamps are on for the whole night phase, rain or not.
   updateLights() {
     if (this.night) return;
     const w = this.wx, t = this.viewTime;
@@ -445,6 +531,10 @@ export class CityLife {
     let tOn = -1, tOff = -1;
     if (w.phase === 'storm' || w.phase === 'clearing') tOn = t - s.gEnd;
     else if (w.phase === 'clear' && s && t >= s.end) tOff = t - s.end;
+    if (this.splash && this.dnLightsAt > -1e8) {
+      if (this.dnLights) tOn = Math.max(tOn, t - this.dnLightsAt);
+      else if (tOn < 0) tOff = Math.max(tOff, t - this.dnLightsAt);
+    }
     const vs = this.vehicles;
     for (let k = 0; k < vs.length; k++) {
       const v = vs[k];
@@ -732,7 +822,21 @@ export class CityLife {
     if (this.hzDefs) { this.hzDefs.remove(); this.hzDefs = null; }
     if (this.polDefs) { this.polDefs.remove(); this.polDefs = null; }
     this.bd = null;
+    if (this.dnTimer) { clearTimeout(this.dnTimer); this.dnTimer = 0; }
+    if (this.dnReT) { this.dnReT.forEach(clearTimeout); this.dnReT = []; }
+    this.restoreNightWindows(true);
+    if (this.sunEl) { this.sunEl.remove(); this.sunEl = null; }
+    if (this.moonEl) { this.moonEl.remove(); this.moonEl = null; }
+    if (this.starsEl) { this.starsEl.remove(); this.starsEl = null; }
+    if (this.birdGs) {
+      this.birdGs.forEach(g => { g.style.removeProperty('opacity'); g.style.removeProperty('transition'); });
+      this.birdGs = null;
+    }
+    this.dnRules = null; this.dnGeo = null; this.dnWins = null;
+    this.clearScreenBg();   // drop the splash background before the host is forgotten
     if (this.skyHost) {
+      this.skyHost.removeAttribute('data-cl-dn');
+      this.skyHost.removeAttribute('data-cl-dnj');
       this.skyHost.removeAttribute('data-cl-dark');
       this.skyHost.removeAttribute('data-cl-sky');
       this.skyHost = null;
@@ -930,6 +1034,20 @@ export class CityLife {
     this.syncWeather();
     this.updateStormClouds();
     this.applyVehicles();
+  }
+
+  // debug: land on an exact moment of the day/night cycle (0 = day, 96 = dusk midpoint, 150 = night,
+  // 198 = dawn midpoint). Applied without easing so a screenshot shows exactly that moment.
+  setPhaseTime(sec) {
+    this.dnT = ((+sec || 0) % DN_TOTAL + DN_TOTAL) % DN_TOTAL;
+    if (this.night || !this.splash || !this.dnRules) return this.state();
+    const host = this.skyHost;
+    this.dnJump = true;
+    if (host) host.setAttribute('data-cl-dnj', '1');
+    this.updateCycle(0);
+    if (host) { host.getBoundingClientRect(); host.removeAttribute('data-cl-dnj'); }
+    this.dnJump = false;
+    return this.state();
   }
 
   // ---------- traffic sim ----------
@@ -1468,11 +1586,19 @@ export class CityLife {
   }
 
   // gather -> storm: darken; clearing: back to the plain green. Set once per phase change.
+  // While the splash is on, the day/night cycle owns the sky colour instead (data-cl-dn rules), so the
+  // darkening is folded into the cycle's own colour and the data-cl-dark attribute is left alone.
   setSkyDark(dark) {
-    if (dark === this.dark) return;
+    dark = !!dark;
+    const changed = dark !== this.dark;
     this.dark = dark;
+    if (this.splash && !this.night) { if (changed) this.applySky('4s ease'); return; }
     const host = this.skyHost;
-    if (!host) return;
+    if (!host || !changed) return;
+    this.setDarkAttr(host, dark);
+  }
+
+  setDarkAttr(host, dark) {
     if (dark) {
       this.ensureSkyStyle(host); // fill transitions first, so the darkening below animates
       host.setAttribute('data-cl-dark', '1');
@@ -1537,6 +1663,8 @@ export class CityLife {
       p.setAttribute('stroke-width', (ink.sw / S).toFixed(3));
       p.setAttribute('stroke-linejoin', 'round');
       p.setAttribute('data-cl-wxc', 'body');
+      p.setAttribute('data-cl-cld', '1');           // clouds take the night blue-grey, not the skyline fill
+      p.style.transition = 'fill 4s ease';          // data-cl-wxc keeps it out of ensureSkyStyle's pass
       g.appendChild(p);
       // inner detail strokes, thinner in proportion to the outline
       const dl = document.createElementNS(SVGNS, 'path');
@@ -1558,6 +1686,17 @@ export class CityLife {
       g.appendChild(hl);
       this.el.insertBefore(g, this.wxAnchor);
       this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null, ox: 6, oy: 60, cxm: 66 });
+    }
+    // on the splash, one storm cloud parks over the sun/moon for the whole storm: it slides in with the
+    // rest during gathering, holds its position (no drift) through the storm, and slides out again
+    if (this.splash && !this.night && this.dnGeo && this.stormClouds.length) {
+      let c = this.stormClouds[0];
+      for (let k = 1; k < this.stormClouds.length; k++) if (this.stormClouds[k].S > c.S) c = this.stormClouds[k];
+      const g = this.dnGeo;
+      c.hold = true;
+      c.Xt = g.sunX - 60 * c.S;
+      c.Y = g.sunV - g.ground + g.elH + 70 * c.S;   // the cloud's body centre on the sun/moon
+      c.dir = c.Xt + 60 * c.S < W / 2 ? -1 : 1;
     }
     this.buildFarClouds();
     this.updateStormClouds();
@@ -1597,6 +1736,8 @@ export class CityLife {
       p.setAttribute('stroke-width', (ink.sw / S).toFixed(3));
       p.setAttribute('stroke-linejoin', 'round');
       p.setAttribute('data-cl-wxc', 'body');
+      p.setAttribute('data-cl-cld', '1');
+      p.style.transition = 'fill 4s ease';
       g.appendChild(p);
       const dl = document.createElementNS(SVGNS, 'path');
       dl.setAttribute('d', 'M44 -15Q50 -20 62 -19M90 -12Q98 -14 104 -12');
@@ -1647,10 +1788,11 @@ export class CityLife {
     for (let i = 0; i < cs.length; i++) {
       const c = cs[i];
       let X, op;
-      // in they slide during gathering, out they slide during clearing; at rest in the storm they are 1
+      // in they slide during gathering, out they slide during clearing; at rest in the storm they are 1.
+      // A "hold" cloud (the one parked over the sun/moon) never drifts: it stays put for the whole storm.
       if (w.phase === 'gathering') { const p = clamp01(w.p); X = c.from + (c.Xt - c.from) * (1 - Math.pow(1 - p, 3)); op = p; }
-      else if (w.phase === 'storm') { X = c.Xt + 4 * (t - s.gEnd); op = 1; }
-      else { X = c.Xt + 4 * s.D + c.dir * 90 * (t - s.cEnd); op = 1 - clamp01(w.p); }
+      else if (w.phase === 'storm') { X = c.hold ? c.Xt : c.Xt + 4 * (t - s.gEnd); op = 1; }
+      else { X = c.Xt + (c.hold ? 0 : 4 * s.D) + c.dir * 90 * (t - s.cEnd); op = 1 - clamp01(w.p); }
       c.cx = X;
       const tf = 'translate3d(' + r1(X - c.ox * c.S) + 'px,' + r1(c.Y - c.oy * c.S) + 'px,0) scale(' + c.S.toFixed(2) + ')';
       if (tf !== c.tf) { c.tf = tf; c.g.style.transform = tf; }
@@ -1782,6 +1924,7 @@ export class CityLife {
     this.deriveTraffic();
     this.deriveWeather();
     this.syncWeather();
+    this.updateCycle(dt);
     this.fireLightning();
     this.updateStormClouds();
     this.applyVehicles();
@@ -2396,6 +2539,389 @@ export class CityLife {
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // ---------- day/night cycle (loading splash only) ----------
+  // DAY 90s -> DUSK 12s -> NIGHT 90s -> DAWN 12s, looping on viewing time. q is "night-ness": 0 in full
+  // day, 1 in full night, interpolated across dusk and dawn. The cycle starts in day.
+  dnPhaseAt(t) {
+    t = ((t % DN_TOTAL) + DN_TOTAL) % DN_TOTAL;
+    if (t < DN_DAY) return { name: 'day', u: 0, q: 0 };
+    if (t < DN_DAY + DN_DUSK) { const u = (t - DN_DAY) / DN_DUSK; return { name: 'dusk', u, q: u }; }
+    if (t < DN_DAY + DN_DUSK + DN_NIGHT) return { name: 'night', u: 0, q: 1 };
+    const u = (t - DN_DAY - DN_DUSK - DN_NIGHT) / DN_DAWN;
+    return { name: 'dawn', u, q: 1 - u };
+  }
+  // sky green <-> night blue through the warm dusky mid-tone; the skyline fill walks its own two ends
+  dnSky(q) { return q <= 0.5 ? mixHex(SKY_DAY, SKY_DUSK, q * 2) : mixHex(SKY_DUSK, SKY_NIGHT, (q - 0.5) * 2); }
+  dnFill(q) { return mixHex(FILL_DAY, FILL_NIGHT, q); }
+  dnCloudFill(q) { return mixHex(CLOUD_FILL_DAY, CLOUD_FILL_NIGHT, q); }
+  dnStormSky(q) { return mixHex(DARK_FILL, SKY_STORM_NIGHT, q); }
+  dnStormFill(q) { return mixHex(DARK_FILL, FILL_STORM_NIGHT, q); }
+  dnStormCloud(q) { return mixHex(DARK_FILL, CLOUD_STORM_NIGHT, q); }
+  dnDark() { const p = this.wx.phase; return p === 'gathering' || p === 'storm'; }
+  // the colour the hero sky shows right now: the phase colour, or the storm's darkening of it
+  skyNow() {
+    if (!this.splash || !this.dnRules) return this.dnDark() ? DARK_FILL : SKY_DAY;
+    const q = this.dnPhaseAt(this.dnT).q;
+    return this.dnDark() ? this.dnStormSky(q) : this.dnSky(q);
+  }
+
+  // Splash API. Off by default: HomePage calls this.setSplash(true) for the launching page (for its whole
+  // life) and at mount on the full site, then this.setSplash(false) when the opening intro ends.
+  setSplash(on) {
+    if (this.night || this.destroyed) return this;
+    on = !!on;
+    if (on === this.splash) return this;
+    this.splash = on;
+    if (on) this.splashOn(); else this.splashOff();
+    return this;
+  }
+
+  splashOn() {
+    if (this.destroyed || this.night) return;
+    this.ensureDnStyle();
+    const host = this.skyHost;
+    if (host) {
+      host.setAttribute('data-cl-dn', '1');
+      host.removeAttribute('data-cl-dark'); // the cycle owns the colour now
+    }
+    this.dnT = 0;
+    this.dnKey = null;
+    this.dnNight = false;
+    this.dnLights = false;
+    this.dnLightsAt = -1e9;
+    if (this.dnWins) this.dnWins.forEach(w => { w.on = false; w.pend = false; w.anim = ''; });
+    this.dnPend = false;
+    this.buildSkyVis();
+    this.measureDn();
+    this.dnJump = true;
+    this.updateCycle(0);
+    this.dnJump = false;
+    // re-measure once the intro's layout has settled (fonts, the city switching to fixed)
+    this.dnReT.forEach(clearTimeout);
+    this.dnReT = [1200, 3200].map(ms => setTimeout(() => {
+      if (this.destroyed || !this.splash) return;
+      this.measureDn();
+      this.dnJump = true; this.updateCycle(0); this.dnJump = false;
+    }, ms));
+  }
+
+  // the intro was dismissed: the hero fades back to its normal day look over ~0.8 s, then the storm
+  // mechanism (data-cl-dark) takes the sky back
+  splashOff() {
+    const dark = this.dnDark();
+    const sky = dark ? DARK_FILL : SKY_DAY;
+    if (this.dnRules) {
+      // the hero goes back to its day look (green sky, normal storms) and stays there
+      this.setDnColors(sky, dark ? DARK_FILL : FILL_DAY, dark ? DARK_FILL : CLOUD_FILL_DAY, '0.8s ease');
+    }
+    this.setScreenBg(sky, '0.8s ease');   // splash is already off, so setDnColors left html/body alone
+    if (this.sunEl) this.sunEl.style.opacity = '0';
+    if (this.moonEl) this.moonEl.style.opacity = '0';
+    if (this.starsEl) this.starsEl.style.opacity = '0';
+    this.setNightWindows(false, 'fast');
+    this.setBirds(true, 'fast');
+    this.setNightLights(false, 'fast');
+    this.dnReT.forEach(clearTimeout);
+    this.dnReT = [];
+    if (this.dnTimer) clearTimeout(this.dnTimer);
+    this.dnTimer = setTimeout(() => { this.dnTimer = 0; this.detachDn(); }, 900);
+  }
+
+  detachDn() {
+    if (this.destroyed) return;
+    const host = this.skyHost;
+    if (host) {
+      host.removeAttribute('data-cl-dn');
+      host.removeAttribute('data-cl-dnj');
+      if (this.dark) this.setDarkAttr(host, true);
+    }
+    this.clearScreenBg();   // hand the background back to the stylesheet (storm darkening, page colour)
+    this.restoreNightWindows(true);
+    this.visHide();
+  }
+
+  visHide() {
+    if (this.sunEl) { this.sunEl.style.display = 'none'; this.sunEl.style.opacity = '0'; }
+    if (this.moonEl) { this.moonEl.style.display = 'none'; this.moonEl.style.opacity = '0'; }
+    if (this.starsEl) { this.starsEl.style.display = 'none'; this.starsEl.style.opacity = '0'; }
+    this.sunO = this.moonO = this.starsO = null;
+  }
+
+  ensureDnStyle() {
+    if (this.dnRules || this.night) return;
+    let s = document.getElementById('cl-dn-style');
+    if (!s) {
+      s = document.createElement('style');
+      s.id = 'cl-dn-style';
+      s.textContent = DN_CSS;
+      document.head.appendChild(s);
+    }
+    const rs = Array.from(s.sheet.cssRules);
+    const sel = r => r.selectorText || '';
+    this.dnStyle = s;
+    this.dnRules = {
+      fill: rs.find(r => sel(r) === DN_SEL_FILL),
+      cld: rs.find(r => sel(r) === DN_SEL_CLD),
+    };
+  }
+
+  // one write per phase/weather change: the hero section's own inline background (a stylesheet rule cannot
+  // beat the section's inline `background` shorthand), every green skyline fill, and — while the splash is
+  // up — html/body, so the whole screen is sky. Inline transitions do the easing; nothing per frame.
+  setDnColors(sky, fill, cloud, dur) {
+    const R = this.dnRules;
+    if (!R) return;
+    const sect = this.skyHost;
+    if (sect) {
+      sect.style.transition = 'background-color ' + dur;
+      sect.style.backgroundColor = sky;
+    }
+    if (R.fill) R.fill.style.fill = fill;
+    if (R.cld) R.cld.style.fill = cloud;
+    if (this.splash) this.setScreenBg(sky, dur);
+  }
+
+  setScreenBg(sky, dur) {
+    const h = document.documentElement, b = document.body;
+    if (h) { h.style.transition = 'background-color ' + dur; h.style.backgroundColor = sky; }
+    if (b) { b.style.transition = 'background-color ' + dur; b.style.backgroundColor = sky; }
+  }
+
+  clearScreenBg() {
+    [document.documentElement, document.body, this.skyHost].forEach(el => {
+      if (!el) return;
+      el.style.removeProperty('background-color');
+      el.style.removeProperty('transition');
+    });
+  }
+
+  // a weather change on the splash: the darkening rides on top of the current phase colour
+  applySky(dur) {
+    if (!this.splash || !this.dnRules) return;
+    const q = this.dnPhaseAt(this.dnT).q;
+    const dark = this.dnDark();
+    this.setDnColors(dark ? this.dnStormSky(q) : this.dnSky(q), dark ? this.dnStormFill(q) : this.dnFill(q),
+      dark ? this.dnStormCloud(q) : this.dnCloudFill(q), dur || '4s ease');
+  }
+
+  // step change of the cycle: the sky eases towards the *next* half-phase colour, so dusk walks
+  // green -> mid-tone -> night blue as two 6 s linear legs (dawn does the mirror)
+  applyCycle(jump) {
+    const ph = this.dnPhaseAt(this.dnT);
+    const dark = this.dnDark();
+    const q = jump ? ph.q
+      : ph.name === 'dusk' ? (ph.u < 0.5 ? 0.5 : 1)
+        : ph.name === 'dawn' ? (ph.u < 0.5 ? 0.5 : 0)
+          : ph.q;
+    const dur = jump ? '0s' : (ph.name === 'dusk' || ph.name === 'dawn') ? '6s linear' : '4s ease';
+    this.setDnColors(dark ? this.dnStormSky(q) : this.dnSky(q), dark ? this.dnStormFill(q) : this.dnFill(q),
+      dark ? this.dnStormCloud(q) : this.dnCloudFill(q), dur);
+    const mode = jump ? 'jump' : 'normal';
+    const nightState = ph.name === 'dusk' || ph.name === 'night';
+    if (nightState !== this.dnNight) {
+      this.dnNight = nightState;
+      if (nightState) {
+        this.setNightWindows(true, mode);
+        this.setBirds(false, mode);
+        this.setNightLights(true, mode);
+      } else {
+        this.setNightWindows(false, mode);
+        this.setBirds(true, mode);
+        this.setNightLights(false, mode);
+        if (jump) this.restoreNightWindows(true);
+      }
+    } else if (ph.name === 'day') {
+      this.restoreNightWindows(false);
+    }
+  }
+
+  // ---------- splash sky (sun, moon, stars) ----------
+  buildSkyVis() {
+    if (this.night || this.sunEl || !this.el) return;
+    const phone = this.W < PHONE_W;
+    const sc = phone ? 0.65 : 1;
+    const sz = (140 * sc).toFixed(1), mz = (120 * sc).toFixed(1);
+    const mk = w => {
+      const s = document.createElementNS(SVGNS, 'svg');
+      s.setAttribute('aria-hidden', 'true');
+      s.setAttribute('width', w);
+      s.setAttribute('height', w);
+      s.style.cssText = 'position:absolute;left:0;bottom:0;overflow:visible;pointer-events:none;will-change:transform,opacity;opacity:0';
+      return s;
+    };
+    // sun: filled disc, thin white-ish outline, short rays turning slowly.
+    // The rays are their own <g> rotating about the viewBox centre, so nothing is touched per frame.
+    const sun = mk(sz);
+    sun.setAttribute('viewBox', '-70 -70 140 140');
+    let rays = '';
+    for (let k = 0; k < 8; k++) {
+      rays += '<path d="M33 0h11" stroke="rgba(255,255,255,.8)" stroke-width="2.6" stroke-linecap="round" transform="rotate(' + k * 45 + ')"></path>';
+    }
+    sun.innerHTML = '<g>' + (this.reducedMotion ? '' : '<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="90s" repeatCount="indefinite"></animateTransform>') + rays + '</g>'
+      + '<circle r="26" fill="' + SUN_COL + '" fill-opacity=".9" stroke="rgba(255,255,255,.85)" stroke-width="1.4"></circle>';
+    // moon: crescent with a soft glow, same place in the sky as the sun
+    const moon = mk(mz);
+    moon.setAttribute('viewBox', '-60 -60 120 120');
+    moon.innerHTML = '<defs><radialGradient id="cl-mg-' + this.seed + '"><stop offset="0" stop-color="' + MOON_COL + '" stop-opacity=".45"></stop><stop offset="1" stop-color="' + MOON_COL + '" stop-opacity="0"></stop></radialGradient></defs>'
+      + '<circle r="46" fill="url(#cl-mg-' + this.seed + ')"></circle>'
+      + '<path d="M0 -22A22 22 0 0 0 0 22A36 36 0 0 1 0 -22Z" fill="' + MOON_COL + '" fill-opacity=".95" stroke="rgba(255,255,255,.5)" stroke-width="1.1" stroke-linejoin="round"></path>';
+    const stars = document.createElementNS(SVGNS, 'svg');
+    stars.setAttribute('aria-hidden', 'true');
+    stars.style.cssText = 'position:absolute;left:0;bottom:320px;overflow:visible;pointer-events:none;opacity:0';
+    this.el.insertBefore(stars, this.el.firstChild);
+    this.el.insertBefore(moon, this.el.firstChild);
+    this.el.insertBefore(sun, this.el.firstChild);
+    this.sunEl = sun; this.moonEl = moon; this.starsEl = stars;
+    this.sunO = this.moonO = this.starsO = null;
+  }
+
+  // Splash geometry. The sky visuals live inside the city box and are placed from its *bottom* edge, so a
+  // box that is fixed to the viewport bottom and one sitting at the bottom of a tall hero both read right.
+  measureDn() {
+    if (this.night || !this.el || !this.sunEl) return;
+    const host = this.skyHost || this.el.parentElement;
+    if (!host || !host.getBoundingClientRect) return;
+    const hr = host.getBoundingClientRect();
+    const vh = window.innerHeight || 800;
+    const elH = this.el.clientHeight || 320;
+    const ground = this.el.style.position === 'fixed' ? vh : hr.bottom;   // viewport y of the ground line
+    const heroH = Math.min(Math.max(160, hr.height), vh);
+    const phone = this.W < PHONE_W;
+    const sc = phone ? 0.65 : 1;
+    const band = Math.max(120, ground - elH);                            // viewport y of the skyline top
+    const sunV = Math.min(heroH * (phone ? 0.16 : 0.22), band - 50);
+    this.dnGeo = { elH, ground, heroH, band, sc, sunX: this.W * (phone ? 0.72 : 0.78), sunV: Math.max(30, sunV) };
+    const g = this.dnGeo, sz = 140 * sc, mz = 120 * sc;
+    const dist = g.ground - g.sunV;                                      // height of the sun/moon above the ground
+    this.sunEl.style.left = (g.sunX - sz / 2).toFixed(1) + 'px';
+    this.sunEl.style.bottom = (dist - sz / 2).toFixed(1) + 'px';
+    this.moonEl.style.left = (g.sunX - mz / 2).toFixed(1) + 'px';
+    this.moonEl.style.bottom = (dist - mz / 2).toFixed(1) + 'px';
+    this.buildStars();
+  }
+
+  buildStars() {
+    const g = this.dnGeo;
+    if (!g || !this.starsEl) return;
+    const phone = this.W < PHONE_W;
+    const n = phone ? 14 : 20;
+    const h = Math.max(80, g.band);
+    const top = Math.min(0.22 * g.heroH, 120), bot = Math.min(0.44 * g.heroH, h - 24);
+    const rs = mulberry32(this.seed * 31 + 7);
+    let out = '';
+    for (let k = 0; k < n; k++) {
+      const x = (4 + rs() * 92) / 100 * this.W;
+      const y = top + rs() * Math.max(20, bot - top);
+      const r = (0.9 + rs() * 1.0) * g.sc;
+      const dur = (2.6 + rs() * 3.6).toFixed(1), del = (rs() * 5).toFixed(1);
+      out += '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + r.toFixed(2) + '" fill="' + STAR_COL + '"'
+        + (this.reducedMotion ? ' opacity=".45"' : ' style="animation:clStar ' + dur + 's ease-in-out ' + del + 's infinite"') + '></circle>';
+    }
+    this.starsEl.setAttribute('width', this.W);
+    this.starsEl.setAttribute('height', h);
+    this.starsEl.setAttribute('viewBox', '0 0 ' + this.W + ' ' + h);
+    this.starsEl.style.height = h + 'px';
+    this.starsEl.style.width = this.W + 'px';
+    this.starsEl.innerHTML = out;
+  }
+
+  // ~30% of windows lit warm yellow (the footer's night look) as dusk falls, staggered; fading back to
+  // their ordinary twinkle as dawn breaks
+  setNightWindows(on, mode) {
+    const ws = this.dnWins;
+    if (!ws || !ws.length) return;
+    const jump = mode === 'jump', fast = mode === 'fast';
+    for (let k = 0; k < ws.length; k++) {
+      const w = ws[k], r = w.r;
+      if (on) {
+        if (w.on) continue;
+        w.on = true;
+        if (!w.anim) w.anim = r.style.animation;   // whatever the page gave it (cityLive's twinkle)
+        const d = jump ? '0s' : (fast ? '0s' : w.d1) + 's';
+        r.style.transition = jump ? 'none' : 'fill .8s ease ' + d + ', fill-opacity .8s ease ' + d;
+        r.style.animation = 'none';
+        r.style.fill = WIN_COL;
+        r.style.fillOpacity = '0.85';
+      } else {
+        if (!w.on) continue;
+        w.on = false;
+        const d = jump ? '0s' : (fast ? (w.d2 * 0.05).toFixed(2) : w.d2) + 's';
+        r.style.transition = jump ? 'none' : 'fill ' + (fast ? '.4s' : '.9s') + ' ease ' + d + ', fill-opacity ' + (fast ? '.4s' : '.9s') + ' ease ' + d;
+        r.style.fill = '#a7c957';
+        r.style.fillOpacity = '0';
+        w.pend = true;
+        this.dnPend = true;
+      }
+    }
+  }
+
+  restoreNightWindows(all) {
+    if (!this.dnPend && !all) return;
+    this.dnPend = false;
+    const ws = this.dnWins || [];
+    for (let k = 0; k < ws.length; k++) {
+      const w = ws[k];
+      if (!w.pend) continue;
+      w.pend = false;
+      w.r.style.animation = w.anim || w.tw;
+      w.r.style.removeProperty('fill');
+      w.r.style.removeProperty('fill-opacity');
+      w.r.style.removeProperty('transition');
+      w.anim = '';
+    }
+  }
+
+  setBirds(on, mode) {
+    const gs = this.birdGs;
+    if (!gs || !gs.length) return;
+    const jump = mode === 'jump';
+    for (let k = 0; k < gs.length; k++) {
+      const g = gs[k];
+      g.style.transition = jump ? 'none' : 'opacity ' + (mode === 'fast' ? '.5s' : '1.2s') + ' ease';
+      g.style.opacity = on ? '' : '0';
+    }
+  }
+
+  // headlights + tail lights on for the whole night, and off again by day (see updateLights)
+  setNightLights(on, mode) {
+    this.dnLights = !!on;
+    this.dnLightsAt = mode === 'jump' ? this.viewTime - 99 : this.viewTime;
+  }
+
+  // ---------- per-frame cycle driver ----------
+  updateCycle(dt) {
+    if (this.night || !this.splash || !this.dnRules) return;
+    // cheap drift check: only reading style strings, so a re-measure stays rare
+    const pos = this.el.style.position, tf = this.el.style.transform, cw = this.el.clientWidth;
+    if (pos !== this.dnPos || tf !== this.dnTf || cw !== this.dnW || window.innerHeight !== this.dnVh) {
+      this.dnPos = pos; this.dnTf = tf; this.dnW = cw; this.dnVh = window.innerHeight;
+      this.measureDn();
+    }
+    if (!this.reducedMotion && dt > 0) this.dnT = (this.dnT + dt) % DN_TOTAL;
+    const ph = this.dnPhaseAt(this.dnT);
+    const key = ph.name + (ph.u < 0.5 ? 'a' : 'b');
+    if (this.dnJump || key !== this.dnKey) {
+      this.dnKey = key;
+      this.applyCycle(!!this.dnJump);
+    } else if (ph.name === 'day') {
+      this.restoreNightWindows(false);
+    }
+    const g = this.dnGeo;
+    if (!g || !this.sunEl) return;
+    // sun and moon trade places: one sinks and fades as the other rises; a storm dims them to ~0.15
+    const occ = 1 - 0.85 * clamp01(this.wx.dim || 0);
+    const sunP = ph.name === 'day' ? 1 : ph.name === 'dusk' ? 1 - ph.u : ph.name === 'night' ? 0 : ph.u;
+    const sunD = (ph.name === 'dusk' ? ph.u : ph.name === 'night' ? 1 : ph.name === 'dawn' ? 1 - ph.u : 0) * 30 * g.sc;
+    const moonD = (ph.name === 'dusk' ? 1 - ph.u : ph.name === 'day' ? 1 : ph.name === 'dawn' ? ph.u : 0) * 30 * g.sc;
+    const so = (sunP * occ).toFixed(3), mo = ((1 - sunP) * occ).toFixed(3), xo = (ph.q * occ).toFixed(3);
+    if (so !== this.sunO) { this.sunO = so; this.sunEl.style.opacity = so; }
+    if (mo !== this.moonO) { this.moonO = mo; this.moonEl.style.opacity = mo; }
+    if (xo !== this.starsO) { this.starsO = xo; this.starsEl.style.opacity = xo; }
+    const st = 'translate3d(0,' + sunD.toFixed(1) + 'px,0)', mt = 'translate3d(0,' + moonD.toFixed(1) + 'px,0)';
+    if (st !== this.sunT) { this.sunT = st; this.sunEl.style.transform = st; }
+    if (mt !== this.moonT) { this.moonT = mt; this.moonEl.style.transform = mt; }
+  }
+
   // ---------- debug ----------
   state() {
     this.deriveTraffic();
@@ -2456,6 +2982,14 @@ export class CityLife {
       } : null,
       target: this.target, VN: this.VN, active: act.length, total: this.vehicles.length, lanes: this.lanes,
       weather: this.wx.phase, weatherP: this.wx.p, dim: this.wx.dim, rain: this.wx.rain,
+      daynight: this.night ? null : {
+        splash: !!this.splash, phase: this.dnPhaseAt(this.dnT).name, t: r1(this.dnT),
+        u: +this.dnPhaseAt(this.dnT).u.toFixed(3), q: +this.dnPhaseAt(this.dnT).q.toFixed(3),
+        sky: this.skyNow(), sun: this.sunO === null || this.sunO === undefined ? null : +this.sunO,
+        moon: this.moonO === null || this.moonO === undefined ? null : +this.moonO,
+        stars: this.starsO === null || this.starsO === undefined ? null : +this.starsO,
+        nightLights: !!this.dnLights,
+      },
       bSplashes: this.bSplashCount,
       splashes: this.splashTot ? {
         road: this.splashTot[SP_ROAD], vehicle: this.splashTot[SP_VEH], nearRoof: this.splashTot[SP_NEAR],
