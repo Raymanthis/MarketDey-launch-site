@@ -5,6 +5,7 @@ Every builder (MB) becomes one Blender object in one of the line collections:
   lines     solid forms: silhouettes, borders and creases are inked by Freestyle
   fine      small solids (pipes, insulators, wheels): inked with the fine line style
   foliage   canopy masses: inked with the scalloped foliage style
+  wires     overhead cables: hair-thin tubes inked as one thin line
   nolines   glass, painted markings, ink-geometry (grille bars, wires, balusters), ground:
             shaded in the tonal pass only, never inked
 
@@ -29,7 +30,7 @@ from mathutils import Matrix, Vector
 
 BOXF = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
 BUILDERS = {}
-COLLECTIONS = ("lines", "fine", "foliage", "nolines")
+COLLECTIONS = ("lines", "fine", "foliage", "wires", "nolines")
 
 
 class MB:
@@ -270,8 +271,7 @@ def apply_union(ob):
     return me
 
 
-def finalize(mats, scene=None):
-    """Turn every builder into an object. `mats` maps material name -> bpy material."""
+def ensure_collections(scene=None):
     scene = scene or bpy.context.scene
     colls = {}
     for c in COLLECTIONS:
@@ -279,6 +279,13 @@ def finalize(mats, scene=None):
         if col.name not in scene.collection.children:
             scene.collection.children.link(col)
         colls[c] = col
+    return colls
+
+
+def finalize(mats, scene=None):
+    """Turn every builder into an object. `mats` maps material name -> bpy material."""
+    scene = scene or bpy.context.scene
+    colls = ensure_collections(scene)
     stats = {"objects": 0, "faces_in": 0, "faces_out": 0}
     for b in list(BUILDERS.values()):
         if len(b.bm.faces) == 0:
