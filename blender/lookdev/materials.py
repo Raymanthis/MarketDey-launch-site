@@ -37,7 +37,7 @@ SPECS = {
     "shop_dark": dict(albedo=0.34, ao=0.0, kind="flat"),
     "ac": dict(albedo=0.92, lines=[("Z", 0.05, 0.006, 15.0, 0.5, 0.0)]),
     # street
-    "road": dict(albedo=0.95, ao=0.6), "paint": dict(albedo=1.0, ao=0.3), "kerb": dict(albedo=0.9),
+    "road": dict(albedo=0.95, ao=0.6, lines=[("X", 1.75, 0.02, 70.0, 0.22, 0.875)]), "paint": dict(albedo=1.0, ao=0.3), "kerb": dict(albedo=0.9),
     "walk": dict(albedo=0.93, lines=[("Y", 0.9, 0.012, 45.0, 0.45, 0.0)]),
     "channel": dict(albedo=0.42), "slab": dict(albedo=0.84, lines=[("Y", 0.6, 0.01, 30.0, 0.5, 0.0)]),
     "ground": dict(albedo=0.95, ao=0.0),
@@ -269,16 +269,16 @@ def make(name, spec):
         sep = N.new("ShaderNodeSeparateXYZ")
         L.new(geo.outputs["Position"], sep.inputs[0])
         along = op("ADD", sep.outputs["X"], sep.outputs["Y"])
-        fz = op("FRACT", op("DIVIDE", sep.outputs["Z"], 0.26), 0)
-        row = op("MULTIPLY", op("GREATER_THAN", fz, 0.38), op("LESS_THAN", fz, 0.66))
+        fz = op("FRACT", op("DIVIDE", sep.outputs["Z"], 0.17), 0)
+        row = op("MULTIPLY", op("GREATER_THAN", fz, 0.42), op("LESS_THAN", fz, 0.62))
         nz = N.new("ShaderNodeTexNoise")
         nz.inputs["Scale"].default_value = 1.0
         cx = N.new("ShaderNodeCombineXYZ")
-        L.new(op("MULTIPLY", along, 7.0), cx.inputs["X"])
-        L.new(op("FLOOR", op("DIVIDE", sep.outputs["Z"], 0.26), 0), cx.inputs["Y"])
+        L.new(op("MULTIPLY", along, 11.0), cx.inputs["X"])
+        L.new(op("FLOOR", op("DIVIDE", sep.outputs["Z"], 0.17), 0), cx.inputs["Y"])
         L.new(cx.outputs[0], nz.inputs["Vector"])
         dash = op("GREATER_THAN", nz.outputs["Fac"], 0.5)
-        tone = op("MULTIPLY", tone, op("SUBTRACT", 1.0, op("MULTIPLY", op("MULTIPLY", row, dash), 0.42)))
+        tone = op("MULTIPLY", tone, op("SUBTRACT", 1.0, op("MULTIPLY", op("MULTIPLY", row, dash), 0.3)))
     if kind == "breeze":
         # breeze-block screen: square openings that read dark
         geo = N.new("ShaderNodeNewGeometry")
