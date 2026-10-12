@@ -24,6 +24,8 @@ WALK_IN, WALK_OUT = 4.1, 9.0   # walkway runs under the building fronts so they 
 R = random.Random(11)
 
 WALL_TONES = ["wall", "wall", "wall_b", "wall_c", "wall_b", "wall_d"]
+# called as SIGN_HOOK(fa, a0, a1, h0, h1, d_face) for every signboard (production adds lettering)
+SIGN_HOOK = None
 
 
 class Fa:
@@ -185,6 +187,8 @@ class Fa:
         S = s.S
         s.box(S, (a0, d - 0.01, h0), (a1, d + 0.06, h1), "sign")
         S.frame(s.M, a0 - 0.03, h0 - 0.03, a1 + 0.03, h1 + 0.03, 0.05, d + 0.0, d + 0.085, "sign_frame")
+        if SIGN_HOOK is not None:
+            SIGN_HOOK(s, a0, a1, h0, h1, d + 0.062)
 
     def canopy(s, a0, a1, ch, cd, sign=True, posts=True):
         S = s.S
@@ -233,8 +237,35 @@ def building(tag, side, y0, W, floors, setback, rng, Dp=12.0, side_walls=(), roo
         M = facade_frame((-xf, y0 + W, BASE + LIFT), (1, 0, 0))
     else:
         M = facade_frame((xf, y0, BASE + LIFT), (-1, 0, 0))
+    info = building_at(tag, M, W, floors, Dp, rng, roof=roof)
+    for sw in side_walls:
+        side_facade(tag + "_sw", side, xf, y0, W, Dp, floors, sw, rng, info["fa"].wall)
+    info.update(side=side, y0=y0, xf=xf)
+    return info
+
+
+# extra facade clutter, raised by production (AC units per floor, satellite dishes, tiles)
+CLUTTER = {"ac": (0, 2), "dish": 0.0, "tiles": 0.0, "open_roof": 0.0}
+
+
+def building_at(tag, M, W, floors, Dp, rng, roof=None, detail=True):
+    """A 2-4 storey street building whose facade frame is M (a along the wall, d out, h up), body
+    behind the facade (d < 0). detail=False gives the plain massing used for back rows."""
     fa = Fa(tag, M, wall=rng.choice(WALL_TONES))
     H = floors * FL
+    if not detail:
+        S = fa.S
+        fa.box(S, (0, -Dp, 0), (W, 0, H + 0.9))
+        fa.box(S, (-0.06, -0.25, H + 0.89), (W + 0.06, 0.08, H + 1.0), "trim")
+        for f in range(1, floors):
+            fa.box(S, (-0.05, -0.01, f * FL - 0.1), (W + 0.05, 0.1, f * FL + 0.08), "trim")
+        for f in range(floors):
+            nb = max(1, int(W / 3.0))
+            for i in range(nb):
+                ac = (i + 0.5) * W / nb
+                S.frame(M, ac - 0.6, f * FL + 0.9, ac + 0.6, f * FL + 2.2, 0.07, -0.01, 0.05, "trim")
+                fa.glass(ac - 0.53, f * FL + 0.97, ac + 0.53, f * FL + 2.13, 0.02, "glass_louvre")
+        return dict(tag=tag, W=W, H=H, top=H + 0.9, Dp=Dp, roof="flat", M=M, fa=fa)
     roof = roof or ("pitched" if floors == 2 and rng.random() < 0.65 else "flat")
     st = dict(
         shop=rng.random() < 0.82, canopy=rng.random() < 0.75,
@@ -315,7 +346,10 @@ def building(tag, side, y0, W, floors, setback, rng, Dp=12.0, side_walls=(), roo
             fa.balcony(i0 * bw + 0.25, (i1 + 1) * bw - 0.25, hf, st["bkind"])
     # ---- services
     fa.drainpipe(W - 0.45 if rng.random() < 0.5 else 0.45, H)
-    for k in range(st["ac"] if floors > 1 else 0):
+    if W > 9 and rng.random() < 0.6:
+        fa.drainpipe(W / 2 + rng.uniform(-1, 1), H)
+    n_ac = st["ac"] + rng.randint(*CLUTTER["ac"])
+    for k in range(n_ac if floors > 1 else 0):
         f = rng.randint(1, floors - 1)
         nb = max(1, int(W / 2.9))
         bw = W / nb
@@ -327,9 +361,28 @@ def building(tag, side, y0, W, floors, setback, rng, Dp=12.0, side_walls=(), roo
         a = 0.4
         fa.box(S, (a - 0.04, -0.01, FL + 0.6), (a + 0.04, 1.3, FL + 0.66), "metal")
         fa.box(S, (a - 0.05, 0.25, FL + 0.66), (a + 0.05, 1.25, FL + 2.3), "sign")
-    for sw in side_walls:
-        side_facade(tag + "_sw", side, xf, y0, W, Dp, floors, sw, rng, fa.wall)
-    return dict(tag=tag, side=side, y0=y0, W=W, xf=xf, H=H, top=top, Dp=Dp, roof=roof, M=M, fa=fa)
+    if roof == "flat" and rng.random() < CLUTTER["dish"]:
+        dish(fa, W * rng.uniform(0.2, 0.8), -1.2, top + 0.1)
+    if rng.random() < CLUTTER["tiles"]:
+        for i in range(max(1, round(W / 3.6)) + 1):
+            a = i * W / max(1, round(W / 3.6))
+            fa.box(S, (max(0, a - 0.16), -0.01, 0.0), (min(W, a + 0.16), 0.115, 2.85), "tile")
+    return dict(tag=tag, W=W, H=H, top=top, Dp=Dp, roof=roof, M=M, fa=fa)
+
+
+def dish(fa, a, d, h):
+    """Satellite dish on a short mast (dish facing up-and-out)."""
+    fa.P.cyl(fa.w((a, d, h)), fa.w((a, d, h + 1.0)), 0.025, n=8, mat="metal")
+    c = fa.w((a, d + 0.25, h + 1.15))
+    n = (fa.M3 @ Vector((0, 0.8, 0.6))).normalized()
+    u = n.orthogonal().normalized()
+    v = n.cross(u)
+    rings = []
+    for (r, dz) in ((0.02, -0.12), (0.25, -0.07), (0.42, 0.0), (0.43, 0.02)):
+        rings.append([c + n * dz + (u * math.cos(2 * math.pi * i / 20) + v * math.sin(2 * math.pi * i / 20)) * r
+                      for i in range(20)])
+    fa.P.loft(rings, True, "trim")
+    fa.P.seg_box(c, c + n * 0.45, 0.02, mat="metal")
 
 
 def side_facade(tag, side, xf, y0, W, Dp, floors, which, rng, wall):
