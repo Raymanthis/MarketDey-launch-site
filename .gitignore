@@ -48,3 +48,8 @@ next-env.d.ts
 
 # Claude Code agent worktrees
 /.claude/
+
+# Blender spike intermediates
+/blender/spike/out/
+/tools/fidelity/candidate2/
+/tools/fidelity/diff2/
