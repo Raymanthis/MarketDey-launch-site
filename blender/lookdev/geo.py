@@ -6,6 +6,7 @@ Every builder (MB) becomes one Blender object in one of the line collections:
   fine      small solids (pipes, insulators, wheels): inked with the fine line style
   foliage   canopy masses: inked with the scalloped foliage style
   wires     overhead cables: hair-thin tubes inked as one thin line
+  figures   people and vehicles: drawn style (heavier outline, interior lines, toon shading)
   nolines   glass, painted markings, ink-geometry (grille bars, wires, balusters), ground:
             shaded in the tonal pass only, never inked
 
@@ -30,7 +31,18 @@ from mathutils import Matrix, Vector
 
 BOXF = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
 BUILDERS = {}
-COLLECTIONS = ("lines", "fine", "foliage", "wires", "nolines")
+COLLECTIONS = ("lines", "fine", "foliage", "wires", "figures", "nolines")
+# Builders created while CURRENT_MATRIX is set are modelled in that local frame and their objects
+# get it as matrix_world (production builds every building in its own street frame). PARENT, if
+# set, becomes every object's parent (production scales the whole city during the tilt).
+CURRENT_MATRIX = None
+PARENT = None
+# while set (e.g. "figures"), inked builders ("lines"/"fine") go to that collection instead
+COLL_OVERRIDE = None
+
+
+def coll_for(coll):
+    return COLL_OVERRIDE if (COLL_OVERRIDE and coll in ("lines", "fine")) else coll
 
 
 class MB:
@@ -208,9 +220,13 @@ class MB:
 
 
 def get(name, coll="lines", smooth=False, union=False, props=None, subsurf=0):
+    coll = coll_for(coll)
     b = BUILDERS.get(name)
     if b is None:
         b = BUILDERS[name] = MB(name, coll, smooth, union, props, subsurf)
+        b.matrix = CURRENT_MATRIX.copy() if CURRENT_MATRIX is not None else None
+    elif (b.matrix is None) != (CURRENT_MATRIX is None) or (b.matrix is not None and b.matrix != CURRENT_MATRIX):
+        raise RuntimeError(f"builder {name} reused under a different local frame")
     return b
 
 
@@ -300,6 +316,10 @@ def finalize(mats, scene=None):
             me.materials.append(mats[name])
         ob = bpy.data.objects.new(b.name, me)
         colls[b.coll].objects.link(ob)
+        if PARENT is not None:
+            ob.parent = PARENT
+        if getattr(b, "matrix", None) is not None:
+            ob.matrix_basis = b.matrix
         if b.union:
             me = apply_union(ob)
         if b.subsurf:
