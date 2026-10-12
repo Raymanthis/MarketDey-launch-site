@@ -73,6 +73,11 @@ export class CityLife {
     this.queue = [];
     this.overtakes = 0;
     this.stopLines = null;
+    this.jamCount = 0;
+    this.jamType = null;
+    this.bd = null;
+    this.hzG = null;
+    this.hzDefs = null;
 
     // weather schedule
     this.storms = [];
@@ -121,7 +126,7 @@ export class CityLife {
         vBase: +g.getAttribute('data-v') || 40, v0: 0,
         bx0: bb.x, len: bb.width, bbY: bb.y, bbH: bb.height,
         extra: g.hasAttribute('data-extra'), active: false, queued: false,
-        lane: 0, dy: 0, drift: null, wdy: null, s0: S0, lc: null, lcCool: 0,
+        lane: 0, dy: 0, drift: null, wdy: null, s0: S0, lc: null, lcCool: 0, crawl: null, crawling: false,
       };
     });
     this.vehicles.forEach(v => { this.pickV0(v); v.lcCool = this.rT() * 2; });
@@ -389,6 +394,9 @@ export class CityLife {
     if (this.canvas) this.canvas.remove();
     this.clearStormClouds();
     this.clearLights();
+    this.hazardsOff();
+    if (this.hzDefs) { this.hzDefs.remove(); this.hzDefs = null; }
+    this.bd = null;
     this.skyEls.forEach(g => { g.style.removeProperty('transition'); g.style.removeProperty('opacity'); });
     this.cloudEls.forEach(g => {
       const p = g.querySelector('path');
@@ -418,7 +426,9 @@ export class CityLife {
 
   // ---------- traffic schedule ----------
   genTraffic() {
-    const r = this.rT, fs = this.tNextFree, first = this.tSegs.length === 0, bs = fs + 60;
+    const r = this.rT, fs = this.tNextFree, bs = fs + 60;
+    const type = (this.jamCount % 2 === 0) ? 'bottleneck' : 'breakdown';
+    this.jamCount++;
     const waves = [];
     let ws = fs + 15 + r() * 10;
     for (;;) {
@@ -427,15 +437,24 @@ export class CityLife {
       waves.push({ s: ws, e: ws + d, cw });
       ws += 15 + r() * 10;
     }
+    if (type === 'breakdown') {
+      const stopDur = 25 + r() * 15;
+      this.tSegs.push(
+        { k: 'free', t0: fs, t1: bs, decay: true, waves, type },
+        { k: 'breakdown', t0: bs, t1: bs + 20 + stopDur, stopDur, type },
+      );
+      this.tNextFree = bs + 20 + stopDur;
+      return;
+    }
     const bEnd = bs + 15, hEnd = bEnd + 25 + r() * 15, eEnd = hEnd + 20;
     // one stop line per lane, 8-16 px inside the right edge: where the queue head parks
     const stops = [];
     for (let L = 0; L < this.lanes; L++) stops.push(this.W - (8 + r() * 8));
     this.tSegs.push(
-      { k: 'free', t0: fs, t1: bs, decay: !first, waves },
-      { k: 'build', t0: bs, t1: bEnd, stops },
-      { k: 'hold', t0: bEnd, t1: hEnd, stops },
-      { k: 'ease', t0: hEnd, t1: eEnd },
+      { k: 'free', t0: fs, t1: bs, decay: false, waves, type },
+      { k: 'build', t0: bs, t1: bEnd, stops, type },
+      { k: 'hold', t0: bEnd, t1: hEnd, stops, type },
+      { k: 'ease', t0: hEnd, t1: eEnd, type },
     );
     this.tNextFree = eEnd;
   }
@@ -450,6 +469,7 @@ export class CityLife {
     if (s.k === 'build') return { C: smooth((t - s.t0) / 15), phase: 'build', stops: s.stops };
     if (s.k === 'hold') return { C: 1, phase: 'hold', stops: s.stops };
     if (s.k === 'ease') return { C: lerp(1, 0.3, smooth((t - s.t0) / 20)), phase: 'ease' };
+    if (s.k === 'breakdown') return { C: 0, phase: 'breakdown', seg: s };
     let wc = 0, inWave = false;
     for (const w of s.waves) {
       if (t >= w.s && t < w.e) { inWave = true; wc = Math.max(wc, w.cw * smooth((t - w.s) / 1.5) * smooth((w.e - t) / 1.5)); }
@@ -465,7 +485,18 @@ export class CityLife {
     this.tPhase = tr.phase;
     // stop lines exist only while the queue builds up and holds; ease lets the heads pull away
     this.stopLines = (tr.phase === 'build' || tr.phase === 'hold') && !this.reducedMotion ? tr.stops || null : null;
-    const jamK = tr.phase === 'build' || tr.phase === 'hold' ? tr.C : tr.phase === 'ease' ? tr.C * 0.5 : 0;
+    // a new breakdown segment arms its state machine the first time we reach it
+    if (tr.phase === 'breakdown' && !tr.seg.started) {
+      tr.seg.started = true;
+      if (this.bd) this.hazardsOff();
+      this.bd = { seg: tr.seg, veh: null, phase: 'seek', stopFront: 0, tStop: 0, vTrig: 0, hazardsOn: false, hazardVisible: false };
+      this.vehicles.forEach(v => { v.crawl = null; v.crawling = false; });
+    }
+    if (this.bd) this.tPhase = 'breakdown';
+    let jamType = null;
+    for (const s of this.tSegs) { if (s.t1 > this.viewTime) { jamType = s.type; break; } }
+    this.jamType = jamType;
+    const jamK = this.bd ? 0.5 : tr.phase === 'build' || tr.phase === 'hold' ? tr.C : tr.phase === 'ease' ? tr.C * 0.5 : 0;
     this.target = Math.min(this.vehicles.length, this.VN + Math.round(this.VN * jamK));
   }
 
@@ -518,6 +549,33 @@ export class CityLife {
     return this.state();
   }
 
+  forceJam(type) {
+    if (this.reducedMotion) return this.state();
+    const now = this.viewTime;
+    this.tSegs = this.tSegs.filter(s => s.t0 < now);
+    if (this.tSegs.length) this.tSegs[this.tSegs.length - 1].t1 = Math.min(this.tSegs[this.tSegs.length - 1].t1, now);
+    const kind = type === 'bottleneck' ? 'bottleneck' : 'breakdown';
+    const r = this.rT;
+    if (kind === 'bottleneck') {
+      const bEnd = now + 15, hEnd = bEnd + 25 + r() * 15, eEnd = hEnd + 20;
+      const stops = [];
+      for (let L = 0; L < this.lanes; L++) stops.push(this.W - (8 + r() * 8));
+      this.tSegs.push(
+        { k: 'build', t0: now, t1: bEnd, stops, type: 'bottleneck' },
+        { k: 'hold', t0: bEnd, t1: hEnd, stops, type: 'bottleneck' },
+        { k: 'ease', t0: hEnd, t1: eEnd, type: 'bottleneck' },
+      );
+      this.tNextFree = eEnd;
+    } else {
+      const stopDur = 25 + r() * 15;
+      this.tSegs.push({ k: 'breakdown', t0: now, t1: now + 20 + stopDur, stopDur, type: 'breakdown' });
+      this.tNextFree = now + 20 + stopDur;
+    }
+    this.jamCount = kind === 'bottleneck' ? 1 : 0;
+    this.tIdx = 0;
+    return this.state();
+  }
+
   setViewTime(sec) {
     this.viewTime = Math.max(0, +sec || 0);
     this.storms.forEach(s => s.events.forEach(e => { e.fired = e.t < this.viewTime; }));
@@ -538,9 +596,32 @@ export class CityLife {
     const rearOf = v => v.x + v.bx0;
     const act = this.vehicles.filter(v => v.active);
 
+    // breakdown: pick the broken vehicle once (seek)
+    if (this.bd && this.bd.phase === 'seek') {
+      const bd = this.bd;
+      let cand = null;
+      act.forEach(v => {
+        if (v.drift || v.lc || (v.i !== 3 && v.i !== 6)) return;
+        if (frontOf(v) < W / 2 + v.len / 2 - 60 && (!cand || frontOf(v) > frontOf(cand))) cand = v;
+      });
+      if (!cand) {
+        const parked = this.vehicles.find(v => !v.active && (v.i === 3 || v.i === 6));
+        if (parked) {
+          const qi = this.queue.indexOf(parked);
+          if (qi >= 0) this.queue.splice(qi, 1);
+          this.queue.unshift(parked);
+          parked.queued = true;
+          cand = parked;
+        }
+      }
+      if (!cand) { this.hazardsOff(); this.bd = null; }
+      else { bd.veh = cand; bd.stopFront = W / 2 + cand.len / 2; bd.phase = 'approach'; }
+    }
+
     // okada/keke start filtering (drifting) in slow traffic
     if ((this.tPhase === 'build' || this.tPhase === 'hold') && this.C > 0.5) {
       act.forEach(v => {
+        if (v === (this.bd && this.bd.veh)) return;
         if (v.drift || v.lc || (v.i !== 5 && v.i !== 2)) return;
         const front = frontOf(v);
         if (front >= Z0 - 200 && front <= Z1 && v.v < 15) {
@@ -565,9 +646,14 @@ export class CityLife {
       return g;
     };
 
+    // obstruction box while the broken vehicle is stopping/stopped
+    const bdBlock = this.bd && this.bd.veh && (this.bd.phase === 'stopping' || this.bd.phase === 'stopped')
+      ? { bR: rearOf(this.bd.veh), bF: frontOf(this.bd.veh), bL: this.bd.veh.lane } : null;
+
     // overtaking: decide lane changes (gap acceptance) before car-following
     let groups = buildGroups();
     act.forEach(v => {
+      if (v === (this.bd && this.bd.veh)) return;
       if (v.drift || v.lc || v.lcCool > 0) return;
       const front = frontOf(v), rear = rearOf(v);
       const L = v.lane;
@@ -586,6 +672,8 @@ export class CityLife {
       if (L + 1 < this.lanes) cands.push(L + 1);
       if (cands.length === 2 && this.rT() < 0.5) cands.reverse();
       for (const C of cands) {
+        // don't join the blocked lane right behind the breakdown
+        if (bdBlock && C === bdBlock.bL && front >= bdBlock.bR - 250 && front <= bdBlock.bF) continue;
         let a = null, b = null, aRear = Infinity, bFront = -Infinity, overlap = false;
         act.forEach(o => {
           if (o === v || o.drift) return;
@@ -607,6 +695,53 @@ export class CityLife {
         }
       }
     });
+
+    // breakdown: slow zone and merge-around while the obstruction is in place
+    act.forEach(v => { v.crawling = false; });
+    if (bdBlock) {
+      act.forEach(v => {
+        if (v === this.bd.veh) return;
+        const front = frontOf(v), rear = rearOf(v);
+        if (front >= bdBlock.bR - 120 && rear < bdBlock.bF) {
+          if (v.crawl == null) v.crawl = 10 + this.rT() * 10;
+          v.crawling = true;
+        }
+      });
+      // one vehicle at a time merges out of the blocked lane
+      if (!act.some(v => v.lc && v.lc.from === bdBlock.bL && frontOf(v) >= bdBlock.bR - 200 && frontOf(v) <= bdBlock.bF)) {
+        let follower = null;
+        act.forEach(v => {
+          if (v === this.bd.veh || v.drift || v.lane !== bdBlock.bL) return;
+          const f = frontOf(v);
+          if (f <= bdBlock.bR && (!follower || f > frontOf(follower))) follower = v;
+        });
+        if (follower && frontOf(follower) >= bdBlock.bR - 40 && follower.v < 12) {
+          const v = follower, front = frontOf(v), rear = rearOf(v);
+          const cands = [];
+          if (bdBlock.bL - 1 >= 0) cands.push(bdBlock.bL - 1);
+          if (bdBlock.bL + 1 < this.lanes) cands.push(bdBlock.bL + 1);
+          if (cands.length === 2 && this.rT() < 0.5) cands.reverse();
+          for (const C of cands) {
+            let a = null, b = null, aRear = Infinity, bFront = -Infinity, overlap = false;
+            act.forEach(o => {
+              if (o === v || o.drift) return;
+              if (!(o.lane === C || (o.lc && (o.lc.to === C || o.lc.from === C)))) return;
+              const of = frontOf(o), or = rearOf(o);
+              if (or >= front && or < aRear) { aRear = or; a = o; }
+              if (of <= rear && of > bFront) { bFront = of; b = o; }
+              if (or < front && of > rear) overlap = true;
+            });
+            if (overlap) continue;
+            if ((!a || aRear - front >= 8) && (!b || rear - bFront >= 8)) {
+              v.lc = { from: bdBlock.bL, to: C, t: 0, dur: 1.2 };
+              v.lane = C;
+              v.lcCool = 3;
+              break;
+            }
+          }
+        }
+      }
+    }
 
     // car-following within each lane only (mid-change vehicles are obstacles in their old lane)
     groups = buildGroups();
@@ -634,6 +769,7 @@ export class CityLife {
           const jam = 8 * Math.pow(0.5 + 0.5 * Math.sin(2 * Math.PI * this.simTime / 7 - front / 45), 2);
           vd = Math.min(v.v0, lerp(v.v0, jam, this.C));
         }
+        if (v.crawling) vd = Math.min(vd, v.crawl);
         vd = Math.max(0.5, vd);
         const ld = n > 0 ? group[n - 1] : null;
         let term = 0;
@@ -648,19 +784,41 @@ export class CityLife {
           term = Math.pow(sStar / Math.max(stop - front, 0.1), 2);
         }
         v._a = Math.max(-DECEL_MAX, Math.min(ACC, ACC * (1 - Math.pow(v.v / vd, 4) - term)));
+        if (this.bd && v === this.bd.veh && this.bd.phase === 'restart') v._a = Math.min(v._a, ACC * 0.5);
       });
     });
     // drifters: walking pace, no leader
     drifters.forEach(v => {
-      const vd = Math.max(0.5, Math.min(v.v0, 18));
+      let vd = Math.max(0.5, Math.min(v.v0, 18));
+      if (v.crawling) vd = Math.min(vd, v.crawl);
       v._a = Math.max(-DECEL_MAX, Math.min(ACC, ACC * (1 - Math.pow(v.v / vd, 4))));
     });
 
+    act.forEach(v => { if (v.lcCool > 0) v.lcCool -= dt; });
     act.forEach(v => {
+      if (this.bd && v === this.bd.veh && (this.bd.phase === 'stopping' || this.bd.phase === 'stopped')) return;
       v.v = Math.max(0, v.v + (v._a || 0) * dt);
       v.x += v.v * dt;
-      if (v.lcCool > 0) v.lcCool -= dt;
     });
+
+    // breakdown vehicle: approach trigger, brake, hold, restart
+    if (this.bd && this.bd.veh) {
+      const bd = this.bd, bv = bd.veh;
+      if (bd.phase === 'approach') {
+        if (bv.active && bd.stopFront - frontOf(bv) <= Math.max(8, 0.75 * bv.v)) { bd.phase = 'stopping'; bd.vTrig = bv.v; }
+      } else if (bd.phase === 'stopping') {
+        bv.v = Math.max(0, bv.v - (bd.vTrig / 1.5) * dt);
+        bv.x += bv.v * dt;
+        if (frontOf(bv) > bd.stopFront + 4) { bv.x = bd.stopFront + 4 - bv.bx0 - bv.len; bv.v = 0; }
+        if (bv.v === 0) { bd.phase = 'stopped'; bd.tStop = this.simTime; this.hazardsOn(); }
+      } else if (bd.phase === 'stopped') {
+        bv.v = 0;
+        if (this.simTime - bd.tStop >= bd.seg.stopDur) { this.hazardsOff(); bd.phase = 'restart'; }
+      } else if (bd.phase === 'restart') {
+        if (rearOf(bv) > W / 2 + 140) { this.hazardsOff(); this.bd = null; }
+      }
+      this.updateHazards();
+    }
 
     // no lane head ever pokes past its stop line; drifters ignore the lines but stay behind the furthest
     if (stops) {
@@ -703,6 +861,7 @@ export class CityLife {
       for (let n = 1; n < group.length; n++) {
         const ld = group[n - 1], v = group[n];
         if (v.lane !== L) continue; // mid-change obstacle: never moved in its old lane
+        if (this.bd && v === this.bd.veh && this.bd.phase === 'stopped') continue; // broken vehicle holds still
         const gap = ld.x + ld.bx0 - (v.x + v.bx0 + v.len);
         if (gap < v.s0) { v.x += gap - v.s0; v.v = Math.min(v.v, ld.v); }
       }
@@ -740,6 +899,7 @@ export class CityLife {
     let count = act.length;
     act.forEach(v => {
       if (v.x + v.bx0 > W + 20) {
+        if (this.bd && v === this.bd.veh) { this.hazardsOff(); this.bd = null; }
         if (count > this.target) { this.setActive(v, false); v.queued = false; } else { this.setActive(v, false); v.queued = true; this.queue.push(v); }
         count--;
       }
@@ -785,6 +945,73 @@ export class CityLife {
         return (b.x + b.bx0 + b.len) - (a.x + a.bx0 + a.len);
       });
       sorted.forEach(v => this.vehParent.insertBefore(v.wrapper, this.vehAnchor));
+    }
+  }
+
+  // ---------- breakdown hazards ----------
+  ensureHzDefs() {
+    if (this.hzDefs || !this.svg) return;
+    const defs = document.createElementNS(SVGNS, 'defs');
+    defs.setAttribute('data-cl-hz', '1');
+    defs.innerHTML = '<radialGradient id="cl-hz-' + this.seed + '"><stop offset="0" stop-color="#ffb703" stop-opacity=".55"/><stop offset="1" stop-color="#ffb703" stop-opacity="0"/></radialGradient>';
+    this.svg.insertBefore(defs, this.svg.firstChild);
+    this.hzDefs = defs;
+  }
+
+  hazardsOn() {
+    const bd = this.bd;
+    if (!bd || !bd.veh) return;
+    if (!this.hzG) {
+      this.ensureHzDefs();
+      const v = bd.veh, bx0 = v.bx0, len = v.len, bbY = v.bbY, bbH = v.bbH;
+      const g = document.createElementNS(SVGNS, 'g');
+      g.setAttribute('data-cl-hz', '1');
+      const lamps = [
+        [bx0 + len - 1, bbY + bbH * 0.30],
+        [bx0 + len - 1, bbY + bbH * 0.72],
+        [bx0 + 1, bbY + bbH * 0.30],
+        [bx0 + 1, bbY + bbH * 0.72],
+      ];
+      lamps.forEach(([x, y]) => {
+        const halo = document.createElementNS(SVGNS, 'circle');
+        if (this.night) {
+          halo.setAttribute('r', '9');
+          halo.setAttribute('fill', 'url(#cl-hz-' + this.seed + ')');
+        } else {
+          halo.setAttribute('r', '4');
+          halo.setAttribute('fill', '#ffb703');
+          halo.setAttribute('opacity', '.35');
+        }
+        halo.setAttribute('cx', x.toFixed(1));
+        halo.setAttribute('cy', y.toFixed(1));
+        halo.setAttribute('data-cl-hz', '1');
+        g.appendChild(halo);
+        const lamp = document.createElementNS(SVGNS, 'circle');
+        lamp.setAttribute('r', '2.2');
+        lamp.setAttribute('fill', '#ffb703');
+        lamp.setAttribute('cx', x.toFixed(1));
+        lamp.setAttribute('cy', y.toFixed(1));
+        lamp.setAttribute('data-cl-hz', '1');
+        g.appendChild(lamp);
+      });
+      v.g.appendChild(g);
+      this.hzG = g;
+    }
+    bd.hazardsOn = true;
+  }
+
+  hazardsOff() {
+    if (this.hzG) { this.hzG.remove(); this.hzG = null; }
+    if (this.bd) { this.bd.hazardsOn = false; this.bd.hazardVisible = false; }
+  }
+
+  updateHazards() {
+    if (!this.hzG || !this.bd) return;
+    const bd = this.bd;
+    const visible = bd.hazardsOn && (((this.simTime - bd.tStop) * 1.5) % 1 < 0.5);
+    if (visible !== bd.hazardVisible) {
+      bd.hazardVisible = visible;
+      this.hzG.style.display = visible ? '' : 'none';
     }
   }
 
@@ -1243,13 +1470,26 @@ export class CityLife {
     }
     return {
       viewTime: this.viewTime, simTime: this.simTime, running: this.running, C: this.C, trafficPhase: this.tPhase,
+      jamType: this.jamType,
+      bd: this.bd ? {
+        phase: this.bd.phase,
+        i: this.bd.veh ? this.bd.veh.i : null,
+        x: this.bd.veh ? this.bd.veh.x : null,
+        front: this.bd.veh ? this.bd.veh.x + this.bd.veh.bx0 + this.bd.veh.len : null,
+        rear: this.bd.veh ? this.bd.veh.x + this.bd.veh.bx0 : null,
+        lane: this.bd.veh ? this.bd.veh.lane : null,
+        v: this.bd.veh ? this.bd.veh.v : null,
+        hazardsOn: !!this.bd.hazardsOn,
+        hazardVisible: !!this.bd.hazardVisible,
+        stopFront: this.bd.stopFront,
+      } : null,
       target: this.target, VN: this.VN, active: act.length, total: this.vehicles.length, lanes: this.lanes,
       weather: this.wx.phase, weatherP: this.wx.p, dim: this.wx.dim, rain: this.wx.rain,
       lightningLeft: s && this.wx.phase !== 'clear' ? s.events.filter(e => e.t > this.viewTime).length : 0,
       minGap, minGapDrift, crossLaneOverlaps,
       stopLines: this.stopLines ? this.stopLines.slice() : null, laneHeads,
       laneChanges: act.filter(v => v.lc).length, overtakes: this.overtakes,
-      vehicles: act.map(v => ({ i: v.i, x: v.x, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0, v: v.v, v0: v.v0, len: v.len, lane: v.lane, dy: v.dy, drifting: !!v.drift, lc: !!v.lc }))
+      vehicles: act.map(v => ({ i: v.i, x: v.x, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0, v: v.v, v0: v.v0, len: v.len, lane: v.lane, dy: v.dy, drifting: !!v.drift, lc: !!v.lc, crawl: !!v.crawling }))
         .sort((a, b) => b.front - a.front),
     };
   }
