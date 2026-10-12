@@ -46,12 +46,13 @@ const TM_P0 = 1.8, TM_HAND = 4.4, TM_END = 5.4, TM_LM = 3.9;
 const SIGN_K = 400, SIGN_C = 2;
 const SIGN_RING_CY = 8.8, SIGN_HOLE_R = 3.68, SIGN_LOOP_R = 5.6, SIGN_RING_D = 11.2;
 const SIGN_PEND_K = 700, SIGN_PEND_C = 3, SIGN_PEND_MAX = 55, SIGN_PEND_VMAX = 260;
+const SIGN_IDLE_AMP = 2.6, SIGN_IDLE_T = 4.2;
 const SIGN_FLICK_WIN = 200, SIGN_FLICK_MIN = 400, SIGN_FLICK_K = 0.3, SIGN_FLICK_MAX = 700;
 
 class HomePage extends React.Component {
   static defaultProps = { startMarket: 'ogwashi', launchMode: false };
   state = { gs: -1, sel: null, platform: footerCopy.waitlist.platforms[0], moves: [], submitted: false, forMarket: '', faq: 0, ph: 0, enter: true, mounted: false };
-  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef(); signRef = React.createRef(); signPendRef = React.createRef(); signDropRef = React.createRef(); signNodeRef = React.createRef(); signRopeRef = React.createRef(); signRopeFrontRef = React.createRef(); signBodyRef = React.createRef(); signFrontRef = React.createRef(); signBackRef = React.createRef();
+  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef(); signRef = React.createRef(); signRopeLayerRef = React.createRef(); signNodeRef = React.createRef(); signRopeRef = React.createRef(); signRopeFrontRef = React.createRef(); signBodyRef = React.createRef(); signFrontRef = React.createRef(); signBackRef = React.createRef();
   buildCity(el0, fl0, sky) {
     const el = el0 || this.cityRef.current; if (!el) return; const hero = !el0, W = Math.max(320, el.clientWidth || window.innerWidth), G = 292, r = mulberry(hero ? 5 : 19), on = hero ? !!this.cityOn : true; let out = [];
     const S = 'rgba(255,255,255,.55)', SF = 'rgba(255,255,255,.28)', SFAR = 'rgba(167,201,87,.4)', SFAR2 = 'rgba(167,201,87,.2)', FL = fl0 || '#386641';
@@ -290,7 +291,7 @@ class HomePage extends React.Component {
   bMove(e) { const p = this.bp; if (!p || !p.drag) return; const nx = Math.max(-160, Math.min(160, e.clientX - p.sx)), ny = Math.max(-50, Math.min(110, e.clientY - p.sy)), now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
     p.vx = p.vx * 0.5 + ((nx - p.x) / dt) * 0.5; p.vy = p.vy * 0.5 + ((ny - p.y) / dt) * 0.5; if (Math.abs(nx) + Math.abs(ny) > 4) p.moved = true; p.x = nx; p.y = ny; p.pt = now; }
   bUp(e) { const p = this.bp; if (!p) return; p.drag = false; if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab'; this.bRun(); }
-  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, phi: 0, phv: 0, drag: false, down: false, moved: false, tapDir: 1, vx: 0, vy: 0, sx: 0, sy: 0, cx: 0, ax: 0, ay: 0, px: 0, py: 0, pt: 0, dt0: 0, a0: 0, st0: 0, stx: 0, hist: [], lastTapAt: 0, last: performance.now() }; return this.sp; }
+  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, phi: 0, phv: 0, drag: false, down: false, moved: false, tapDir: 1, vx: 0, vy: 0, sx: 0, sy: 0, cx: 0, ax: 0, ay: 0, px: 0, py: 0, pt: 0, dt0: 0, a0: 0, st0: 0, stx: 0, hist: [], lastTapAt: 0, idleOn: false, idleT0: 0, last: performance.now() }; return this.sp; }
   signPlace() {
     const logo = this.heroRef.current && this.heroRef.current.querySelector('[data-h="logo"]');
     const node = this.signNodeRef.current;
@@ -301,44 +302,56 @@ class HomePage extends React.Component {
     node.style.top = top + 'px';
     this.signRope();
   }
-  // rope is redrawn every frame: straight line from the fixed anchor down to the swung eyelet, loop around it
+  // The rope layer (under the wordmark) and the card layer (over it) are two fixed elements that get the SAME
+  // transform every frame (signRender), so in local coordinates the rope is a straight vertical line from the
+  // anchor to the eyelet at (0, signTop + SIGN_RING_CY) and can never drift off the hole.
   signRope() {
     const rope = this.signRopeRef.current, ropeF = this.signRopeFrontRef.current;
     if (!rope || !ropeF || this.signTop == null) return;
-    const p = this.signPhys(), R = SIGN_LOOP_R, cy = this.signTop + SIGN_RING_CY, loopBot = cy + R * 2, holeTop = cy - SIGN_HOLE_R;
-    const rad = p.phi * Math.PI / 180, s = Math.sin(rad), c = Math.cos(rad), at = y => (-y * s).toFixed(2) + ' ' + (y * c).toFixed(2); // CSS rotate(phi) maps (0,y) to (-y sin, y cos)
-    rope.style.height = (loopBot + 2) + 'px';
-    rope.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 0 L' + at(cy) + ' A ' + R + ' ' + R + ' 0 1 1 ' + at(loopBot) + ' A ' + R + ' ' + R + ' 0 1 1 ' + at(cy)));
-    ropeF.style.height = holeTop + 'px';
-    ropeF.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 0 L' + at(holeTop)));
+    const R = SIGN_LOOP_R, top = this.signTop, cy = top + SIGN_RING_CY, loopBot = cy + R * 2, holeTop = cy - SIGN_HOLE_R;
+    rope.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 -600 L0 ' + cy + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + loopBot + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + cy));
+    // front piece: only over the card, from its top edge down into the hole
+    ropeF.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 ' + top + ' L0 ' + holeTop.toFixed(2)));
   }
-  // pendulum angle phi swings the card about the anchor; torsion theta spins it about the rope axis
-  signRender() {
-    const p = this.signPhys(), pend = this.signPendRef.current, body = this.signBodyRef.current;
-    if (pend) {
-      const moving = p.drag || Math.abs(p.phi) > 0.02 || Math.abs(p.phv) > 0.2;
-      if (moving) { if (this.signSway) { pend.classList.remove('md-sign-pend'); this.signSway = false; } pend.style.transform = 'rotate(' + p.phi.toFixed(3) + 'deg)'; }
-      else { if (!this.signSway) { pend.classList.add('md-sign-pend'); this.signSway = true; } pend.style.transform = ''; }
-    }
+  // idle sway (degrees) added on top of the pendulum angle while the sign hangs untouched
+  signIdle(now) {
+    const p = this.signPhys(); if (!p.idleOn || this.reducedMotion) return 0;
+    const t = (now - p.idleT0) / 1000; return t > 0 ? SIGN_IDLE_AMP * Math.sin(t * Math.PI * 2 / SIGN_IDLE_T) : 0;
+  }
+  // drop-in offset (px) when the sign first appears
+  signDropY(now) {
+    if (this.signDropT0 == null || this.reducedMotion) return 0;
+    const t = (now - this.signDropT0) / 800; if (t >= 1) { this.signDropT0 = null; return 0; }
+    const K = [[0, -56], [0.55, 7], [0.75, -3], [1, 0]]; let i = 0; while (t > K[i + 1][0]) i++;
+    const u = (t - K[i][0]) / (K[i + 1][0] - K[i][0]), e = u * u * (3 - 2 * u); return K[i][1] + (K[i + 1][1] - K[i][1]) * e;
+  }
+  // pendulum angle phi (+ idle sway) swings both layers about the anchor; torsion theta spins the card about the rope axis
+  signRender(now) {
+    now = now || performance.now();
+    const p = this.signPhys(), body = this.signBodyRef.current, ang = p.phi + this.signIdle(now), dy = this.signDropY(now);
+    const xf = 'translate(0px,' + dy.toFixed(2) + 'px) rotate(' + ang.toFixed(3) + 'deg)';
+    if (this.signRef.current) this.signRef.current.style.transform = xf;
+    if (this.signRopeLayerRef.current) this.signRopeLayerRef.current.style.transform = xf;
     if (body && !this.reducedMotion) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
-    this.signRope();
   }
   signShow() {
     const el = this.signRef.current; if (!el) return;
     this.signPlace();
     el.style.opacity = '1';
     el.style.pointerEvents = 'auto';
+    if (this.signRopeLayerRef.current) this.signRopeLayerRef.current.style.opacity = '1';
     if (this.reducedMotion) {
       const body = this.signBodyRef.current, f = this.signFrontRef.current, b = this.signBackRef.current;
       if (body) body.style.transformStyle = 'flat';
       if (f) { f.style.backfaceVisibility = 'visible'; f.style.transition = 'opacity .3s ease'; f.style.opacity = '1'; }
       if (b) { b.style.transform = 'none'; b.style.backfaceVisibility = 'visible'; b.style.transition = 'opacity .3s ease'; b.style.opacity = '0'; }
       this.signFace = 0;
+      this.signRender();
       return;
     }
-    const drop = this.signDropRef.current;
-    if (drop) { drop.style.animation = 'none'; void drop.offsetWidth; drop.style.animation = 'mdSignDrop .8s cubic-bezier(.25,.85,.3,1.15) both'; }
-    this.signSway = true;
+    const p = this.signPhys(), now = performance.now();
+    this.signDropT0 = now;
+    p.idleOn = true; p.idleT0 = now + 1400;
     this.signRun();
   }
   signRun() {
@@ -357,12 +370,16 @@ class HomePage extends React.Component {
           p.theta += p.omega * dt;
         }
       }
-      this.signRender();
       const face = Math.round(p.theta / 180) * 180;
       const calmP = !p.drag && Math.abs(p.phi) < 0.15 && Math.abs(p.phv) < 1;
       const calmT = rm || (!p.drag && Math.abs(p.theta - face) < 0.05 && Math.abs(p.omega) < 0.5);
-      if (!calmP || !calmT) this.signRaf = requestAnimationFrame(step);
-      else { this.signRaf = null; p.phi = 0; p.phv = 0; if (!rm) { p.theta = face; p.omega = 0; } this.signRender(); }
+      // pendulum settled: hand back to the idle sway, which starts at angle 0 so there is no jump
+      if (calmP && !rm && !p.idleOn) { p.phi = 0; p.phv = 0; p.idleOn = true; p.idleT0 = now; }
+      if (calmT && !rm) { p.theta = face; p.omega = 0; }
+      this.signRender(now);
+      // idle sway and the drop-in keep the loop alive; reduced motion stops once the pendulum is still
+      if (!rm || !calmP) this.signRaf = requestAnimationFrame(step);
+      else { this.signRaf = null; p.phi = 0; p.phv = 0; this.signRender(now); }
     };
     this.signRaf = requestAnimationFrame(step);
   }
@@ -385,7 +402,8 @@ class HomePage extends React.Component {
   signMove(e) {
     const p = this.sp; if (!p || !p.down) return;
     const dx = e.clientX - p.sx, dy = e.clientY - p.sy;
-    if (!p.moved) { if (Math.abs(dx) <= 6 && Math.abs(dy) <= 6) return; p.moved = true; p.drag = true; p.px = e.clientX; p.py = e.clientY; p.pt = performance.now(); p.hist = []; }
+    if (!p.moved) { if (Math.abs(dx) <= 6 && Math.abs(dy) <= 6) return; p.moved = true; p.drag = true; p.px = e.clientX; p.py = e.clientY; p.pt = performance.now(); p.hist = [];
+      if (p.idleOn) { p.phi += this.signIdle(p.pt); p.idleOn = false; p.st0 = p.phi; } } // grabbing takes over from the idle sway at its current angle
     const now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
     let ang = Math.atan2(e.clientX - p.ax, e.clientY - p.ay) - p.a0;
     while (ang > Math.PI) ang -= Math.PI * 2;
@@ -651,9 +669,9 @@ class HomePage extends React.Component {
       <div className={`sc-host ${styles.root}`} data-sc-name="orig">
         <div style={{overflowX:"clip"}}>
           <section ref={v.heroRef} data-screen-label="01 Hero" style={v.launchMode ? {position:"relative",background:"#386641",overflow:"hidden",height:"100vh"} : {position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
-            {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <div data-h="sign" ref={this.signRef} className="md-sign-pend" style={{position:"fixed",left:"50%",top:"0",zIndex:"0",transform:"translateX(-50%)",transformOrigin:"0px 0px",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease"}}><div ref={this.signDropRef} style={{position:"absolute",top:"0",left:"0"}}><svg data-rope="back" ref={this.signRopeRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg><div ref={this.signPendRef} className="md-sign-pend" style={{position:"absolute",top:"0",left:"0",transformOrigin:"0px 0px"}}><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} data-face="front" style={sFace}>{heroCopy.launchingSoon}<span data-eyelet="1" style={sEyelet}></span></div><div ref={this.signBackRef} data-face="back" style={{...sFace,background:"#ffffff",color:"#111111",position:"absolute",top:"0",left:"0",right:"0",bottom:"0",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}<span data-eyelet="1" style={sEyelet}></span></div></div></div></div></div><svg data-rope="front" ref={this.signRopeFrontRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none",zIndex:"5"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div></div>}{' '}
+            {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <>{/* launch sign: rope layer (z1, under the wordmark) and card layer (z3, over it) share one transform */}<div data-h="rope" ref={this.signRopeLayerRef} aria-hidden="true" style={{position:"fixed",left:"50%",top:"0",width:"0",height:"0",transformOrigin:"0px 0px",transform:"translate(0px,0px) rotate(0deg)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease",zIndex:"1"}}><svg data-rope="back" ref={this.signRopeRef} style={{position:"absolute",left:"0",top:"0",width:"1px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div><div data-h="sign" ref={this.signRef} style={{position:"fixed",left:"50%",top:"0",width:"0",height:"0",transformOrigin:"0px 0px",transform:"translate(0px,0px) rotate(0deg)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease",zIndex:"3"}}><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} data-face="front" style={sFace}>{heroCopy.launchingSoon}<span data-eyelet="1" style={sEyelet}></span></div><div ref={this.signBackRef} data-face="back" style={{...sFace,background:"#ffffff",color:"#111111",position:"absolute",top:"0",left:"0",right:"0",bottom:"0",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}<span data-eyelet="1" style={sEyelet}></span></div></div></div></div><svg data-rope="front" ref={this.signRopeFrontRef} style={{position:"absolute",left:"0",top:"0",width:"1px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div></>}{' '}
             <div ref={v.cityRef} style={{position:"absolute",left:"0",right:"0",bottom:"0",height:"320px",zIndex:"0",pointerEvents:"none",transform:"translateY(100%)",transition:"transform 1.3s cubic-bezier(.2,.8,.2,1)"}}></div>{' '}
-            <div style={{position:"relative",zIndex:"1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
+            <div style={{position:"relative",zIndex:v.launchMode ? "2" : "1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
               <div style={{position:"relative",zIndex:"3",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"24px",padding:"24px 0",flexWrap:"wrap"}}>
                 <div data-h="logo" style={{position:"relative",zIndex:"5",fontSize:"28px",fontWeight:"900",letterSpacing:"-.035em",color:"#fff",opacity:"0",transformOrigin:"50% 50%"}}>{heroCopy.logo.split('').map((ch, i) => <span key={i} data-l="1" style={{display:"inline-block"}}>{ch}</span>)}</div>
                 {!v.launchMode ? <div style={{display:"flex",alignItems:"center",gap:"28px",flexWrap:"wrap",fontSize:"15px",fontWeight:"700"}}>
