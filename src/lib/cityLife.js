@@ -74,6 +74,7 @@ export class CityLife {
 
     this.readVehicles();
     this.makeCanvas();
+    if (this.night) { this.addLights(); this.lightWindows(); }
   }
 
   // ---------- setup ----------
@@ -105,6 +106,46 @@ export class CityLife {
       if (ld.fr - ld.len - f.fr < S0) f.fr = ld.fr - ld.len - S0 - 30;
     }
     base.forEach(v => { v.x = v.fr - v.bx0 - v.len; delete v.fr; this.setActive(v, true); });
+  }
+
+  // night mode: headlights, tail lights and lit windows
+  addLights() {
+    const id = 'cl-cone-' + this.seed;
+    const defs = document.createElementNS(SVGNS, 'defs');
+    defs.setAttribute('data-cl', '1');
+    defs.innerHTML = '<linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffd66b" stop-opacity=".35"></stop><stop offset="1" stop-color="#ffd66b" stop-opacity="0"></stop></linearGradient>';
+    this.svg.insertBefore(defs, this.svg.firstChild);
+    this.vehicles.forEach(v => {
+      const y = v.bbY + v.bbH * 0.62, F = v.bx0 + v.len - 0.5;
+      const tmp = document.createElementNS(SVGNS, 'g');
+      tmp.innerHTML = '<polygon data-cl="1" points="' + F + ',' + (y - 2) + ' ' + F + ',' + (y + 2) + ' ' + (F + 48) + ',' + (y + 10) + ' ' + (F + 48) + ',' + (y - 8) + '" fill="url(#' + id + ')"></polygon>'
+        + '<circle data-cl="1" cx="' + F + '" cy="' + y + '" r="2" fill="#ffd66b"></circle>'
+        + '<rect data-cl="1" x="' + (v.bx0 - 1) + '" y="' + (y - 1.5) + '" width="2.5" height="3" rx=".6" fill="#e63946"></rect>';
+      while (tmp.firstChild) v.g.appendChild(tmp.firstChild);
+    });
+  }
+
+  lightWindows() {
+    this.lit = [];
+    this.svg.querySelectorAll('[data-scroll]').forEach((sc, tile) => {
+      Array.from(sc.children).filter(c => c.tagName.toLowerCase() === 'g').slice(0, 3).forEach(copy => {
+        copy.querySelectorAll('rect[data-w]').forEach((r, k) => {
+          if (mulberry32(this.seed * 1000003 ^ tile * 7919 ^ k * 104729)() >= 0.30) return;
+          this.lit.push({ r, anim: r.style.animation });
+          r.style.animation = 'none'; r.style.fill = '#f6c453'; r.style.fillOpacity = '0.85';
+          r.setAttribute('data-lit', '1');
+        });
+      });
+    });
+  }
+
+  clearLights() {
+    if (this.svg) this.svg.querySelectorAll('[data-cl]').forEach(n => n.remove());
+    (this.lit || []).forEach(({ r, anim }) => {
+      r.style.animation = anim; r.style.removeProperty('fill'); r.style.removeProperty('fill-opacity');
+      r.removeAttribute('data-lit');
+    });
+    this.lit = [];
   }
 
   makeCanvas() {
@@ -196,6 +237,7 @@ export class CityLife {
     this.destroyed = true;
     if (this.canvas) this.canvas.remove();
     this.clearStormClouds();
+    this.clearLights();
     this.skyEls.forEach(g => { g.style.removeProperty('transition'); g.style.removeProperty('opacity'); });
     this.cloudEls.forEach(g => {
       const p = g.querySelector('path');
