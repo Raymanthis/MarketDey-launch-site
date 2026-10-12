@@ -3,10 +3,8 @@
   "launchingSoon": "We're launching soon",
   "launchingSoonBack": "i go lie for you?",
   "storeBadges": {
-    "appStoreAlt": "Download on the App Store",
-    "appStoreUrl": "",
-    "googlePlayAlt": "Get it on Google Play",
-    "googlePlayUrl": ""
+    "appStoreAlt": "Coming to iPhone (App Store)",
+    "googlePlayAlt": "Coming to Android (Google Play)"
   },
   "logo": "Marketdey",
   "howItWorks": "How it works",
