@@ -426,8 +426,7 @@ def street(y_start=-12.0, y_end=132.0):
     for side in (-1, 1):
         def X(x):
             return side * x
-        S.box((X(3.5), y_start, -0.55), (X(3.66), yb, 0.2), mat="kerb")             # kerb wall
-        S.box((X(3.48), y_start, 0.19), (X(3.68), yb, 0.23), mat="kerb")            # kerb cap
+        S.box((X(3.5), y_start, -0.55), (X(3.66), yb, 0.22), mat="kerb")            # kerb wall
         S.box((X(3.95), y_start, -0.55), (X(4.1), yb, BASE), mat="kerb")            # back wall
         S.box((X(3.6), y_start, -0.62), (X(4.0), yb, -0.5), mat="channel")          # channel floor
         S.box((X(4.05), y_start, -0.3), (X(WALK_OUT), yb, BASE), mat="walk")        # walkway
