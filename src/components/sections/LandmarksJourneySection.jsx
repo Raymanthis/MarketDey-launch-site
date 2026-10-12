@@ -3,6 +3,7 @@
 import React from 'react';
 import LandmarkPhone from '@/components/sections/LandmarkPhone';
 import content from '@/content/landmarks-journey.json';
+import { MAP_END, RIDE_START, RIDE_END, REVEAL, clamp, sstep, S0, PX, PZ, SMAX, fr, W, LS, LSD, SB, MK, TS0, TS1, headS, makeRideCamera } from '@/lib/rideCamera';
 import './LandmarksJourneySection.global.css';
 
 const LM = content.landmarks;
@@ -17,11 +18,6 @@ const TIPS = [
 ];
 const TIP_AT = [0, 0.095, 0.155, 0.215, 0.275, 0.335, 0.395];
 const STOPS = [0.12, 0.3, 0.48, 0.66, 0.84];
-const KP = [0, 0.12, 0.3, 0.48, 0.66, 0.84, 0.95, 1];
-const MAP_END = 0.47, RIDE_START = 0.56, RIDE_END = 1, REVEAL = 1 / 17;
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const sstep = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-const interp = (p, xs, ys) => { for (let i = 1; i < xs.length; i++) if (p <= xs[i]) { const t = (p - xs[i - 1]) / (xs[i] - xs[i - 1]); const e = t * t * (3 - 2 * t); return ys[i - 1] + (ys[i] - ys[i - 1]) * e; } return ys[ys.length - 1]; };
 const stepFor = p => { if (p >= 0.95) return 6; let s = 0; STOPS.forEach(t => { if (p >= t - 0.05) s++; }); return s; };
 
 class LandmarksJourneySection extends React.Component {
@@ -100,12 +96,7 @@ class LandmarksJourneySection extends React.Component {
     const LMAT = {}, lineMat = c => LMAT[c] || (LMAT[c] = new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: 0.92 }));
     const groundMat = new THREE.MeshBasicMaterial({ color: PAPER }); { const gp = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), groundMat); gp.rotation.x = -Math.PI / 2; gp.position.set(0, -0.02, -150); scene.add(gp); }
     let seed = 11; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-    // road centreline: straight, LEFT, straight, RIGHT, straight, LEFT, straight
-    const DS = 0.5, S0 = -420, PX = [0], PZ = [0], PT = [0];
-    { let x = 0, z = 0, th = 0; for (const [len, deg] of [[100, 0], [22, 90], [110, 0], [22, -90], [126, 0], [95, 0], [30, -55], [30, 0], [34, 70], [25, 0], [26, -50], [210, 0]]) { const n = Math.round(len / DS), k = deg * Math.PI / 180 / n; for (let i = 0; i < n; i++) { th += k / 2; x += Math.sin(th) * DS; z -= Math.cos(th) * DS; th += k / 2; PX.push(x); PZ.push(z); PT.push(th); } } }
-    const SMAX = S0 + (PX.length - 1) * DS;
-    const fr = s => { const f = Math.min(Math.max((s - S0) / DS, 0), PX.length - 1.001), i = Math.floor(f), u = f - i; return [PX[i] + (PX[i + 1] - PX[i]) * u, PZ[i] + (PZ[i + 1] - PZ[i]) * u, PT[i] + (PT[i + 1] - PT[i]) * u]; };
-    const W = (s, lat) => { const [x, z, t] = fr(s); return [x + Math.cos(t) * lat, z + Math.sin(t) * lat]; };
+    // road centreline, fr, W: src/lib/rideCamera.js
     let TX = 0, TZ = 0, TC = 1, TS = 0, TR = 0;
     const setT = (s, lat) => { const [x, z, t] = fr(s); TC = Math.cos(t); TS = Math.sin(t); TR = t; TX = x + TC * lat; TZ = z + TS * lat; };
     const setW = () => { TX = 0; TZ = 0; TC = 1; TS = 0; TR = 0; };
@@ -243,8 +234,7 @@ class LandmarksJourneySection extends React.Component {
       circX('ink', -0.67, 0.3, 0.75, 0.3, 14); circX('ink', 0.67, 0.3, 0.75, 0.3, 14); circX('ink', 0, 0.28, -1.05, 0.28, 14); circX('fine', -0.68, 0.3, 0.75, 0.12, 8); circX('fine', 0.68, 0.3, 0.75, 0.12, 8); };
     const veh = (s, lat, flip, fn) => { setT(s, lat); if (flip) { TC = -TC; TS = -TS; TR += Math.PI; } fn(); };
     // landmarks, boards and their clearances go in first
-    const LS = [40, 100, 160, 215, 245], LSD = [1, -1, 1, -1, -1], SB = [28, 88, 144, 203, 228];
-    const MK = [[11, 8, 40], [-12, 15.5, 100], [8, 5.4, 160], [-10.4, 14.5, 209.8], [-6.4, 10.4, 245]];
+    // LS, LSD, SB, MK: src/lib/rideCamera.js
     [[40, 4.6, 20, -14, 14], [100, -20, -4.6, -9, 9], [160, 4.6, 10, -11, 11], [215, -22, -4.6, -9.5, 9.5], [245, -62, -4.6, -16, 16]].forEach(([s, a, b, c, d]) => { setT(s, 0); FOOT.push(quad(a, b, c, d)); });
     SB.forEach((s, i) => { setT(s, 0); FOOT.push(LSD[i] > 0 ? quad(4.6, 7.4, -2.6, 2.6) : quad(-7.4, -4.6, -2.6, 2.6)); });
     // side streets: same in the map and on the ground
@@ -366,13 +356,10 @@ class LandmarksJourneySection extends React.Component {
     mapGrp.add(new THREE.Mesh(quadsGeo(patches, 0.002), patchMat));
     mapGrp.add(new THREE.Mesh(ribbon(S0, SMAX, 5.8, 0.004, 1), casingMat)); mapGrp.add(new THREE.Mesh(quadsGeo(sideQ.map(q => grow(q, 1.1)), 0.004), casingMat));
     mapGrp.add(new THREE.Mesh(ribbon(S0, SMAX, 4.7, 0.006, 1), roadMat)); mapGrp.add(new THREE.Mesh(quadsGeo(sideQ, 0.006), roadMat));
-    const TS0 = S0 + 4, TS1 = -14, TDS = 1, trailMesh = new THREE.Mesh(ribbon(TS0, TS1, 1.15, 0.35, TDS), trailMat); trailMesh.renderOrder = 10; mapGrp.add(trailMesh);
+    const TDS = 1, trailMesh = new THREE.Mesh(ribbon(TS0, TS1, 1.15, 0.35, TDS), trailMat); trailMesh.renderOrder = 10; mapGrp.add(trailMesh);
     const C_BLOCK = new THREE.Color('#ddd6c9'), C_PAPER = new THREE.Color(PAPER), C_BG = new THREE.Color('#ebe8e1'), prj = new THREE.Vector3();
     let hdS, keyS, ltS = 0, projS = null;
-    const Q_GATE = 0.84, camP = new THREE.Vector3(), look0 = new THREE.Vector3();
-    const gateCurve = new THREE.CatmullRomCurve3([[216, 1.3], [228, 1.1], [237, -0.6], [242.5, -4.2], [245, -9], [245, -20], [245, -36]].map(([s, l]) => { const [x, z] = W(s, l); return new THREE.Vector3(x, 1.75, z); }), false, 'centripetal');
-    const [gX, gZ] = W(245, -6.4);
-    const gateFar = (() => { const [x, z] = W(245, -60); return new THREE.Vector3(x, 1.9, z); })();
+    const rig = makeRideCamera(THREE), { gX, gZ } = rig;
     // signboards + number markers
     const roundRect = (k, x, y, w, h, r) => { k.beginPath(); k.moveTo(x + r, y); k.arcTo(x + w, y, x + w, y + h, r); k.arcTo(x + w, y + h, x, y + h, r); k.arcTo(x, y + h, x, y, r); k.arcTo(x, y, x + w, y, r); k.closePath(); };
     const boardTex = (n, l) => {
@@ -408,15 +395,13 @@ class LandmarksJourneySection extends React.Component {
       [-1.7, 1.7].forEach(x => { const m = new THREE.Mesh(postG, fillMat); m.position.set(x, 1.45, -0.06); grp.add(m); const e = new THREE.LineSegments(postE, lineMat(INK)); e.position.copy(m.position); grp.add(e); });
       const [bx, bz] = W(SB[i], sd * 5.9); grp.position.set(bx, -8, bz); grp.rotation.y = -fr(SB[i])[2] + (sd > 0 ? -0.5 : 0.5); scene.add(grp); boards.push({ grp, s: SB[i] });
       const [px, pz] = W(MK[i][2], MK[i][0]); const sp = i === 4 ? (() => { const g = coinPin(), [cx, cz] = W(245, -5.2); g.userData.at = [cx, cz]; return g; })() : new THREE.Sprite(new THREE.SpriteMaterial({ map: pinTex(i + 1), transparent: true })); sp.position.set(px, MK[i][1], pz); sp.scale.set(2.2, 2.2, 1); scene.add(sp); pins.push(sp); });
-    const KS = [-14, 10, 70, 130, 185, 216, 235, 235];
-    const look = new THREE.Vector3(), ahead = new THREE.Vector3(), tgt = new THREE.Vector3();
     const self = this;
     this.three = {
       resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); },
       dispose() { renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); },
       render(st, t) {
         const { k, e, q } = st, e1 = sstep(0, 1, e);
-        const sHead = k < 1 ? TS0 + k * (TS1 - 30 - TS0) : TS1 - 30 + 30 * clamp(e / 0.45, 0, 1), th = fr(sHead)[2];
+        const sHead = headS(k, e), th = fr(sHead)[2];
         if (hdS === undefined) hdS = th; hdS += (th - hdS) * 0.12;
         const key = [k, e, q, hdS, st.f].map(v => v.toFixed(4)).join();
         if (key === keyS && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS; keyS = key; ltS = t;
@@ -427,22 +412,7 @@ class LandmarksJourneySection extends React.Component {
         [casingMat, roadMat, patchMat].forEach(m => { m.opacity = roadK; m.visible = roadK > 0.002; }); trailMat.opacity = trailK; trailMat.visible = trailK > 0.002;
         scene.fog.near = 60 + (1 - e1) * 3000; scene.fog.far = 290 + (1 - e1) * 6000;
         trailMesh.geometry.setDrawRange(0, Math.max(0, Math.round((sHead - TS0) / TDS)) * 6);
-        const roll = sstep(-338, -302, sHead), ra = Math.PI * (1 - roll), fx = Math.sin(hdS + ra), fz = -Math.cos(hdS + ra), [hx, hz] = W(sHead, 0), Hm = 95, ffin = st.f + (0.58 - st.f) * roll, off = (ffin - 0.5) * 105.3;
-        const roadCam = qq => { const s1 = interp(qq, KP, KS), [rx, rz] = W(s1, 1.3), [ax, az] = W(s1 + 26, 0.6); look.set(ax, 1.9, az);
-          let wMax = 0, wi = -1; LS.forEach((ls, i) => { const d = ls - s1, w = Math.max(0, 1 - Math.abs(d - 30) / 22) * 0.5; if (w > wMax) { wMax = w; wi = i; } });
-          if (wi >= 0) { const [mx, mz] = W(LS[wi], MK[wi][0] * 0.8); tgt.set(mx, 3.4, mz); look.lerp(tgt, wMax); }
-          camP.set(rx, 1.75 + Math.sin(s1 * 0.8) * 0.04, rz); return s1; };
-        let sc;
-        if (q <= Q_GATE) sc = roadCam(q);
-        else { roadCam(Q_GATE); look0.copy(look); const u = 0.6 * sstep(0, 1, (q - Q_GATE) / (1 - Q_GATE)); gateCurve.getPointAt(u, camP); camP.y = 1.75;
-          if (u + 0.08 <= 1) gateCurve.getPointAt(u + 0.08, tgt); else { gateCurve.getPointAt(1, tgt); tgt.lerp(gateFar, (u + 0.08 - 1) / 0.08); }
-          tgt.y = 1.9; look.copy(look0).lerp(tgt, sstep(0, 0.3, u)); sc = 216 + u * 29; }
-        const cx = camP.x, cy = camP.y, cz = camP.z;
-        if (e < 1) { const mx = hx + fx * off, mz = hz + fz * off;
-          camera.position.set(mx + (cx - mx) * e1, Hm + (cy - Hm) * e1, mz + (cz - mz) * e1);
-          tgt.set(mx + (look.x - mx) * e1, look.y * e1, mz + (look.z - mz) * e1);
-          camera.up.set(fx * (1 - e1), e1, fz * (1 - e1)).normalize(); camera.lookAt(tgt); }
-        else { camera.position.set(cx, cy, cz); camera.up.set(0, 1, 0); camera.lookAt(look); }
+        const { sc, hx, hz, roll } = rig.pose(camera, st, sHead, hdS);
         boards.forEach(b => { const d = b.s - sc, rise = sstep(70, 34, d); b.grp.position.y = -8 * (1 - rise); b.grp.visible = e >= 1; });
         const step = stepFor(q);
         pins.forEach((sp, i) => { sp.visible = e >= 1; if (sp.userData.coin) { const at = sp.userData.at; sp.position.set(at[0], 1.25 + Math.sin(t / 520) * 0.18, at[1]); sp.rotation.y = t / 650; sp.scale.set(1.6, 1.6, 1.6); return; } const cur = step === i + 1; const s2 = cur ? 3 + Math.sin(t / 280) * 0.15 : 2.1; sp.scale.set(s2, s2, 1); });
