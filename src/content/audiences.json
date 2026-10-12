@@ -4,38 +4,74 @@
       "bg": {
         "id": "who-commuters-bg",
         "placeholder": "Wide photo: traffic jam on a road beside a busy market (2400×1500)",
-        "src": null,
-        "alt": "Wide photo: traffic jam on a road beside a busy market (2400×1500)"
+        "src": "/images/audiences/who-commuters-bg.jpg",
+        "alt": "Heavy traffic on a Lagos highway",
+        "attribution": {
+          "author": "Koutchika Lihouenou Gaspard",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Lagos_Traffic_1.jpg"
+        }
       },
       "detail": {
         "id": "who-commuters-detail",
         "placeholder": "Portrait: driver or okada rider stuck in traffic (1200×1500)",
-        "src": null,
-        "alt": "Portrait: driver or okada rider stuck in traffic (1200×1500)"
+        "src": "/images/audiences/who-commuters-detail.jpg",
+        "alt": "Okada riders and drivers at a busy junction",
+        "attribution": {
+          "author": "Veevianne90",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Okada_and_Drivers.jpg"
+        }
       },
       "detail2": {
         "id": "who-commuters-detail-2",
         "placeholder": "Close-up: danfo or keke in traffic (1200×900)",
-        "src": null,
-        "alt": "Close-up: danfo or keke in traffic (1200×900)"
+        "src": "/images/audiences/who-commuters-detail-2.jpg",
+        "alt": "Yellow danfo bus and a traffic officer",
+        "attribution": {
+          "author": "Juwon Muhammed",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Danfo_and_Police.jpg"
+        }
       },
       "m1": {
         "id": "who-commuters-m1",
         "placeholder": "keke passenger",
-        "src": null,
-        "alt": "keke passenger"
+        "src": "/images/audiences/who-commuters-m1.jpg",
+        "alt": "Keke napep tricycle on the move",
+        "attribution": {
+          "author": "Joseph Slyboy",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Keke_napep_on_motion.jpg"
+        }
       },
       "m2": {
         "id": "who-commuters-m2",
         "placeholder": "roadside hawker",
-        "src": null,
-        "alt": "roadside hawker"
+        "src": "/images/audiences/who-commuters-m2.jpg",
+        "alt": "Hawker in Lagos chasing after a bus",
+        "attribution": {
+          "author": "Periye",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Traffic_Hawker_in_lagos_chasing_after_a_bus.jpg"
+        }
       },
       "m3": {
         "id": "who-commuters-m3",
         "placeholder": "traffic warden",
-        "src": null,
-        "alt": "traffic warden"
+        "src": "/images/audiences/who-commuters-m3.jpg",
+        "alt": "Traffic warden directing cars",
+        "attribution": {
+          "author": "VinoTinto",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Traffic_Warden.jpg"
+        }
       }
     },
     "number": "01",
@@ -52,38 +88,74 @@
       "bg": {
         "id": "who-shoppers-bg",
         "placeholder": "Wide photo: crowded open market, traders and buyers at stalls (2400×1500)",
-        "src": null,
-        "alt": "Wide photo: crowded open market, traders and buyers at stalls (2400×1500)"
+        "src": "/images/audiences/who-shoppers-bg.jpg",
+        "alt": "Busy open market in Eastern Nigeria",
+        "attribution": {
+          "author": "Ossy Mbagwu",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Market_in_Eastern_Nigeria.jpg"
+        }
       },
       "detail": {
         "id": "who-shoppers-detail",
         "placeholder": "Portrait: hands exchanging tomatoes, peppers or naira notes (1200×1500)",
-        "src": null,
-        "alt": "Portrait: hands exchanging tomatoes, peppers or naira notes (1200×1500)"
+        "src": "/images/audiences/who-shoppers-detail.jpg",
+        "alt": "Buckets of tomatoes at a Monday market",
+        "attribution": {
+          "author": "Dorcas Atule",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Tomato_at_monday_market_03.jpg"
+        }
       },
       "detail2": {
         "id": "who-shoppers-detail-2",
         "placeholder": "Close-up: basins of produce on a stall (1200×900)",
-        "src": null,
-        "alt": "Close-up: basins of produce on a stall (1200×900)"
+        "src": "/images/audiences/who-shoppers-detail-2.jpg",
+        "alt": "Trader with baskets of tomatoes and peppers",
+        "attribution": {
+          "author": "Ummigarba",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:From_the_farm_to_your_plate.jpg"
+        }
       },
       "m1": {
         "id": "who-shoppers-m1",
         "placeholder": "trader weighing garri",
-        "src": null,
-        "alt": "trader weighing garri"
+        "src": "/images/audiences/who-shoppers-m1.jpg",
+        "alt": "Market woman selling garri at Ipata market",
+        "attribution": {
+          "author": "Ee nn yy",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:A_market_woman_selling_garri_at_Ipata_market.jpg"
+        }
       },
       "m2": {
         "id": "who-shoppers-m2",
         "placeholder": "pepper and tomatoes",
-        "src": null,
-        "alt": "pepper and tomatoes"
+        "src": "/images/audiences/who-shoppers-m2.jpg",
+        "alt": "Peppers and tomatoes on a market stall",
+        "attribution": {
+          "author": "Midey pearl",
+          "license": "CC0",
+          "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "https://commons.wikimedia.org/wiki/File:Pepper_and_tomatoes_19_03_2025.jpg"
+        }
       },
       "m3": {
         "id": "who-shoppers-m3",
         "placeholder": "buyer with shopping bag",
-        "src": null,
-        "alt": "buyer with shopping bag"
+        "src": "/images/audiences/who-shoppers-m3.jpg",
+        "alt": "Trader at her market stall",
+        "attribution": {
+          "author": "Johnnybam",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Abacha_Seller_at_Her_Shop.jpg"
+        }
       }
     },
     "label": "MARKET-DAY SHOPPERS",
@@ -102,38 +174,74 @@
       "bg": {
         "id": "who-seekers-bg",
         "placeholder": "Wide photo: person on their phone at a roadside or bus stop (2400×1500)",
-        "src": null,
-        "alt": "Wide photo: person on their phone at a roadside or bus stop (2400×1500)"
+        "src": "/images/audiences/who-seekers-bg.jpg",
+        "alt": "People at the BRT bus stop in Mile 12",
+        "attribution": {
+          "author": "Olatunbosun Success",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:BRT_Bus_stop_in_Mile12.jpg"
+        }
       },
       "detail": {
         "id": "who-seekers-detail",
         "placeholder": "Portrait: a stack of yams or bolts of fabric at a well-known market (1200×1500)",
-        "src": null,
-        "alt": "Portrait: a stack of yams or bolts of fabric at a well-known market (1200×1500)"
+        "src": "/images/audiences/who-seekers-detail.jpg",
+        "alt": "Stack of yam tubers at a market",
+        "attribution": {
+          "author": "Charlie.Smatt",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Tubers_of_Yam.jpg"
+        }
       },
       "detail2": {
         "id": "who-seekers-detail-2",
         "placeholder": "Close-up: phone screen showing a market search (1200×900)",
-        "src": null,
-        "alt": "Close-up: phone screen showing a market search (1200×900)"
+        "src": "/images/audiences/who-seekers-detail-2.jpg",
+        "alt": "Smartphone showing a navigation map",
+        "attribution": {
+          "author": "Santeri Viinamäki",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Smartphone_with_navigation_map_app.jpg"
+        }
       },
       "m1": {
         "id": "who-seekers-m1",
         "placeholder": "bolts of ankara fabric",
-        "src": null,
-        "alt": "bolts of ankara fabric"
+        "src": "/images/audiences/who-seekers-m1.jpg",
+        "alt": "Stacks of colourful wax-print fabric",
+        "attribution": {
+          "author": "Virginia Wanjiru",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:PeaceCorpsUganda-Arua.jpg"
+        }
       },
       "m2": {
         "id": "who-seekers-m2",
         "placeholder": "person checking a map",
-        "src": null,
-        "alt": "person checking a map"
+        "src": "/images/audiences/who-seekers-m2.jpg",
+        "alt": "Woman checking her phone while crossing the road",
+        "attribution": {
+          "author": "N509FZ",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:A_woman_crossing_G103_for_Huoma_Rd_at_Huoxian_Town,_Beijing_(20240412141828).jpg"
+        }
       },
       "m3": {
         "id": "who-seekers-m3",
         "placeholder": "yam barn",
-        "src": null,
-        "alt": "yam barn"
+        "src": "/images/audiences/who-seekers-m3.jpg",
+        "alt": "Farmer tending a yam barn",
+        "attribution": {
+          "author": "Chukwukajustice",
+          "license": "CC BY-SA 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Yam_Barn_1.jpg"
+        }
       }
     },
     "number": "03",
