@@ -173,6 +173,11 @@ LINESETS = {
                  (35.0, 160.0), 0.18),
     "fine": (("fine",), ("silhouette", "border", "external_contour", "crease", "material_boundary"), (), 0.85,
              (40.0, 170.0), 0.2),
+    # people and vehicles: drawn, not shaded. A firm outline plus interior lines (garment and
+    # panel boundaries, inner contours, creases) at a medium weight
+    "fig_outline": (("figures",), ("silhouette", "border", "external_contour"), (), 1.45, (60.0, 220.0), 0.22),
+    "fig_inner": (("figures",), ("contour", "crease", "material_boundary"), ("silhouette", "border", "external_contour"),
+                  0.85, (40.0, 160.0), 0.18),
     "wires": (("wires",), ("silhouette", "border", "external_contour"), (), 0.75, (90.0, 320.0), 0.12),
     # foliage: only the outline of each tree's whole leaf mass (contour), never clump-by-clump
     "foliage": (("foliage",), ("silhouette", "external_contour"), (), 1.1, (60.0, 240.0), 0.0),
