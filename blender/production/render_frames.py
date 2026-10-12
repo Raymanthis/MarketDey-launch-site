@@ -4,7 +4,7 @@
         [--frames 0,28,110]  [--samples 64]  [--skip-existing]
 
 Camera i comes from section.json frames[i] (the section's camera at pAt[i], Three.js scene
-coordinates), converted to Blender. The city root is scaled in z by frames[i].grow, as the section
+coordinates), converted to Blender; the portrait variant uses frames[i].quatP (contract rev 2). The city root is scaled in z by frames[i].grow, as the section
 scales `city` during the tilt. Writes out/passes/<variant>/<iiii>.exr; then
 `$BPY blender/lookdev/composite.py --white ...` turns them into frames over white paper.
 """
@@ -58,7 +58,7 @@ def args():
     return o
 
 
-def set_camera(scene, fr):
+def set_camera(scene, fr, variant="l"):
     cam = scene.camera
     if cam is None:
         cd = bpy.data.cameras.new("cam")
@@ -67,7 +67,7 @@ def set_camera(scene, fr):
         scene.camera = cam
     p = fr["pos"]
     cam.location = Vector((p[0], -p[2], p[1]))
-    qx, qy, qz, qw = fr["quat"]
+    qx, qy, qz, qw = fr["quatP"] if variant == "p" and "quatP" in fr else fr["quat"]
     cam.rotation_mode = "QUATERNION"
     cam.rotation_quaternion = Q_THREE_TO_BLENDER @ Quaternion((qw, qx, qy, qz))
     cd = cam.data
@@ -103,7 +103,7 @@ def main():
             if o["skip"] and os.path.exists(os.path.join(d, name + ".exr")):
                 continue
             fr = frames[i]
-            set_camera(scene, fr)
+            set_camera(scene, fr, v)
             root.scale = (1.0, 1.0, fr["grow"])
             R.setup_compositor(scene, d, name)
             t0 = time.time()
