@@ -59,6 +59,8 @@ SPECS = {
     "shoes": dict(toon=True, albedo=0.32), "cloth_light": dict(toon=True, albedo=0.95), "cloth_dark": dict(toon=True, albedo=0.6),
     "basin": dict(toon=True, albedo=0.8), "goods": dict(toon=True, albedo=0.62),
     # production additions
+    "verge": dict(albedo=0.94, ao=0.75),
+    "road_uv": dict(albedo=0.95, ao=0.6, lines=[("V", 1.75, 0.02, 70.0, 0.22, 0.875)]),
     "tile": dict(albedo=0.92, lines=[("Z", 0.3, 0.008, 25.0, 0.5, 0.0), ("X", 0.3, 0.008, 25.0, 0.45, 0.0),
                                      ("Y", 0.3, 0.008, 25.0, 0.45, 0.0)]),
     "earth": dict(albedo=0.88, ao=0.4), "canopy_yellow": dict(albedo=0.9), "canopy_band": dict(albedo=0.42),
@@ -330,15 +332,18 @@ def make(name, spec):
         step = N.new("ShaderNodeRGBToBW")
         L.new(ramp.outputs[0], step.inputs[0])
         shade = op("SUBTRACT", 1.0, step.outputs[0])            # 0 lit .. 0.34 darkest
-        hg = N.new("ShaderNodeGroup")
-        hg.node_tree = lines_group()
+        # hatch lines at a constant ~5 px spacing on screen: world diagonal coordinate divided by
+        # the size of a pixel at this depth (view distance x 0.0011 m/px at 1000 px height)
         geo_ = N.new("ShaderNodeNewGeometry")
         sep = N.new("ShaderNodeSeparateXYZ")
         L.new(geo_.outputs["Position"], sep.inputs[0])
-        L.new(op("ADD", op("ADD", sep.outputs["X"], sep.outputs["Y"]), op("MULTIPLY", sep.outputs["Z"], 1.4)), hg.inputs["Coord"])
-        for k, v in (("Period", 0.045), ("Width", 0.006), ("Fade end", 40.0), ("Strength", 1.0)):
-            hg.inputs[k].default_value = v
-        hatch = op("SUBTRACT", 1.0, hg.outputs[0])              # 1 on a hatch line
+        cam = N.new("ShaderNodeCameraData")
+        diag = op("ADD", op("ADD", sep.outputs["X"], sep.outputs["Y"]), op("MULTIPLY", sep.outputs["Z"], 1.4))
+        per = op("MAXIMUM", op("MULTIPLY", cam.outputs["View Distance"], 0.0062), 0.004)
+        fr_ = op("FRACT", op("DIVIDE", diag, per), 0)
+        dline = op("ABSOLUTE", op("SUBTRACT", fr_, 0.5), 0)
+        hline = op("MINIMUM", op("MAXIMUM", op("MULTIPLY", op("SUBTRACT", dline, 0.38), 9.0), 0.0), 1.0)
+        hatch = hline                                           # 1 on a hatch line
         hk = op("MINIMUM", op("MULTIPLY", shade, 2.4), 0.75)    # hatch only where in shade
         tone = op("MULTIPLY", op("MULTIPLY", tone, step.outputs[0]), op("SUBTRACT", 1.0, op("MULTIPLY", hatch, hk)))
     elif kind == "glass":
