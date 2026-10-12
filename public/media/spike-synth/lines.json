@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "count": 64761,
+  "min": [
+    -19.394452852895483,
+    0,
+    -131
+  ],
+  "max": [
+    19.30465199192986,
+    13.48728234693408,
+    10
+  ],
+  "stride": 14,
+  "classes": [
+    "structure",
+    "detail",
+    "fine"
+  ],
+  "features": [
+    "general",
+    "building",
+    "vehicle",
+    "tree",
+    "wire",
+    "person",
+    "landmark"
+  ]
+}
