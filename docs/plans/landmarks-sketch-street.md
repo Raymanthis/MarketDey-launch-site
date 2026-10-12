@@ -64,12 +64,12 @@ stroke textures). The reference's density is overwhelmingly border/crease edges,
    b. Blender Freestyle still (option 2's look ceiling), with measured seconds/frame;
    c. today's renderer, for contrast.
    Plus profiling of (a) on a low-end Android and throttled "Slow 3G" load time.
-2. **Composition** — the reference is a high-rise CBD; its density comes from curtain-wall towers.
+2. **Composition — decided 2026-10-12: Delta State street.** The reference is a high-rise CBD; its density comes from curtain-wall towers.
    Owner decides: *the reference's line craft on a Delta State street* (2–4 storeys, balconies,
    grilles, kiosks, poles) — recommended, it's the product's world — or *the tall-city composition
    too*.
 
-## Scene content (if Delta State street)
+## Scene content (Delta State street — owner decision 2026-10-12)
 
 - 2–4 storey concrete buildings with balconies, burglar-proof grilles, louvre windows, parapets,
   corrugated roofs, shop canopies, signboard blanks, kiosks, gutters — Geometry Nodes facade
