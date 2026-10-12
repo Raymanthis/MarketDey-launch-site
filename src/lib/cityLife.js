@@ -24,9 +24,12 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const CLOUD_D = 'M0 0H120Q132 0 130 -10Q128 -22 112 -20Q108 -40 86 -38Q76 -56 52 -50Q32 -46 30 -28Q12 -32 6 -18Q-4 -16 -2 -6Q-1 0 0 0Z';
 // distant-cloud body: same silhouette flattened to half height (low over the far skyline)
 const FAR_CLOUD_D = 'M0 0H120Q132 0 130 -5Q128 -11 112 -10Q108 -20 86 -19Q76 -28 52 -25Q32 -23 30 -14Q12 -16 6 -9Q-4 -8 -2 -3Q-1 0 0 0Z';
-// storm-cloud fill: one step lighter than before; far clouds are hazier (lighter, semi-transparent)
-const STORM_FILL = n => (n ? '#474744' : '#425c4b');
-const FAR_FILL = n => (n ? '#545450' : '#53685a');
+// storm clouds wear the normal clouds' own ink (read off the SVG at construction), so there is no
+// dark/grey storm palette any more. The sky darkens instead: the hero section's background and every
+// green skyline fill drop to this colour together (see setSkyDark).
+const DARK_FILL = '#2a4f33';     // ≈15% darker than the hero skyline green #386641
+const PHONE_W = 600;             // skyline container width under which storm clouds are drawn smaller
+const PHONE_S = 0.6;             // their scale on phones, relative to desktop
 // splash surface indices for the rolling state() counter
 const SP_ROAD = 0, SP_VEH = 1, SP_NEAR = 2, SP_FARB = 3, SP_FARA = 4;
 
@@ -121,7 +124,9 @@ export class CityLife {
     this.wx = { phase: 'clear', p: 0, dim: 0, rain: 0, storm: null };
     this.appliedPhase = 'clear';
     this.appliedStorm = 0;
-    this.tinted = false;
+    this.dark = false;
+    this.skyHost = null;
+    this.skyStyle = null;
     this.stormClouds = [];
     this.farClouds = [];
     this.boltEv = null;
@@ -135,6 +140,12 @@ export class CityLife {
     // visuals
     this.skyEls = Array.from(svgEl.querySelectorAll('[data-sky]'));
     this.cloudEls = Array.from(svgEl.querySelectorAll('[data-cloud]'));
+    this.cloudInk = this.readCloudInk();
+    // day skyline: the hero section behind the city is the "sky" that darkens when a storm gathers
+    if (!this.night && this.el && this.el.closest) {
+      const host = this.el.closest('section');
+      if (host) { this.skyHost = host; host.setAttribute('data-cl-sky', '1'); this.ensureSkyStyle(host); }
+    }
     this.wxG = svgEl.querySelector('g[data-wx]');
     this.drops = [];
     this.nAct = 0;
@@ -718,6 +729,12 @@ export class CityLife {
     if (this.hzDefs) { this.hzDefs.remove(); this.hzDefs = null; }
     if (this.polDefs) { this.polDefs.remove(); this.polDefs = null; }
     this.bd = null;
+    if (this.skyHost) {
+      this.skyHost.removeAttribute('data-cl-dark');
+      this.skyHost.removeAttribute('data-cl-sky');
+      this.skyHost = null;
+    }
+    if (this.skyStyle) { this.skyStyle.remove(); this.skyStyle = null; }
     this.skyEls.forEach(g => { g.style.removeProperty('transition'); g.style.removeProperty('opacity'); });
     this.cloudEls.forEach(g => {
       const p = g.querySelector('path');
@@ -1399,25 +1416,74 @@ export class CityLife {
   }
 
   // ---------- weather visuals ----------
+  // ink of the normal clouds in this skyline (fill, outline, outline width, inner detail stroke):
+  // storm clouds are painted with exactly these, so both bands look like ordinary clouds.
+  readCloudInk() {
+    const ink = { fill: '#386641', stroke: 'rgba(255,255,255,.3)', sw: 1.3, dStroke: 'rgba(255,255,255,.18)', dSw: 1.1, sa: 0.3, da: 0.18 };
+    const alpha = s => { const m = /rgba?\([^)]*,\s*([\d.]+)\s*\)\s*$/.exec(s || ''); return m ? +m[1] : null; };
+    const ps = this.cloudEls && this.cloudEls[0] ? this.cloudEls[0].querySelectorAll('path') : [];
+    const a = ps[0], b = ps[1];
+    if (a) {
+      const f = a.getAttribute('fill'); if (f && f !== 'none') ink.fill = f;
+      const s = a.getAttribute('stroke'); if (s) ink.stroke = s;
+      ink.sw = +a.getAttribute('stroke-width') || ink.sw;
+      const sa = alpha(s); if (sa != null) ink.sa = sa;
+    }
+    if (b) {
+      const s = b.getAttribute('stroke'); if (s) ink.dStroke = s;
+      ink.dSw = +b.getAttribute('stroke-width') || ink.dSw;
+      const da = alpha(s); if (da != null) ink.da = da;
+    }
+    return ink;
+  }
+
+  // one stylesheet for the hero sky: background colour + every green skyline fill move together when
+  // the storm gathers. Both are plain CSS transitions, so nothing is touched per frame.
+  ensureSkyStyle(host) {
+    if (!this.skyStyle) {
+      let s = document.getElementById('cl-sky-style');
+      if (!s) {
+        s = document.createElement('style');
+        s.id = 'cl-sky-style';
+        s.textContent = '[data-cl-sky]{transition:background-color 4s ease}'
+          + '[data-cl-sky][data-cl-dark]{background-color:' + DARK_FILL + '!important}'
+          + '[data-cl-sky] [fill="#386641"]:not([data-cl-wxc]){transition:fill 4s ease}'
+          + '[data-cl-sky][data-cl-dark] [fill="#386641"]:not([data-cl-wxc]){fill:' + DARK_FILL + '}';
+        document.head.appendChild(s);
+      }
+      this.skyStyle = s;
+    }
+    // building paths carry an inline transition (their draw-in), so the stylesheet rule cannot win:
+    // add the fill transition to those elements while the storm is on, and take it back out after
+    const els = host.querySelectorAll('[fill="#386641"]');
+    for (let k = 0; k < els.length; k++) {
+      const el = els[k];
+      if (el.hasAttribute('data-cl-wxc')) continue;
+      const tr = el.style.transition;
+      if (tr && tr.indexOf('fill ') < 0) el.style.transition = tr + ', fill 4s ease';
+    }
+  }
+
+  // gather -> storm: darken; clearing: back to the plain green. Set once per phase change.
+  setSkyDark(dark) {
+    if (dark === this.dark) return;
+    this.dark = dark;
+    const host = this.skyHost;
+    if (!host) return;
+    if (dark) {
+      this.ensureSkyStyle(host); // fill transitions first, so the darkening below animates
+      host.setAttribute('data-cl-dark', '1');
+    } else {
+      host.removeAttribute('data-cl-dark'); // the transitions stay, so the lightening animates too
+    }
+  }
+
   syncWeather() {
     const w = this.wx, ph = w.phase, sid = w.storm ? w.storm.id : 0;
     if (ph === this.appliedPhase && sid === this.appliedStorm) return;
-    const clear = ph === 'clear', tint = ph === 'gathering' || ph === 'storm';
+    const clear = ph === 'clear';
     this.skyEls.forEach(g => { g.style.opacity = clear ? '1' : '0'; });
-    if (tint !== this.tinted) {
-      const fill = this.night ? '#343431' : '#3a5642';
-      this.cloudEls.forEach(g => {
-        const p = g.querySelector('path');
-        if (!p) return;
-        if (tint) {
-          p.style.transition = 'fill 3s ease, stroke 3s ease';
-          p.style.fill = fill; p.style.stroke = 'rgba(255,255,255,.5)'; p.style.strokeWidth = '1.6';
-        } else {
-          p.style.removeProperty('fill'); p.style.removeProperty('stroke'); p.style.removeProperty('stroke-width');
-        }
-      });
-      this.tinted = tint;
-    }
+    this.setSkyDark(!!this.skyHost && (ph === 'gathering' || ph === 'storm'));
     if (clear) this.clearStormClouds();
     else if (sid !== this.appliedStorm || !this.stormClouds.length) this.buildStormClouds();
     this.appliedPhase = ph;
@@ -1435,69 +1501,80 @@ export class CityLife {
     this.clearStormClouds();
     if (!this.wxG) return;
     this.ensureGlowDefs();
+    const ink = this.cloudInk, ph = this.W < PHONE_W ? PHONE_S : 1;
     const rv = this.rV, W = this.W, n = 4 + Math.floor(rv() * 3), span = (W - 120) + 60;
     for (let j = 0; j < n; j++) {
-      const S = 1.6 + rv() * 0.8, Y = -340 + rv() * 150;
+      const S0 = 1.6 + rv() * 0.8, Y0 = -340 + rv() * 150;
+      // phones: 60% scale, raised so the cloud keeps its desktop height in the sky (base stays above the city)
+      const S = S0 * ph, Y = Y0 - (1 - ph) * 28 * S0;
       const Xt = -60 + (j + 0.5) * (span / n) + (rv() - 0.5) * (span / n) * 0.6;
       const from = j % 2 ? W + 60 : -300;
       const g = document.createElementNS(SVGNS, 'svg');
+      g.setAttribute('data-cl-storm', 'near');
       g.setAttribute('width', '140');
       g.setAttribute('height', '70');
       g.setAttribute('viewBox', '-6 -60 140 70');
       g.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;will-change:transform,opacity;transform-origin:0 0';
-      // glow sits behind the body: the cloud lights up from inside during a strike
+      // glow sits behind the body: the cloud lights up from inside during a strike. It carries no
+      // opacity: the flash rides on fill-opacity, so the cloud's own elements stay fully opaque.
       const glow = document.createElementNS(SVGNS, 'ellipse');
       glow.setAttribute('cx', '66');
       glow.setAttribute('cy', '-10');
       glow.setAttribute('rx', '95');
       glow.setAttribute('ry', '48');
       glow.setAttribute('fill', 'url(#cl-glow-' + this.seed + ')');
-      glow.setAttribute('opacity', '0');
+      glow.setAttribute('fill-opacity', '0');
       g.appendChild(glow);
       const p = document.createElementNS(SVGNS, 'path');
       p.setAttribute('d', CLOUD_D);
-      // one step lighter than the original storm clouds (item 4)
-      p.setAttribute('fill', STORM_FILL(this.night));
-      p.setAttribute('stroke', 'rgba(255,255,255,.5)');
+      // the normal clouds' own ink: same fill, outline colour and outline width
+      p.setAttribute('fill', ink.fill);
+      p.setAttribute('stroke', ink.stroke);
       // CSS scale also scales strokes now, so bake the inverse into the width
-      p.setAttribute('stroke-width', (0.8 / S).toFixed(3));
+      p.setAttribute('stroke-width', (ink.sw / S).toFixed(3));
       p.setAttribute('stroke-linejoin', 'round');
+      p.setAttribute('data-cl-wxc', 'body');
       g.appendChild(p);
       // inner detail strokes, thinner in proportion to the outline
       const dl = document.createElementNS(SVGNS, 'path');
       dl.setAttribute('d', 'M44 -30Q50 -40 62 -38M90 -24Q98 -28 104 -24');
       dl.setAttribute('fill', 'none');
-      dl.setAttribute('stroke', 'rgba(255,255,255,.3)');
-      dl.setAttribute('stroke-width', (0.7 / S).toFixed(3));
+      dl.setAttribute('stroke', ink.dStroke);
+      dl.setAttribute('stroke-width', (ink.dSw / S).toFixed(3));
       dl.setAttribute('stroke-linecap', 'round');
+      dl.setAttribute('data-cl-wxc', 'detail');
       g.appendChild(dl);
-      // lit lower edge, drawn last
+      // lit lower edge, drawn last (stroke-opacity carries the flash, not opacity)
       const hl = document.createElementNS(SVGNS, 'path');
       hl.setAttribute('d', 'M8 -3Q40 3 66 0Q96 -3 124 -4');
       hl.setAttribute('fill', 'none');
       hl.setAttribute('stroke', '#f4fbe0');
       hl.setAttribute('stroke-width', (1 / S).toFixed(3));
       hl.setAttribute('stroke-linecap', 'round');
-      hl.setAttribute('opacity', '0');
+      hl.setAttribute('stroke-opacity', '0');
       g.appendChild(hl);
       this.el.insertBefore(g, this.wxAnchor);
-      this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null, ox: 6, oy: 60, cxm: 66, sa: 0.5, da: 0.3 });
+      this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null, ox: 6, oy: 60, cxm: 66 });
     }
     this.buildFarClouds();
     this.updateStormClouds();
   }
 
-  // distant storm clouds: fewer, smaller, flatter and hazier, low over the far skyline.
-  // They live in front of the far city (farA/farB tiles) and behind the near row + near
-  // clouds (inserted before the mid rain canvas, which is itself before the near tile).
+  // distant storm clouds: fewer, smaller and flatter, but painted with the same normal-cloud ink and
+  // equally opaque. They live in front of the far city (farA/farB tiles) and behind the near row +
+  // near clouds (inserted before the mid rain canvas, which is itself before the near tile).
   buildFarClouds() {
     if (!this.cMid) return;
+    const ink = this.cloudInk, ph = this.W < PHONE_W ? PHONE_S : 1;
     const rv = this.rV, W = this.W, n = 4 + Math.floor(rv() * 4), span = (W - 120) + 60;
     for (let j = 0; j < n; j++) {
-      const S = 0.7 + rv() * 0.5, Y = -170 + rv() * 70;
+      const S0 = 0.7 + rv() * 0.5, Y0 = -170 + rv() * 70;
+      // phones: 60% scale, raised to keep the band's desktop height above the far skyline
+      const S = S0 * ph, Y = Y0 - (1 - ph) * 14 * S0;
       const Xt = -60 + (j + 0.5) * (span / n) + (rv() - 0.5) * (span / n) * 0.6;
       const from = j % 2 ? W + 60 : -300;
       const g = document.createElementNS(SVGNS, 'svg');
+      g.setAttribute('data-cl-storm', 'far');
       g.setAttribute('width', '120');
       g.setAttribute('height', '44');
       g.setAttribute('viewBox', '-6 -32 120 44');
@@ -1508,22 +1585,23 @@ export class CityLife {
       glow.setAttribute('rx', '70');
       glow.setAttribute('ry', '26');
       glow.setAttribute('fill', 'url(#cl-glow-' + this.seed + ')');
-      glow.setAttribute('opacity', '0');
+      glow.setAttribute('fill-opacity', '0');
       g.appendChild(glow);
       const p = document.createElementNS(SVGNS, 'path');
       p.setAttribute('d', FAR_CLOUD_D);
-      p.setAttribute('fill', FAR_FILL(this.night));
-      p.setAttribute('fill-opacity', '0.82'); // distance haze
-      p.setAttribute('stroke', 'rgba(255,255,255,.30)');
-      p.setAttribute('stroke-width', (0.6 / S).toFixed(3));
+      p.setAttribute('fill', ink.fill); // no distance haze: the cloud is opaque like a normal one
+      p.setAttribute('stroke', ink.stroke);
+      p.setAttribute('stroke-width', (ink.sw / S).toFixed(3));
       p.setAttribute('stroke-linejoin', 'round');
+      p.setAttribute('data-cl-wxc', 'body');
       g.appendChild(p);
       const dl = document.createElementNS(SVGNS, 'path');
       dl.setAttribute('d', 'M44 -15Q50 -20 62 -19M90 -12Q98 -14 104 -12');
       dl.setAttribute('fill', 'none');
-      dl.setAttribute('stroke', 'rgba(255,255,255,.18)');
-      dl.setAttribute('stroke-width', (0.5 / S).toFixed(3));
+      dl.setAttribute('stroke', ink.dStroke);
+      dl.setAttribute('stroke-width', (ink.dSw / S).toFixed(3));
       dl.setAttribute('stroke-linecap', 'round');
+      dl.setAttribute('data-cl-wxc', 'detail');
       g.appendChild(dl);
       const hl = document.createElementNS(SVGNS, 'path');
       hl.setAttribute('d', 'M8 -2Q40 1 66 0Q96 -2 124 -2');
@@ -1531,10 +1609,10 @@ export class CityLife {
       hl.setAttribute('stroke', '#f4fbe0');
       hl.setAttribute('stroke-width', (0.9 / S).toFixed(3));
       hl.setAttribute('stroke-linecap', 'round');
-      hl.setAttribute('opacity', '0');
+      hl.setAttribute('stroke-opacity', '0');
       g.appendChild(hl);
       this.el.insertBefore(g, this.cMid);
-      this.farClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null, ox: 6, oy: 32, cxm: 60, sa: 0.30, da: 0.18 });
+      this.farClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null, ox: 6, oy: 32, cxm: 60 });
     }
   }
 
@@ -1553,26 +1631,30 @@ export class CityLife {
     const w = this.wx, s = w.storm;
     if (!s) return;
     const t = this.viewTime, W = this.W;
-    const base = STORM_FILL(this.night), farBase = FAR_FILL(this.night);
+    // storm clouds wear the normal clouds' fill (darkened with the sky on the hero while the storm runs)
+    const base = this.dark ? DARK_FILL : this.cloudInk.fill;
     const lit = s.events.filter(e => e.src != null && this.stormClouds[e.src]);
     this.updateClouds(this.stormClouds, base, lit, 1, t, W, w, s);
-    this.updateClouds(this.farClouds, farBase, lit, 0.55, t, W, w, s);
+    this.updateClouds(this.farClouds, base, lit, 0.55, t, W, w, s);
   }
 
   updateClouds(cs, base, lit, glowScale, t, W, w, s) {
     if (!cs.length) return;
+    const ink = this.cloudInk;
     for (let i = 0; i < cs.length; i++) {
       const c = cs[i];
       let X, op;
-      if (w.phase === 'gathering') { const p = clamp01(w.p); X = c.from + (c.Xt - c.from) * (1 - Math.pow(1 - p, 3)); op = 0.95 * p; }
-      else if (w.phase === 'storm') { X = c.Xt + 4 * (t - s.gEnd); op = 0.95; }
-      else { X = c.Xt + 4 * s.D + c.dir * 90 * (t - s.cEnd); op = 0.95 * (1 - clamp01(w.p)); }
+      // in they slide during gathering, out they slide during clearing; at rest in the storm they are 1
+      if (w.phase === 'gathering') { const p = clamp01(w.p); X = c.from + (c.Xt - c.from) * (1 - Math.pow(1 - p, 3)); op = p; }
+      else if (w.phase === 'storm') { X = c.Xt + 4 * (t - s.gEnd); op = 1; }
+      else { X = c.Xt + 4 * s.D + c.dir * 90 * (t - s.cEnd); op = 1 - clamp01(w.p); }
       c.cx = X;
       const tf = 'translate3d(' + r1(X - c.ox * c.S) + 'px,' + r1(c.Y - c.oy * c.S) + 'px,0) scale(' + c.S.toFixed(2) + ')';
       if (tf !== c.tf) { c.tf = tf; c.g.style.transform = tf; }
       const opS = op.toFixed(3);
       if (opS !== c.op) { c.op = opS; c.g.style.opacity = opS; }
-      // lightning light: source cloud brightest, neighbours fade with distance (far clouds scaled down)
+      // lightning light: source cloud brightest, neighbours fade with distance (far clouds scaled down).
+      // The flash brightens the fill and the inner glow; the cloud itself never goes translucent.
       const cxc = c.cx + c.cxm * c.S;
       let L = 0;
       lit.forEach(e => {
@@ -1587,10 +1669,10 @@ export class CityLife {
       if (Math.abs(L - c.L) > 0.002) {
         c.L = L;
         c.body.setAttribute('fill', mixHex(base, '#eef8cf', 0.85 * L));
-        c.body.setAttribute('stroke', 'rgba(255,255,255,' + (c.sa + (1 - c.sa) * L).toFixed(3) + ')');
-        c.detail.setAttribute('stroke', 'rgba(255,255,255,' + (c.da + (1 - c.da) * L).toFixed(3) + ')');
-        c.glow.setAttribute('opacity', L.toFixed(3));
-        c.hl.setAttribute('opacity', L.toFixed(3));
+        c.body.setAttribute('stroke', 'rgba(255,255,255,' + (ink.sa + (1 - ink.sa) * L).toFixed(3) + ')');
+        c.detail.setAttribute('stroke', 'rgba(255,255,255,' + (ink.da + (1 - ink.da) * L).toFixed(3) + ')');
+        c.glow.setAttribute('fill-opacity', L.toFixed(3));
+        c.hl.setAttribute('stroke-opacity', L.toFixed(3));
       }
     }
   }
