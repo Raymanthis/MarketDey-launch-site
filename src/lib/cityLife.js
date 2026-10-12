@@ -26,6 +26,18 @@ const CLOUD_D = 'M0 0H120Q132 0 130 -10Q128 -22 112 -20Q108 -40 86 -38Q76 -56 52
 // IDM constants (px, seconds)
 const S0 = 10, HEADWAY = 0.6, ACC = 60, DECEL = 90, DECEL_MAX = 260;
 
+// roof segments per vehicle shape (vehicle-local coords, x relative to the inner g, y relative to the wrapper)
+const ROOFS = [
+  [[0, 22, -21], [22, 50, -32], [50, 66, -21]],
+  [[0, 64, -38], [64, 72, -28]],
+  [[0, 36, -32], [36, 44, -18]],
+  [[0, 104, -52], [104, 112, -12], [112, 134, -44], [134, 140, -30]],
+  [[0, 12, -24], [12, 58, -36], [58, 66, -22]],
+  [[-2, 12, -14], [12, 24, -38], [24, 40, -12]],
+  [[0, 74, -38], [74, 78, -12], [78, 94, -36], [94, 104, -26]],
+  [[0, 62, -48], [62, 64, -10], [64, 82, -36], [82, 92, -26]],
+];
+
 export class CityLife {
   constructor(svgEl, { night = false, W, G = 292, seed = 1, reducedMotion = false } = {}) {
     this.svg = svgEl;
@@ -91,6 +103,7 @@ export class CityLife {
     this.orderDirty = false;
     this.readVehicles();
     this.makeCanvas();
+    this.buildRainLayers();
     if (this.night) { this.addLights(); this.lightWindows(); }
   }
 
@@ -209,8 +222,87 @@ export class CityLife {
     const rr = this.rR;
     for (let n = 0; n < N; n++) {
       const len = 10 + rr() * 12;
-      this.drops.push({ x: rr() * (this.W + 60) - 60, y: -len - rr() * 60, len, spd: 650 + rr() * 300, ang: (8 + rr() * 4) * Math.PI / 180 });
+      this.drops.push({ x: rr() * (this.W + 60) - 60, y: this.top - len - rr() * 60, len, spd: 650 + rr() * 300, ang: (8 + rr() * 4) * Math.PI / 180 });
     }
+  }
+
+  // rain/splash SVG layers: rain behind every vehicle, roof splashes above all vehicles
+  buildRainLayers() {
+    const id = 'cl-rain-' + this.seed;
+    const col = this.night ? '#c8d6e5' : '#ffffff';
+    const rainA = this.night ? 0.30 : 0.35;
+    const splashA = this.night ? 0.60 : 0.65;
+    const buckets = [0.9, 0.55, 0.25].map(b => (splashA * b).toFixed(3));
+
+    // gradient fades rain in over the top 140 px so it never shows a hard line
+    const defs = document.createElementNS(SVGNS, 'defs');
+    defs.setAttribute('data-cl-rain', '1');
+    defs.innerHTML = '<linearGradient id="' + id + '" gradientUnits="userSpaceOnUse" x1="0" y1="' + this.top
+      + '" x2="0" y2="' + (this.top + 140) + '">'
+      + '<stop offset="0" stop-color="' + col + '" stop-opacity="0"></stop>'
+      + '<stop offset="1" stop-color="' + col + '" stop-opacity="' + rainA + '"></stop></linearGradient>';
+    this.svg.insertBefore(defs, this.svg.firstChild);
+    this.rainDefs = defs;
+
+    const mkRipple = () => {
+      const p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', col);
+      p.setAttribute('stroke-width', '1.2');
+      p.setAttribute('d', '');
+      return p;
+    };
+    const mkFill = () => {
+      const p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('fill', col);
+      p.setAttribute('stroke', 'none');
+      p.setAttribute('d', '');
+      return p;
+    };
+
+    if (!this.vehParent) { this.vehParent = this.svg; this.vehAnchor = null; }
+
+    // rain layer: above buildings/road, below every vehicle
+    this.rainL = document.createElementNS(SVGNS, 'g');
+    this.rainL.setAttribute('data-cl-rain', '1');
+    this.rainL.setAttribute('pointer-events', 'none');
+    this.dropPath = document.createElementNS(SVGNS, 'path');
+    this.dropPath.setAttribute('fill', 'none');
+    this.dropPath.setAttribute('stroke', 'url(#' + id + ')');
+    this.dropPath.setAttribute('stroke-width', '1');
+    this.dropPath.setAttribute('stroke-linecap', 'round');
+    this.dropPath.setAttribute('d', '');
+    this.rainL.appendChild(this.dropPath);
+    this.gndR = []; this.gndF = [];
+    for (let b = 0; b < 3; b++) {
+      const r = mkRipple(), f = mkFill();
+      r.setAttribute('opacity', buckets[b]);
+      f.setAttribute('opacity', buckets[b]);
+      this.rainL.appendChild(r); this.rainL.appendChild(f);
+      this.gndR.push(r); this.gndF.push(f);
+    }
+    if (this.vehicles.length) this.vehParent.insertBefore(this.rainL, this.vehicles[0].wrapper);
+    else this.vehParent.appendChild(this.rainL);
+
+    // roof layer: above all vehicles; re-anchor so later draw-order re-sorting keeps it on top
+    this.roofL = document.createElementNS(SVGNS, 'g');
+    this.roofL.setAttribute('data-cl-roof', '1');
+    this.roofL.setAttribute('pointer-events', 'none');
+    this.roofR = []; this.roofF = [];
+    for (let b = 0; b < 3; b++) {
+      const r = mkRipple(), f = mkFill();
+      r.setAttribute('opacity', buckets[b]);
+      f.setAttribute('opacity', buckets[b]);
+      this.roofL.appendChild(r); this.roofL.appendChild(f);
+      this.roofR.push(r); this.roofF.push(f);
+    }
+    this.vehParent.insertBefore(this.roofL, this.vehAnchor);
+    this.vehAnchor = this.roofL;
+
+    this.dropD = '';
+    this.gndRd = ['', '', '']; this.gndFd = ['', '', ''];
+    this.roofRd = ['', '', '']; this.roofFd = ['', '', ''];
+    this.roofSplashes = [];
   }
 
   setActive(v, on) {
@@ -287,11 +379,14 @@ export class CityLife {
       if (p) ['transition', 'fill', 'stroke', 'stroke-width'].forEach(k => p.style.removeProperty(k));
     });
     if (this.boltG) { this.boltG.remove(); this.boltG = null; }
+    if (this.rainL) { this.rainL.remove(); this.rainL = null; }
+    if (this.roofL) { this.roofL.remove(); this.roofL = null; }
+    if (this.rainDefs) { this.rainDefs.remove(); this.rainDefs = null; }
     if (this.svg) { const d = this.svg.querySelector('defs[data-cl-wx]'); if (d) d.remove(); }
     this.boltEv = null;
     this.canvas = null; this.ctx = null;
     this.vehicles = []; this.queue = []; this.skyEls = []; this.cloudEls = [];
-    this.wxG = null; this.svg = null; this.el = null; this.splashes = []; this.drops = [];
+    this.wxG = null; this.svg = null; this.el = null; this.splashes = []; this.roofSplashes = []; this.drops = [];
   }
 
   tick(now) {
@@ -803,6 +898,7 @@ export class CityLife {
     this.syncWeather();
     this.updateStormClouds();
     this.applyVehicles();
+    this.stepRain(dt);
     this.draw(dt);
   }
 
@@ -826,7 +922,7 @@ export class CityLife {
   draw(dt) {
     const ctx = this.ctx;
     if (!ctx) return;
-    const w = this.wx, W = this.W, H = this.H, gy = this.gy;
+    const w = this.wx, W = this.W, H = this.H;
     // fire lightning events
     if (w.storm) {
       w.storm.events.forEach(e => {
@@ -847,7 +943,7 @@ export class CityLife {
     let K = 0;
     if (w.storm) w.storm.events.forEach(e => { K = Math.max(K, this.flashK(e, this.viewTime)); });
     const dimK = 1 - 0.7 * K;
-    if (!w.dim && !w.rain && !flash && !this.boltEv && !this.splashes.length) {
+    if (!w.dim && !w.rain && !flash && !this.boltEv) {
       if (this.drawn) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.drawn = false; }
       return;
     }
@@ -859,49 +955,10 @@ export class CityLife {
       ctx.fillStyle = this.night ? 'rgba(0,0,0,' + (0.28 * w.dim * dimK).toFixed(3) + ')' : 'rgba(12,28,18,' + (0.22 * w.dim * dimK).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }
-    const rainCol = this.night ? 'rgba(200,214,229,.30)' : 'rgba(255,255,255,.35)';
-    // 2 rain
-    const na = Math.round(this.N * w.rain), rr = this.rR;
-    for (let k = this.nAct; k < na; k++) this.drops[k].y = -40 + rr() * (gy + 40);
-    this.nAct = na;
-    if (na > 0) {
-      ctx.strokeStyle = rainCol; ctx.lineWidth = 1; ctx.beginPath();
-      for (let k = 0; k < na; k++) {
-        const d = this.drops[k], sn = Math.sin(d.ang), cs = Math.cos(d.ang), dist = d.spd * dt;
-        d.x += sn * dist; d.y += cs * dist;
-        if (d.y >= gy) {
-          if (this.splashes.length < 160) this.addSplash(d.x);
-          d.y = -d.len - rr() * 60; d.x = rr() * (W + 60) - 60;
-        }
-        ctx.moveTo(d.x - sn * d.len, d.y - cs * d.len); ctx.lineTo(d.x, d.y);
-      }
-      ctx.stroke();
-    }
-    // 3 splashes
-    if (this.splashes.length) {
-      const spCol = this.night ? 'rgba(200,214,229,.6)' : 'rgba(255,255,255,.65)';
-      ctx.strokeStyle = spCol; ctx.fillStyle = spCol; ctx.lineWidth = 1.2;
-      this.splashes = this.splashes.filter(sp => {
-        sp.age += dt;
-        const t = sp.age / 0.3;
-        if (t >= 1) return false;
-        ctx.globalAlpha = 1 - t;
-        ctx.beginPath();
-        const rx = lerp(2, 9, t);
-        ctx.ellipse(sp.x, gy, rx, rx * 0.3, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        sp.dr.forEach(q => {
-          q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 700 * dt;
-          ctx.fillRect(q.x - 0.9, q.y - 0.9, 1.8, 1.8);
-        });
-        return true;
-      });
-      ctx.globalAlpha = 1;
-    }
-    // 4 flash
+    // 2 flash
     if (flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flash.toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
-    // 5 bolt is SVG (this.boltG), drawn under the city by showBolt()/updateBolt()
-    // soften the canvas top edge so dim/flash/rain never show a hard line
+    // 3 bolt is SVG (this.boltG), drawn under the city by showBolt()/updateBolt()
+    // soften the canvas top edge so dim/flash never show a hard line
     if (!this.topFade) {
       this.topFade = ctx.createLinearGradient(0, 0, 0, 140);
       this.topFade.addColorStop(0, 'rgba(0,0,0,1)');
@@ -913,10 +970,109 @@ export class CityLife {
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  addSplash(x) {
+  // world roof y at world x wx (svg coords), or null if the shape has no roof there
+  roofAt(v, wx) {
+    const segs = ROOFS[v.i];
+    if (!segs) return null;
+    const lx = wx - v.x;
+    for (let k = 0; k < segs.length; k++) {
+      const s = segs[k];
+      if (lx >= s[0] && lx <= s[1]) return this.G + v.dy + s[2];
+    }
+    return null;
+  }
+
+  addGroundSplash(x, y) {
+    if (this.splashes.length >= 160) return;
     const rv = this.rV, n = 2 + Math.floor(rv() * 2), dr = [];
-    for (let k = 0; k < n; k++) dr.push({ x, y: this.gy, vx: -45 + rv() * 90, vy: -150 + rv() * 60 });
+    for (let k = 0; k < n; k++) dr.push({ x, y, vx: -45 + rv() * 90, vy: -150 + rv() * 60 });
     this.splashes.push({ x, age: 0, dr });
+  }
+
+  addRoofSplash(v, lx, ly) {
+    if (this.roofSplashes.length >= 80) return;
+    const rv = this.rV, dr = [];
+    for (let k = 0; k < 2; k++) dr.push({ x: 0, y: 0, vx: -30 + rv() * 60, vy: -90 + rv() * 40 });
+    this.roofSplashes.push({ veh: v, lx, ly, age: 0, dr });
+  }
+
+  stepRain(dt) {
+    const W = this.W, G = this.G, rr = this.rR;
+    const na = Math.round(this.N * this.wx.rain);
+    const act = this.vehicles.filter(v => v.active);
+    for (let k = this.nAct; k < na; k++) this.drops[k].y = this.top - 40 + rr() * (this.gy + 40);
+    this.nAct = na;
+
+    const drops = [];
+    for (let k = 0; k < na; k++) {
+      const d = this.drops[k], sn = Math.sin(d.ang), cs = Math.cos(d.ang), dist = d.spd * dt;
+      const py = d.y;
+      d.x += sn * dist;
+      d.y += cs * dist;
+      const hx = d.x, hy = d.y;
+      let hit = null;
+      for (const v of act) {
+        if (hx < v.x + v.bx0 || hx > v.x + v.bx0 + v.len) continue;
+        if (!hit || v.dy > hit.dy) hit = v;
+      }
+      let ry = null;
+      if (hit) ry = this.roofAt(hit, hx);
+      if (ry != null && py < ry && hy >= ry) {
+        this.addRoofSplash(hit, hx - hit.x, ry - (G + hit.dy));
+        d.y = this.top - d.len - rr() * 60;
+        d.x = rr() * (W + 60) - 60;
+      } else if (hy >= G) {
+        this.addGroundSplash(hx, G);
+        d.y = this.top - d.len - rr() * 60;
+        d.x = rr() * (W + 60) - 60;
+      }
+      drops.push('M' + r1(d.x - sn * d.len) + ' ' + r1(d.y - cs * d.len) + 'L' + r1(d.x) + ' ' + r1(d.y));
+    }
+    const dropD = drops.join(' ');
+
+    // advance ground and roof splashes, capping their lives at 0.3 s
+    this.splashes = this.splashes.filter(sp => {
+      sp.age += dt;
+      if (sp.age >= 0.3) return false;
+      sp.dr.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 700 * dt; });
+      return true;
+    });
+    this.roofSplashes = this.roofSplashes.filter(sp => {
+      sp.age += dt;
+      if (sp.age >= 0.3 || !sp.veh.active) return false;
+      sp.dr.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 600 * dt; });
+      return true;
+    });
+
+    // ripple and droplet strings per age bucket
+    const ripple = (cx, cy, rx) => {
+      const ry = rx * 0.3;
+      return 'M' + r1(cx - rx) + ' ' + r1(cy) + ' a' + r1(rx) + ' ' + r1(ry) + ' 0 1 0 ' + r1(rx * 2)
+        + ' 0 a' + r1(rx) + ' ' + r1(ry) + ' 0 1 0 ' + r1(-rx * 2) + ' 0';
+    };
+    const sq = (x, y) => 'M' + r1(x) + ' ' + r1(y) + 'h1.8v1.8h-1.8Z';
+    const gndR = ['', '', ''], gndF = ['', '', ''];
+    for (const sp of this.splashes) {
+      const b = sp.age < 0.1 ? 0 : sp.age < 0.2 ? 1 : 2;
+      gndR[b] += ripple(sp.x, G, lerp(2, 9, sp.age / 0.3));
+      sp.dr.forEach(q => { gndF[b] += sq(q.x, q.y); });
+    }
+    const roofR = ['', '', ''], roofF = ['', '', ''];
+    for (const sp of this.roofSplashes) {
+      const b = sp.age < 0.1 ? 0 : sp.age < 0.2 ? 1 : 2;
+      const wx = sp.veh.x + sp.lx, wy = G + sp.veh.dy + sp.ly;
+      roofR[b] += ripple(wx, wy, lerp(1.5, 6, sp.age / 0.3));
+      sp.dr.forEach(q => { roofF[b] += sq(wx + q.x, wy + q.y); });
+    }
+
+    // write a path's d only when its string changed
+    if (dropD !== this.dropD) { this.dropPath.setAttribute('d', dropD); this.dropD = dropD; }
+    for (let b = 0; b < 3; b++) {
+      if (gndR[b] !== this.gndRd[b]) { this.gndR[b].setAttribute('d', gndR[b]); this.gndRd[b] = gndR[b]; }
+      if (gndF[b] !== this.gndFd[b]) { this.gndF[b].setAttribute('d', gndF[b]); this.gndFd[b] = gndF[b]; }
+      if (roofR[b] !== this.roofRd[b]) { this.roofR[b].setAttribute('d', roofR[b]); this.roofRd[b] = roofR[b]; }
+      if (roofF[b] !== this.roofFd[b]) { this.roofF[b].setAttribute('d', roofF[b]); this.roofFd[b] = roofF[b]; }
+    }
   }
 
   // ---------- debug ----------
