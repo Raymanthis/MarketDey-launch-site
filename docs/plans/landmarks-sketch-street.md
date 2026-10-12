@@ -1,122 +1,124 @@
 # Plan: illustration-quality street sketch for the Landmarks Journey
 
-Status: proposed, 2026-10-12. Owner request: the 3D "ride" view in the Landmarks Journey section
-must reach the line density and craft of the reference sketch (dense window grids, varied line
-weight, overhead wires, trees, cars, people, perspective road lines, distance fading to white).
+Status: proposed (rev. 2, after critique), 2026-10-12. Owner request: the 3D "ride" view in the
+Landmarks Journey section must reach the line density and craft of the reference sketch (dense
+window grids, varied line weight, overhead wires, trees, cars, people, perspective road lines,
+distance fading to white).
 
 ## What exists today (facts)
 
-- `src/components/sections/LandmarksJourneySection.jsx` (≈70 KB) builds the street procedurally
-  in Three.js r160 from the same seeded geometry as the flat map (`seed = 11`, mirrored in
-  `src/lib/lmMapBuild.js`): road centreline `fr(s)`, building footprints `FILL`, five landmarks
-  `MK` at road stations s = 40, 100, 160, 209.8, 245.
-- Look: white `MeshBasicMaterial` + `EdgesGeometry`/`LineBasicMaterial` — 1 px uniform lines,
-  no facade detail. That is why it reads as thin compared with the reference.
-- Choreography (1800vh of scroll): flat 2D map → camera tilts into a 3D overhead → drops to
-  street level → rides the road; numbered pins (1–5), signboards and the phone "Check I'm here"
-  checklist follow the landmarks via `vector.project(camera)`. Camera: `PerspectiveCamera(58°)`.
-- The section is scroll-only: no clickable/draggable controls (verified in the port).
-- The flat map must hand off seamlessly from the Try-it section (same seed/geometry).
+- `src/components/sections/LandmarksJourneySection.jsx` builds the street procedurally in
+  Three.js r160 from the same seeded geometry as the flat map (`seed = 11`, mirrored verbatim in
+  `src/lib/lmMapBuild.js`): road centreline `fr(s)`, footprints `FILL`, five landmarks `MK` at
+  road stations s = 40, 100, 160, 209.8, 245.
+- Look: white `MeshBasicMaterial` + `EdgesGeometry`/`LineBasicMaterial` — uniform 1 px lines, no
+  facade detail. That is why it reads as thin next to the reference.
+- Choreography over 1800vh: flat map (p < `MAP_END` 0.47) → tilt (0.47–`RIDE_START` 0.56, during
+  which buildings grow `city.scale.y`, lines fade in, road/trail fade, fog ramps) → street-level
+  ride (0.56–1) past the five landmarks. Scroll is smoothed (`cur += (p − cur) · 0.12`).
+  Pins/signboards are in-scene objects (boards rise from the ground as you approach); the phone
+  checklist and tip cards are DOM. No clickable controls.
+- The section currently ships **zero media bytes**; the product promises "works on 2G".
 
-## Decision: option 2 — pre-render in Blender, scrub frames on scroll — with four additions
+## Decision: Blender-modelled scene, baked line geometry, drawn live in Three.js
 
-Why option 2 over option 1:
-1. **The look is the requirement.** The reference's character comes from line-weight variation,
-   dense facade linework and depth fade. Blender's Freestyle / Line Art produce that natively; a
-   browser Sobel pass would need modelled mullions *plus* heavy shader tuning and still lands
-   short, and its cost runs on every visitor's GPU (weak Android phones are the core audience).
-2. **The interactivity loss is near-zero here.** The camera path is already fixed and
-   scroll-scrubbed, with no free-look. Option 2's main downside doesn't apply.
-3. **Unlimited scene detail at no runtime cost.** Thousands of windows, wires, grilles, people.
+Neither offered option fits as-is; the plan takes option 1's runtime and option 2's authoring:
 
-The four additions that make option 2 safe for this site:
+- **Model the street in Blender** (the detail the owner is missing is *geometry*: window bays,
+  mullions, grilles, balconies, poles, wires, trees, vehicles, people).
+- **Extract the lines offline in Blender**, not in the browser: crease, border, silhouette-prone
+  and material-boundary edges, each tagged with a weight class (structure / detail / fine) and a
+  feature id. Export as a quantised line buffer (int16 positions, uint8 weight/id), gzip/Brotli.
+  Target ≈ 100–150k segments ≈ 1–1.5 MB on the wire.
+- **Draw it in the existing scene** with a fat-line material (`LineSegments2`/`LineMaterial` or a
+  custom instanced-quad shader): width from weight class × distance falloff (thick near, hairline
+  far), opacity fade to paper with fog, subtle low-frequency wobble and pressure variation in the
+  vertex shader for a hand-drawn feel. Depth-only white fills (from the same geometry) occlude
+  lines behind buildings.
 
-A. **Same geometry, same camera.** Export the scene data (road, footprints, landmark stations)
-   and the *current* camera path (sampled from the existing JS at every frame) to JSON, and build
-   the Blender scene from it. Timing, landmark arrival and the flat-map handoff stay identical.
+Why not option 2 (pre-rendered frames), per the critique:
+1. **Bytes vs audience.** Realistic dense line-art WebP is 200–400 KB/frame; even the trimmed
+   budget (6–35 MB) is minutes of download on 2G/slow 3G, and connection detection
+   (`navigator.connection`) doesn't exist on Safari/Firefox. The degraded "few keyframes" state
+   would be the *normal* state for the audience.
+2. **Ghosting.** ~150 frames over ~250 m of road is 1.5–2.5 m per frame; crossfading two line
+   drawings shows two drawings. Stepping without blending looks choppy.
+3. **Line weight tied to pixels.** A look approved at a 2560 master ships thinner at 960/360 —
+   the exact complaint we're fixing. Live lines stay crisp at every size and pixel density.
+4. **Seams and overlays.** The tilt is animated (growth, fades, fog) and the camera heading is
+   smoothed by scroll history, so a fixed frame 0 can't reliably match the live map; DOM overlays
+   would also lose occlusion behind the new foreground poles/trees and the rise-from-ground reveal.
+   With live lines the scene, tilt, pins and boards all stay in one renderer — zero new seams.
+5. **Three.js stays regardless** (flat map + tilt), so option 2 would add a second renderer.
 
-B. **Overlays stay live, copy stays in JSON.** Pins, signboard text, labels and the phone remain
-   DOM/canvas overlays positioned by projecting 3D points through a per-frame camera exported from
-   Blender (`manifest.json`: position, quaternion, fov per frame). Nothing with words is baked
-   into the renders, so `src/content/*.json` remains the source of truth.
+What this gives up: Freestyle-only niceties (view-dependent silhouette lines, calligraphic
+stroke textures). The reference's density is overwhelmingly border/crease edges, which bake fine.
+**This trade-off is tested at ★0, not assumed** — a Freestyle still is rendered beside it.
 
-C. **One render, two crops.** With a fixed *vertical* FOV, a portrait view is a centred crop of
-   the landscape frame. Render once at 16:9 (2560×1440 master), export desktop tiers (1600w, 960w)
-   and a portrait crop for mobile (720×1280, 360×640). Ultra-wide screens use cover-scaling.
+## ★0 must answer two questions first
 
-D. **Built for slow networks** (the product's audience is on 2G/3G). Tiered, progressive loading:
-   - first paint: ~12 keyframes at the low tier (≈ 200–300 KB), scrubbing works immediately by
-     crossfading between the nearest loaded frames;
-   - fill in every 8th → 4th → 2nd → every frame, low tier then full tier, only once the section
-     is near the viewport;
-   - `navigator.connection.saveData` / `effectiveType` in {slow-2g, 2g}: low tier, every 4th frame
-     only, capped ≈ 2–3 MB;
-   - `prefers-reduced-motion`: show the five landmark stills, crossfaded at their stations.
-   Budget targets: low tier full set ≤ 10 MB desktop / ≤ 6 MB mobile; full tier ≤ 35 MB.
+1. **Look bake-off** — one hand-built dense block (facade module with grilles and balconies, a
+   power pole with wires, a tree, a car, a keke, two people) shown three ways at the *delivered*
+   sizes (1440×900 desktop and 390×844 mobile), beside the reference:
+   a. baked lines drawn live in Three.js (recommended), as a 20-frame scroll scrub;
+   b. Blender Freestyle still (option 2's look ceiling), with measured seconds/frame;
+   c. today's renderer, for contrast.
+   Plus profiling of (a) on a low-end Android and throttled "Slow 3G" load time.
+2. **Composition** — the reference is a high-rise CBD; its density comes from curtain-wall towers.
+   Owner decides: *the reference's line craft on a Delta State street* (2–4 storeys, balconies,
+   grilles, kiosks, poles) — recommended, it's the product's world — or *the tall-city composition
+   too*.
 
-## Scene content (Delta State street, reference style)
+## Scene content (if Delta State street)
 
-- Architecture: 2–4 storey concrete buildings with balconies, burglar-proof window grilles,
-  louvre windows, parapets, corrugated roofs, shopfront canopies, painted signboard *blanks*,
-  kiosks, gutters/culverts. Generated with Geometry Nodes from the exported footprints (facade
-  modules: window bays with mullions + grilles, balcony rails, signboard frames) so every window
-  produces real edges for the line renderer.
-- Street life: power poles with sagging, tangled wires; trees (almond, palm); parked cars, keke
-  napep, danfo, okada; a few pedestrians and traders; road markings, kerbs, manholes.
-- The five landmarks, modelled specifically: filling station with canopy (#1), water tank on
-  stilts behind a fence (#2), row of umbrella stalls (#3), church with white walls / blue roof
-  (#4), market gate with painted arch (#5).
-- Assets: CC0 kits only for generic props (cars/trees/people), recorded in `blender/ASSETS.md`;
-  Nigerian-specific vehicles and the landmarks are modelled in the pipeline.
-- Overhead stretch: same scene seen from the tilt-down camera; line weight reduces with distance.
+- 2–4 storey concrete buildings with balconies, burglar-proof grilles, louvre windows, parapets,
+  corrugated roofs, shop canopies, signboard blanks, kiosks, gutters — Geometry Nodes facade
+  modules on the shared footprints so every window yields real edges.
+- Power poles with sagging, tangled wires; almond and palm trees; cars, keke napep, danfo, okada;
+  traders and pedestrians; kerbs, road markings, manholes.
+- The five landmarks modelled specifically: filling station canopy (1), water tank on stilts
+  behind a fence (2), umbrella stalls (3), church with white walls / blue roof (4), market gate
+  with painted arch (5).
+- CC0 assets only for generic props, listed in `blender/ASSETS.md`.
 
-## Look development
+## Pipeline (`blender/`, headless `blender -b -P`, reproducible)
 
-- Renderer: EEVEE + Freestyle (line thickness by distance from camera, alpha by distance, slight
-  calligraphic variation, crease + silhouette + border + material-boundary edges), with Grease
-  Pencil Line Art evaluated as the alternative on the same test frames. Pick by side-by-side.
-- Paper: very light warm white (#f5f3ee — matches the current section), ink #2a2823 → greys.
-- Distance fade: mist pass fading to paper colour, matching the reference's pale skyline.
-- Optional: per-landmark ID mask pass (cheap) so the active landmark can get a subtle brand-green
-  highlight at runtime without re-rendering.
-
-## Pipeline (versioned in `blender/`)
-
-1. `blender/export/scene-data.mjs` — runs the existing geometry + camera code in Node, writes
-   `blender/data/scene.json` (road, footprints, landmarks) and `camera.json` (per-frame camera).
-2. `blender/build_scene.py` — `blender -b -P` builds the `.blend` from JSON (deterministic).
-3. `blender/render.py` — renders frame ranges (resumable), writes PNG masters.
-4. `blender/encode.mjs` — crops/resizes/encodes WebP tiers + `manifest.json` into
-   `public/media/landmarks/`.
-All scripted, headless, reproducible. (Blender 5.2.2 LTS is installed; the Blender MCP is not
-connected in this session — not needed, the CLI is better for a repeatable pipeline. It can be used
-for interactive look-dev if connected.)
+0. **Extract the shared geometry/camera code** into one module (`src/lib/landmarksGeometry.js`)
+   used by the section, `lmMapBuild` and the exporter — guarded by a snapshot hash of
+   `lmMapBuild()` output taken *before* the refactor, so the Try-it handoff is provably unchanged.
+1. `blender/export/scene-data.mjs` → `blender/data/scene.json` (road, footprints, landmarks).
+2. `blender/build_scene.py` → `.blend` built from JSON (facades, props, landmarks).
+3. `blender/bake_lines.py` → `public/media/landmarks/lines.bin` (+ `lines.json` header:
+   quantisation, weight classes, feature ids, bounds); white fill mesh as a small Draco GLB.
+4. Hashed filenames + long-cache `headers()` in `next.config.ts`. `.blend` sources tracked with
+   Git LFS or kept out of git (decide at phase 1); intermediates gitignored.
 
 ## Runtime integration
 
-- New `FrameScrubber` (canvas, `createImageBitmap` decode off-main-thread, LRU of decoded frames,
-  crossfade between nearest frames) replaces the Three.js scene renderer in the street phase only.
-  The flat-map phase stays as is; crossfade into frame 0 over a short scroll range, where frame 0
-  is rendered to match the flat map's top-down framing.
-- Overlay projection uses a Three.js camera fed from `manifest.json` (no scene, math only).
-- Remove the procedural street meshes once parity is reached; keep the code path behind a flag
-  until sign-off.
+- Load `lines.bin` only when the section approaches the viewport; until it arrives (or if it
+  fails) the current procedural street renders — it remains the permanent zero-byte fallback.
+- Lines fade in during the existing tilt exactly like today's `lineK`, so the flat-map seam and
+  tilt choreography are untouched.
+- Pins, signboards (text from JSON) and occlusion stay in-scene as today.
+- Device budget: cap segment count by GPU tier (fewer "fine" segments on low-end), DPR cap 1.5,
+  `prefers-reduced-motion` respected. All browser reads in `componentDidMount` (SSR rule).
 
-## Phases and checkpoints (owner approves at each ★)
+## Phases and checkpoints (★ = owner sign-off)
 
 | # | Phase | Output | Est. |
 |---|---|---|---|
-| 0 | ★ Look spike | 2 stills (landmark 1 and 3) in Freestyle and Line Art vs the reference | 1 day |
-| 1 | Data + camera export | `scene.json`, `camera.json`, a camera-path preview video | 0.5 day |
-| 2 | Scene build | procedural facades, props, five landmarks; ★ 6 key stills | 2–3 days |
-| 3 | Full render + encode | all frames, tiers, manifest; size report vs budget | 0.5 day + render time (est. 2–6 h) |
-| 4 | Runtime integration | scrubber, overlays, loading tiers, reduced motion, mobile crop | 1.5 days |
-| 5 | QA | fidelity harness on the rest of the page, overlay alignment checks per landmark, throttled-3G and low-end Android profiling; ★ owner review | 1 day |
+| 0 | ★ Bake-off + composition question | 3-way comparison at delivered sizes, Android profile, Slow-3G timing, Freestyle s/frame | 1.5 days |
+| 1 | Shared geometry module + exporter | snapshot-hash-verified refactor, `scene.json` | 0.5 day |
+| 2 | Scene build | facades, props, landmarks; ★ 6 key views rendered live in the browser | 3 days |
+| 3 | Line bake + runtime | `lines.bin`, fat-line material, LOD by GPU tier, fallback path | 1.5 days |
+| 4 | QA | fidelity sequence harness (fixed p = 0.47, 0.56, each landmark stop) for the ride, full-page harness for everything else unchanged, Android + Slow-3G; ★ owner review | 1 day |
 
 ## Risks
 
-- **Payload vs audience** — mitigated by D; if budgets can't be met, drop full tier on mobile.
-- **Flat-map → frame-0 seam** — frame 0 must match the 2D map exactly; verified by a pixel check.
-- **Overlay drift** — per-frame camera export + per-landmark projection check in QA.
-- **Freestyle render time** at 2560×1440 — render low-res for iteration, final overnight.
-- **Change requests after rendering** cost a re-render (hours, not days) — lock the look at ★0/★2.
+- **Low-end GPU cost of 100k+ fat lines** — measured at ★0; LOD by weight class is the lever.
+- **Baked lines look too clean** next to Freestyle — the bake-off shows this before any scene work;
+  if the owner prefers Freestyle, revisit option 2 with its costs stated (bytes, ghosting, seam).
+- **Geometry drift** between section, Try-it map and Blender — single shared module + hash guard.
+- **No objective parity check for the ride today** — phase 4 promotes a fixed-p sequence capture
+  into `tools/fidelity/`.
+- Grease Pencil Line Art in Blender 5.2 could not be verified from the CLI; not relied on.
