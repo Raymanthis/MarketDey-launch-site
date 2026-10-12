@@ -248,7 +248,7 @@ def building(tag, side, y0, W, floors, setback, rng, Dp=12.0, side_walls=(), roo
 CLUTTER = {"ac": (0, 2), "dish": 0.0, "tiles": 0.0, "open_roof": 0.0}
 
 
-def building_at(tag, M, W, floors, Dp, rng, roof=None, detail=True):
+def building_at(tag, M, W, floors, Dp, rng, roof=None, detail=True, over=None):
     """A 2-4 storey street building whose facade frame is M (a along the wall, d out, h up), body
     behind the facade (d < 0). detail=False gives the plain massing used for back rows."""
     fa = Fa(tag, M, wall=rng.choice(WALL_TONES))
@@ -275,6 +275,7 @@ def building_at(tag, M, W, floors, Dp, rng, roof=None, detail=True):
         balc=[f for f in range(1, floors) if rng.random() < 0.5], bkind=rng.choice(["rail", "solid"]),
         breeze=rng.random() < 0.5, ac=rng.randint(0, 2), blade=rng.random() < 0.35,
     )
+    st.update(over or {})
     top = H + (0.95 if roof == "flat" else 0.0)
     S = fa.S
     fa.box(S, (0, -Dp, 0), (W, 0, top))
