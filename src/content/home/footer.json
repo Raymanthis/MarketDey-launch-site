@@ -1,0 +1,43 @@
+{
+  "planYourWakaNever": "Plan your waka, Never miss market day again.",
+  "getItOn": "Get it on",
+  "googlePlay": "Google Play",
+  "downloadOnThe": "Download on the",
+  "appStore": "App Store",
+  "getAlertsWhenNew": "Get alerts when new markets are added near you or market days are updated",
+  "yourEmailAddressPlaceholder": "Your email address",
+  "subscribe": "Subscribe",
+  "oneEmailAMonth": "One email a month. Unsubscribe any time.",
+  "marketdey": "Marketdey",
+  "marketDaysForEvery": "Market days for every town, worked out for you.",
+  "product": "PRODUCT",
+  "howItWorks": "How it works",
+  "findAMarket": "Find a market",
+  "landmarks": "Landmarks",
+  "faq": "FAQ",
+  "contributors": "CONTRIBUTORS",
+  "forContributors": "For contributors",
+  "addAMarket": "Add a market",
+  "reportAChange": "Report a change",
+  "company": "COMPANY",
+  "privacy": "Privacy",
+  "partnersAndPress": "Partners and press",
+  "contact": "Contact",
+  "copyright": "© 2026 Marketdey",
+  "termsAndConditions": "Terms and conditions",
+  "privacyPolicy": "Privacy policy",
+  "cookiePolicy": "Cookie policy",
+  "accessibility": "Accessibility",
+  "waitlist": {
+    "platforms": [
+      "Android",
+      "iPhone"
+    ],
+    "moves": [
+      "Driver or rider",
+      "Commuter",
+      "Trader",
+      "Transporter"
+    ]
+  }
+}

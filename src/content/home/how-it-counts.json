@@ -1,0 +1,20 @@
+{
+  "howMarketdeyCountsAn": "How Marketdey counts · an example",
+  "everyEighthDayWhatever": "Every eighth day, whatever day of the week it falls on.",
+  "thisIsAnExample": "This is an example of how one market might work. Some markets in Delta State run on an eight-day cycle, so market day lands on a different weekday each time. Others keep a fixed day of the week, like every Saturday. Marketdey follows each market's own schedule and alerts you at 6 pm the evening before and 6 am the morning of.",
+  "exampleMarket8Day": "Example market · 8-day cycle",
+  "replay": "Replay",
+  "plusEightDays": "+8 days",
+  "market": "Market",
+  "today": "Today",
+  "landsOn": "Lands on",
+  "eveningBefore": "6 pm, the evening before",
+  "morningOf": "6 am, the morning of",
+  "timeline": {
+    "eveningAlert": "6 pm",
+    "morningAlert": "6 am",
+    "marketDay": "Market day",
+    "dayPrefix": "Day ",
+    "daySuffix": " of 8"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "roadWarnings": "Road warnings",
+  "knowWhichRoadIt": "Know which road it's blocking right now.",
+  "peopleNearTheMarket": "People near the market post when the road is blocked. Every warning says how long ago it was reported and by how many people. Others nearby are asked \"Still blocked?\" so old warnings don't linger.",
+  "reported40MinAgo": "Reported 40 min ago · 2 reports",
+  "roadWarningsCanCome": "Road warnings can come through quiet hours",
+  "screens": {
+    "nt05Light": {
+      "friday11September": "Friday 11 September",
+      "time": "6:42",
+      "marketdey": "Marketdey",
+      "now": "now",
+      "warriRoadBlockedAt": "Warri road blocked at the market gate",
+      "twoPeopleReportedIt": "Two people reported it in the last hour. Expect heavy traffic on the Warri side.",
+      "open": "Open",
+      "stillBlocked": "Still blocked?"
+    },
+    "rw02Light": {
+      "friday11September": "Friday 11 September",
+      "marketdey": "Marketdey",
+      "verifiedLabel": "Verified",
+      "verified": "Verified",
+      "centralMarket": "Central Market",
+      "runsToday21": "Runs today · 2.1 km away",
+      "abrakaMarket": "Abraka Market",
+      "tomorrow64Km": "Tomorrow · 6.4 km",
+      "notYetVerifiedLabel": "Not yet verified",
+      "notYetVerified": "Not yet verified",
+      "areYouNearThe": "Are you near the Warri road?",
+      "twoPeopleSaidIt": "Two people said it was blocked 40 minutes ago. Is it still blocked now?",
+      "warriRoadBlockedAt": "Warri road blocked at the market gate",
+      "reported40MinAgo": "reported 40 min ago · 2 reports",
+      "yesStillBlocked": "Yes, still blocked",
+      "noItIsMoving": "No, it is moving",
+      "iAmNotOn": "I am not on that road"
+    }
+  },
+  "statusTime": "9:41",
+  "statusNetwork": "4G"
+}
