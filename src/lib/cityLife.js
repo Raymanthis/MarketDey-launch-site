@@ -436,13 +436,13 @@ export class CityLife {
     const clear = ph === 'clear', tint = ph === 'gathering' || ph === 'storm';
     this.skyEls.forEach(g => { g.style.opacity = clear ? '1' : '0'; });
     if (tint !== this.tinted) {
-      const fill = this.night ? '#1a1918' : '#2c5134';
+      const fill = this.night ? '#343431' : '#3a5642';
       this.cloudEls.forEach(g => {
         const p = g.querySelector('path');
         if (!p) return;
         if (tint) {
           p.style.transition = 'fill 3s ease, stroke 3s ease';
-          p.style.fill = fill; p.style.stroke = 'rgba(255,255,255,.45)'; p.style.strokeWidth = '2';
+          p.style.fill = fill; p.style.stroke = 'rgba(255,255,255,.5)'; p.style.strokeWidth = '1.6';
         } else {
           p.style.removeProperty('fill'); p.style.removeProperty('stroke'); p.style.removeProperty('stroke-width');
         }
@@ -471,12 +471,22 @@ export class CityLife {
       const g = document.createElementNS(SVGNS, 'g');
       const p = document.createElementNS(SVGNS, 'path');
       p.setAttribute('d', CLOUD_D);
-      p.setAttribute('fill', this.night ? '#161514' : '#2a4a31');
-      p.setAttribute('stroke', 'rgba(255,255,255,.4)');
+      // heavier grey-green (hero) / lighter charcoal (night): darker than normal clouds, never near-black
+      p.setAttribute('fill', this.night ? '#3b3b38' : '#36503f');
+      p.setAttribute('stroke', 'rgba(255,255,255,.5)');
       p.setAttribute('stroke-width', '1.3');
       p.setAttribute('stroke-linejoin', 'round');
       p.setAttribute('vector-effect', 'non-scaling-stroke');
       g.appendChild(p);
+      // inner detail strokes, same as buildCity's cloud()
+      const dl = document.createElementNS(SVGNS, 'path');
+      dl.setAttribute('d', 'M44 -30Q50 -40 62 -38M90 -24Q98 -28 104 -24');
+      dl.setAttribute('fill', 'none');
+      dl.setAttribute('stroke', 'rgba(255,255,255,.3)');
+      dl.setAttribute('stroke-width', '1.1');
+      dl.setAttribute('stroke-linecap', 'round');
+      dl.setAttribute('vector-effect', 'non-scaling-stroke');
+      g.appendChild(dl);
       g.setAttribute('opacity', '0');
       this.wxG.appendChild(g);
       this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from });
