@@ -1,0 +1,65 @@
+{
+  "faq": "FAQ",
+  "questions": "Questions",
+  "pickOneAndWatch": "Pick one and watch how Marketdey handles it.",
+  "centralMarket": "Central Market",
+  "sapele": "Sapele",
+  "alertsOnTheEvening": "Alerts on, the evening before",
+  "noSignUpNeeded": "No sign-up needed",
+  "marketdeyNow": "Marketdey · now",
+  "centralMarketIsTomorrow": "Central Market is tomorrow",
+  "workedOutOnYour": "Worked out on your phone",
+  "yourReportSendsWhen": "Your report sends when you're back online",
+  "addYourMarket": "Add your market",
+  "landmarkPrefix": "Landmark ",
+  "landmarkSuffix": " of 5",
+  "demoDayShort": "FRI",
+  "demoDayNumber": "16",
+  "staysOnPhoneHtml": "Stays on<br>your phone",
+  "android": "Android",
+  "iphone": "iPhone",
+  "sameAppOnBoth": "Same app on both",
+  "questionTotal": " / 07",
+  "list": [
+    {
+      "q": "Do I need an account?",
+      "a": "No. You can follow markets, get alerts and answer \"Is today market day?\" without signing up. We only ask for your phone number if you add a market, post a road warning or apply to verify your town."
+    },
+    {
+      "q": "Does it work without data?",
+      "a": "Yes. Market dates are worked out on your phone and alerts still fire with no network. Reports you make wait and send when you are back online."
+    },
+    {
+      "q": "Which markets are on it?",
+      "a": "Markets across Delta State to start, with more states coming. If a market you know is missing, you can add it and others can confirm it."
+    },
+    {
+      "q": "How do I find the market when I get there?",
+      "a": "Each market shows landmarks in the order you pass them on the way in, with a photo and a short cue like \"White walls, blue roof, on your left.\" Tap \"Check I'm here\" and answer a few quick questions to confirm you have arrived."
+    },
+    {
+      "q": "What if a date is wrong?",
+      "a": "Every market shows whether it is verified. Tap \"Something wrong? Report\" on the market, or answer the market-day question when you pass."
+    },
+    {
+      "q": "Is my location shared?",
+      "a": "No. Your location is used on your phone to find markets near you. It never leaves the device."
+    },
+    {
+      "q": "Android or iPhone?",
+      "a": "Both. Tell us which one you use when you join the waitlist."
+    }
+  ],
+  "demo": {
+    "follow": "Follow",
+    "following": "Following",
+    "network": "4G",
+    "noNetwork": "No network",
+    "verified": "Verified",
+    "notYetVerified": "Not yet verified",
+    "reportIdle": "Something wrong? Report",
+    "reportAsking": "Reported. Asking people nearby",
+    "reportTwoConfirmed": "2 people confirmed",
+    "reportThreeConfirmed": "3 people confirmed"
+  }
+}
