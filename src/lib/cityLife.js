@@ -77,8 +77,11 @@ const roofLine = (i, bodyD) => {
 };
 
 export class CityLife {
-  constructor(svgEl, { night = false, W, G = 292, seed = 1, reducedMotion = false } = {}) {
+  constructor(svgEl, { night = false, W, G = 292, seed = 1, reducedMotion = false, skyDimOnly = false } = {}) {
     this.svg = svgEl;
+    // skyDimOnly: the whole screen is sky (launch page), so the darkening comes only from the sky host's
+    // background; the canvas dim would cover just the skyline band and leave a lighter strip above it
+    this.skyDimOnly = !!skyDimOnly;
     this.el = svgEl.parentElement;
     this.night = !!night;
     this.W = W;
@@ -1823,7 +1826,7 @@ export class CityLife {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     // 1 dim
-    if (w.dim > 0) {
+    if (w.dim > 0 && !this.skyDimOnly) {
       ctx.fillStyle = this.night ? 'rgba(0,0,0,' + (0.28 * w.dim * dimK).toFixed(3) + ')' : 'rgba(12,28,18,' + (0.22 * w.dim * dimK).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }

@@ -19,3 +19,7 @@ input,select,button{font-family:inherit}
 @keyframes mdSignDrop{0%{transform:translateY(-56px)}55%{transform:translateY(7px)}75%{transform:translateY(-3px)}100%{transform:translateY(0px)}}
 .md-sign-pend{animation:mdSignSway 4.2s ease-in-out 1.4s infinite}
 @media (prefers-reduced-motion:reduce){.md-sign-pend{animation:none}}
+/* launch page: the whole screen is the hero sky, so html/body (seen on overscroll and behind the fixed layers)
+   follow the hero section's storm darkening set by cityLife (data-cl-dark) */
+html:has(section[data-launch]),html:has(section[data-launch]) body{background-color:#386641;transition:background-color 4s ease}
+html:has(section[data-launch][data-cl-dark]),html:has(section[data-launch][data-cl-dark]) body{background-color:#2a4f33}
