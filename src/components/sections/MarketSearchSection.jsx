@@ -133,7 +133,7 @@ class MarketSearchSection extends React.Component {
       dot.style.transform = 'translate(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px)';
       const full = Math.hypot(window.innerWidth, window.innerHeight) * 1.6, e = gw * gw * (3 - 2 * gw), rr = 24 + (full - 24) * Math.pow(e, 1.4), c = dot.querySelector('[data-c]');
       if (c) { const sc = (1 + 0.5 * sstep(0, 0.45, dv)) * (1 - mv) + ts * mv; c.style.transform = 'scale(' + sc.toFixed(3) + ')'; c.style.opacity = (sstep(0.04, 0.3, dv) * (1 - sstep(0.75, 1, gw))).toFixed(3); }
-      window.__mdReveal = gw > 0.001 ? { x: px, y: py, r: rr } : (dv > 0.04 ? { x: px, y: py, r: 0 } : null); }
+      window.__mdReveal = gw > 0.001 ? { x: px, y: py, r: rr, d: dv } : (dv > 0.04 ? { x: px, y: py, r: 0, d: dv } : null); }
     if (day) { const a = 0; day.style.clipPath = 'none'; day.style.opacity = a.toFixed(3); day.style.visibility = a > 0.002 ? 'visible' : 'hidden'; }
     if (hide > 0.5) { this.labRefs.forEach(rf => { if (rf.current) rf.current.style.opacity = '0'; }); if (this.ringLabRef.current) this.ringLabRef.current.style.opacity = '0'; return; }
     this.labRefs.forEach((rf, i) => { const el = rf.current; if (!el) return; const q = o.labs[i]; if (!q || q[2] > 1) { el.style.opacity = '0'; return; } el.style.opacity = '1'; el.style.transform = 'translate(' + q[0].toFixed(1) + 'px,' + q[1].toFixed(1) + 'px) translate(-50%,-140%)'; });
