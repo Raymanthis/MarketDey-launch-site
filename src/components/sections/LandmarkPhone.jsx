@@ -48,7 +48,7 @@ class LandmarkPhone extends React.Component {
                   <div style={{ display: 'flex', gap: '6px' }}>
                     {v.segs.map((g, i) => <React.Fragment key={i}><div style={{ flex: '1', height: '5px', borderRadius: '3px', background: 'rgba(204,197,185,.5)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${g.w}`, borderRadius: '3px', background: '#4f772d', transition: 'width 1.6s cubic-bezier(.45,0,.2,1)' }}></div></div></React.Fragment>)}
                   </div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#403d39' }}>{v.progressLabel}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#403d39' }}><span className="sc-interp">{v.progressLabel}</span></div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateRows: `${v.arrRows}`, opacity: `${v.arrOp}`, transition: 'grid-template-rows .7s cubic-bezier(.2,.8,.2,1),opacity .5s' }}><div style={{ overflow: 'hidden', minHeight: '0' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '18px', borderRadius: '20px', background: '#a7c957', marginBottom: '2px' }}>
@@ -62,16 +62,16 @@ class LandmarkPhone extends React.Component {
                     <div style={{ display: 'flex', flexDirection: 'column', borderRadius: `${r.rad}`, background: `${r.bg}`, border: `1.5px solid ${r.bd}`, boxShadow: `${r.sh}`, transition: 'background .5s,border-color .5s,box-shadow .5s,border-radius .5s', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minHeight: '52px', padding: '6px 14px' }}>
                         <span style={{ position: 'relative', flex: 'none', width: '28px', height: '28px', borderRadius: '14px', boxSizing: 'border-box', background: `${r.bBg}`, border: `1.5px solid ${r.bBd}`, color: `${r.bFg}`, transition: 'background .4s,border-color .4s,color .4s' }}>
-                          <span style={{ position: 'absolute', inset: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', opacity: `${r.numOp}`, transform: `scale(${r.numSc})`, transition: 'opacity .25s,transform .3s' }}>{r.n}</span>
+                          <span style={{ position: 'absolute', inset: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', opacity: `${r.numOp}`, transform: `scale(${r.numSc})`, transition: 'opacity .25s,transform .3s' }}><span className="sc-interp">{r.n}</span></span>
                           <i className="ri-check-line" style={{ position: 'absolute', inset: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', opacity: `${r.chkOp}`, transform: `scale(${r.chkSc}) rotate(${r.chkRot})`, transition: 'opacity .35s .2s,transform .55s .2s cubic-bezier(.3,1.6,.5,1)' }}></i>
                         </span>
-                        <div style={{ flex: '1', fontSize: `${r.fs}`, fontWeight: '800', letterSpacing: '-.02em', color: `${r.fc}`, transition: 'font-size .4s,color .4s' }}>{r.name}</div>
+                        <div style={{ flex: '1', fontSize: `${r.fs}`, fontWeight: '800', letterSpacing: '-.02em', color: `${r.fc}`, transition: 'font-size .4s,color .4s' }}><span className="sc-interp">{r.name}</span></div>
                         <div style={{ fontSize: '12px', fontWeight: '800', color: '#386641', opacity: `${r.seenOp}`, transform: `translateX(${r.seenX})`, transition: 'opacity .4s .35s,transform .5s .35s' }}>{content.seen}</div>
                       </div>
                       <div style={{ display: 'grid', gridTemplateRows: `${r.rows}`, transition: 'grid-template-rows .65s cubic-bezier(.2,.8,.2,1)' }}><div style={{ overflow: 'hidden', minHeight: '0' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '0 12px 12px', opacity: `${r.bodyOp}`, transition: 'opacity .4s' }}>
-                          <div style={{ height: '128px', borderRadius: '14px', background: 'repeating-linear-gradient(135deg,rgba(37,36,34,.07) 0 8px,transparent 8px 16px)', border: '1px solid rgba(37,36,34,.08)', display: 'flex', alignItems: 'flex-end', padding: '8px', boxSizing: 'border-box', font: '10px/1.2 ui-monospace,Menlo,monospace', color: '#403d39' }}>{`${content.photoPrefix}${r.photo}`}</div>
-                          <div style={{ fontSize: '15px', lineHeight: '1.4', color: '#403d39' }}>{r.cue}</div>
+                          <div style={{ height: '128px', borderRadius: '14px', background: 'repeating-linear-gradient(135deg,rgba(37,36,34,.07) 0 8px,transparent 8px 16px)', border: '1px solid rgba(37,36,34,.08)', display: 'flex', alignItems: 'flex-end', padding: '8px', boxSizing: 'border-box', font: '10px/1.2 ui-monospace,Menlo,monospace', color: '#403d39' }}>{content.photoPrefix}<span className="sc-interp">{r.photo}</span></div>
+                          <div style={{ fontSize: '15px', lineHeight: '1.4', color: '#403d39' }}><span className="sc-interp">{r.cue}</span></div>
                           <div style={{ display: 'flex', gap: '8px' }}><div style={{ flex: '1', height: '48px', borderRadius: '24px', background: '#4f772d', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '700' }}>{content.actions.yes}</div><div style={{ flex: '1', height: '48px', borderRadius: '24px', border: '1.5px solid rgba(37,36,34,.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '700' }}>{content.actions.no}</div></div>
                         </div>
                       </div></div>
