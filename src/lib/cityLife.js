@@ -1062,7 +1062,14 @@ export class CityLife {
         if (a.dy !== b.dy) return a.dy - b.dy;
         return (b.x + b.bx0 + b.len) - (a.x + a.bx0 + a.len);
       });
-      sorted.forEach(v => this.el.insertBefore(v.wrapper, this.cRoof));
+      // move only the layers that are out of place (walk back from the roof canvas): re-inserting every
+      // composited vehicle layer on each change churns style and layers
+      let ref = this.cRoof;
+      for (let k = sorted.length - 1; k >= 0; k--) {
+        const w = sorted[k].wrapper;
+        if (w.nextSibling !== ref) this.el.insertBefore(w, ref);
+        ref = w;
+      }
     }
   }
 
