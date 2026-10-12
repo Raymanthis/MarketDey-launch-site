@@ -11,6 +11,14 @@ const clamp01 = t => (t < 0 ? 0 : t > 1 ? 1 : t);
 const smooth = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 const r1 = n => Math.round(n * 10) / 10;
+// linear mix of two #rrggbb colours
+const mixHex = (a, b, t) => {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const r = Math.round(lerp(pa >> 16 & 255, pb >> 16 & 255, t));
+  const g = Math.round(lerp(pa >> 8 & 255, pb >> 8 & 255, t));
+  const bl = Math.round(lerp(pa & 255, pb & 255, t));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+};
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const CLOUD_D = 'M0 0H120Q132 0 130 -10Q128 -22 112 -20Q108 -40 86 -38Q76 -56 52 -50Q32 -46 30 -28Q12 -32 6 -18Q-4 -16 -2 -6Q-1 0 0 0Z';
@@ -60,7 +68,13 @@ export class CityLife {
     this.appliedStorm = 0;
     this.tinted = false;
     this.stormClouds = [];
-    this.bolt = null;
+    this.boltEv = null;
+    // illustrated bolt lives in the SVG as its first child, so tiles, buildings and clouds draw over it
+    this.boltG = document.createElementNS(SVGNS, 'g');
+    this.boltG.setAttribute('data-cl-wx', '1');
+    this.boltG.setAttribute('pointer-events', 'none');
+    this.boltG.setAttribute('opacity', '0');
+    svgEl.insertBefore(this.boltG, svgEl.firstChild);
 
     // visuals
     this.skyEls = Array.from(svgEl.querySelectorAll('[data-sky]'));
@@ -243,6 +257,9 @@ export class CityLife {
       const p = g.querySelector('path');
       if (p) ['transition', 'fill', 'stroke', 'stroke-width'].forEach(k => p.style.removeProperty(k));
     });
+    if (this.boltG) { this.boltG.remove(); this.boltG = null; }
+    if (this.svg) { const d = this.svg.querySelector('defs[data-cl-wx]'); if (d) d.remove(); }
+    this.boltEv = null;
     this.canvas = null; this.ctx = null;
     this.vehicles = []; this.queue = []; this.skyEls = []; this.cloudEls = [];
     this.wxG = null; this.svg = null; this.el = null; this.splashes = []; this.drops = [];
@@ -359,7 +376,7 @@ export class CityLife {
   setViewTime(sec) {
     this.viewTime = Math.max(0, +sec || 0);
     this.storms.forEach(s => s.events.forEach(e => { e.fired = e.t < this.viewTime; }));
-    this.bolt = null;
+    this.clearBolt();
     this.deriveTraffic();
     this.deriveWeather();
     this.syncWeather();
@@ -463,12 +480,22 @@ export class CityLife {
   buildStormClouds() {
     this.clearStormClouds();
     if (!this.wxG) return;
+    this.ensureGlowDefs();
     const rv = this.rV, W = this.W, n = 4 + Math.floor(rv() * 3), span = (W - 120) + 60;
     for (let j = 0; j < n; j++) {
       const S = 1.6 + rv() * 0.8, Y = -340 + rv() * 150;
       const Xt = -60 + (j + 0.5) * (span / n) + (rv() - 0.5) * (span / n) * 0.6;
       const from = j % 2 ? W + 60 : -300;
       const g = document.createElementNS(SVGNS, 'g');
+      // glow sits behind the body: the cloud lights up from inside during a strike
+      const glow = document.createElementNS(SVGNS, 'ellipse');
+      glow.setAttribute('cx', '66');
+      glow.setAttribute('cy', '-10');
+      glow.setAttribute('rx', '95');
+      glow.setAttribute('ry', '48');
+      glow.setAttribute('fill', 'url(#cl-glow-' + this.seed + ')');
+      glow.setAttribute('opacity', '0');
+      g.appendChild(glow);
       const p = document.createElementNS(SVGNS, 'path');
       p.setAttribute('d', CLOUD_D);
       // heavier grey-green (hero) / lighter charcoal (night): darker than normal clouds, never near-black
@@ -487,17 +514,40 @@ export class CityLife {
       dl.setAttribute('stroke-linecap', 'round');
       dl.setAttribute('vector-effect', 'non-scaling-stroke');
       g.appendChild(dl);
+      // lit lower edge, drawn last
+      const hl = document.createElementNS(SVGNS, 'path');
+      hl.setAttribute('d', 'M8 -3Q40 3 66 0Q96 -3 124 -4');
+      hl.setAttribute('fill', 'none');
+      hl.setAttribute('stroke', '#f4fbe0');
+      hl.setAttribute('stroke-width', '1.6');
+      hl.setAttribute('stroke-linecap', 'round');
+      hl.setAttribute('vector-effect', 'non-scaling-stroke');
+      hl.setAttribute('opacity', '0');
+      g.appendChild(hl);
       g.setAttribute('opacity', '0');
       this.wxG.appendChild(g);
-      this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from });
+      this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1 });
     }
     this.updateStormClouds();
+  }
+
+  ensureGlowDefs() {
+    if (this.svg.querySelector('defs[data-cl-wx]')) return;
+    const defs = document.createElementNS(SVGNS, 'defs');
+    defs.setAttribute('data-cl-wx', '1');
+    defs.innerHTML = '<radialGradient id="cl-glow-' + this.seed + '" cx="50%" cy="55%" r="50%">'
+      + '<stop offset="0" stop-color="#f1f9d8" stop-opacity=".85"></stop>'
+      + '<stop offset=".55" stop-color="#d9ef9a" stop-opacity=".35"></stop>'
+      + '<stop offset="1" stop-color="#d9ef9a" stop-opacity="0"></stop></radialGradient>';
+    this.svg.insertBefore(defs, this.svg.firstChild);
   }
 
   updateStormClouds() {
     const w = this.wx, s = w.storm;
     if (!s || !this.stormClouds.length) return;
-    const t = this.viewTime;
+    const t = this.viewTime, W = this.W;
+    const base = this.night ? '#3b3b38' : '#36503f';
+    const lit = s.events.filter(e => e.src != null && this.stormClouds[e.src]);
     this.stormClouds.forEach(c => {
       let X, op;
       if (w.phase === 'gathering') { const p = clamp01(w.p); X = c.from + (c.Xt - c.from) * (1 - Math.pow(1 - p, 3)); op = 0.95 * p; }
@@ -506,24 +556,105 @@ export class CityLife {
       c.cx = X;
       c.g.setAttribute('transform', 'translate(' + r1(X) + ' ' + r1(c.Y) + ') scale(' + c.S.toFixed(2) + ')');
       c.g.setAttribute('opacity', op.toFixed(3));
+      // lightning light: source cloud brightest, neighbours fade with distance
+      const cxc = c.cx + 66 * c.S;
+      let L = 0;
+      lit.forEach(e => {
+        const k = this.flashK(e, t);
+        if (k <= 0) return;
+        const sc = this.stormClouds[e.src];
+        const d = Math.abs(cxc - (sc.cx + 66 * sc.S));
+        const fall = d === 0 ? 1 : 0.85 * Math.exp(-d / (0.22 * W));
+        L = Math.max(L, k * fall);
+      });
+      if (Math.abs(L - c.L) > 0.002) {
+        c.L = L;
+        c.body.setAttribute('fill', mixHex(base, '#eef8cf', 0.85 * L));
+        c.body.setAttribute('stroke', 'rgba(255,255,255,' + (0.5 + 0.5 * L).toFixed(3) + ')');
+        c.detail.setAttribute('stroke', 'rgba(255,255,255,' + (0.3 + 0.6 * L).toFixed(3) + ')');
+        c.glow.setAttribute('opacity', L.toFixed(3));
+        c.hl.setAttribute('opacity', L.toFixed(3));
+      }
     });
   }
 
-  genBolt(t0) {
-    const rv = this.rV, top = this.top, W = this.W;
+  genBolt(t0, src) {
+    const rv = this.rV, W = this.W;
     let sx, sy;
-    if (this.stormClouds.length) {
-      const c = this.stormClouds[Math.floor(rv() * this.stormClouds.length)];
-      sx = c.cx + 60 * c.S; sy = c.Y - top;
-    } else { sx = rv() * W; sy = -260 - top; }
-    const ey = this.gy - (120 + rv() * 60), ex = sx + (rv() < 0.5 ? -60 : 60) * rv();
-    const n = 7 + Math.floor(rv() * 4), pts = [[sx, sy]];
-    for (let k = 1; k < n; k++) { const f = k / n; pts.push([lerp(sx, ex, f) + (rv() * 2 - 1) * 14, lerp(sy, ey, f)]); }
-    pts.push([ex, ey]);
-    const m = pts[Math.floor(n / 2)], branch = [m];
-    const bd = rv() < 0.5 ? -1 : 1;
-    for (let k = 1; k <= 3; k++) branch.push([m[0] + bd * k * 14 + (rv() * 2 - 1) * 8, m[1] + k * 18]);
-    return { t0, pts, branch };
+    const c = src != null && this.stormClouds[src] ? this.stormClouds[src] : null;
+    if (c) { sx = c.cx + (40 + rv() * 52) * c.S; sy = c.Y - 8 * c.S; }
+    else if (this.stormClouds.length) {
+      const k = this.stormClouds[Math.floor(rv() * this.stormClouds.length)];
+      sx = k.cx + (40 + rv() * 52) * k.S; sy = k.Y - 8 * k.S;
+    } else { sx = rv() * W; sy = -260; }
+    const ey = this.G - 30 - rv() * 40, ex = sx + (rv() - 0.5) * 120;
+    // main channel: steps down with jitter, nudged toward the end x
+    const n = 8 + Math.floor(rv() * 4), pts = [[sx, sy]];
+    for (let k = 1; k < n; k++) {
+      const f = k / (n - 1), px = pts[k - 1][0];
+      pts.push([px + (ex - px) / (n - k) + (rv() * 2 - 1) * 16, lerp(sy, ey, f)]);
+    }
+    pts[n - 1] = [ex, ey];
+    // 1-3 branches off the upper 60% of the channel, down and sideways, getting shorter
+    const branches = [];
+    const nb = 1 + Math.floor(rv() * 3), hi = Math.max(1, Math.floor((n - 1) * 0.6));
+    for (let b = 0; b < nb; b++) {
+      const s0 = pts[Math.floor(rv() * (hi + 1))], side = rv() < 0.5 ? -1 : 1;
+      const segs = 3 + Math.floor(rv() * 3), bp = [[s0[0], s0[1]]];
+      let sh = 1;
+      for (let k = 1; k <= segs; k++) {
+        const px = bp[k - 1][0], py = bp[k - 1][1];
+        bp.push([px + side * (10 + rv() * 12) * sh, py + (14 + rv() * 10) * sh]);
+        sh *= 0.82;
+      }
+      branches.push(bp);
+    }
+    const toD = a => a.map((q, k) => (k ? 'L' : 'M') + r1(q[0]) + ' ' + r1(q[1])).join('');
+    return { t0, main: toD(pts), branches: branches.map(toD), sx, sy, ex, ey };
+  }
+
+  // build the SVG bolt once per strike: glow strokes first, then cores, then the impact glow
+  showBolt(b) {
+    const g = this.boltG;
+    if (!g) return;
+    while (g.firstChild) g.removeChild(g.firstChild);
+    const mk = (d, w, col, op) => {
+      const p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('d', d);
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', col);
+      p.setAttribute('stroke-width', w);
+      p.setAttribute('stroke-linecap', 'round');
+      p.setAttribute('stroke-linejoin', 'round');
+      if (op) p.setAttribute('stroke-opacity', op);
+      return p;
+    };
+    const glow = [mk(b.main, 7, '#e6f5b8', '.35')].concat(b.branches.map(d => mk(d, 4, '#e6f5b8', '.35')));
+    const core = [mk(b.main, 2, '#ffffff')].concat(b.branches.map(d => mk(d, 1.2, '#ffffff')));
+    glow.forEach(n => g.appendChild(n));
+    core.forEach(n => g.appendChild(n));
+    const c = document.createElementNS(SVGNS, 'circle');
+    c.setAttribute('cx', r1(b.ex));
+    c.setAttribute('cy', r1(b.ey));
+    c.setAttribute('r', '10');
+    c.setAttribute('fill', '#e6f5b8');
+    c.setAttribute('opacity', '.35');
+    g.appendChild(c);
+  }
+
+  clearBolt() {
+    this.boltEv = null;
+    if (!this.boltG) return;
+    this.boltG.setAttribute('opacity', '0');
+    while (this.boltG.firstChild) this.boltG.removeChild(this.boltG.firstChild);
+  }
+
+  updateBolt() {
+    const e = this.boltEv;
+    if (!e) return;
+    const k = this.flashK(e, this.viewTime);
+    this.boltG.setAttribute('opacity', k.toFixed(3));
+    if (k === 0 && this.viewTime - e.t > 0.4) this.clearBolt();
   }
 
   // ---------- drawing ----------
@@ -536,15 +667,20 @@ export class CityLife {
     this.draw(dt);
   }
 
+  // flash envelope of event e at viewTime t: 0..1, with a second pulse for double strikes
+  flashK(e, t) {
+    const d = t - e.t;
+    const pulse = x => (x < 0 ? 0 : x < 0.05 ? x / 0.05 : x < 0.15 ? 1 - (x - 0.05) / 0.10 : 0);
+    let k = pulse(d);
+    if (e.double) k = Math.max(k, 0.7 * pulse(d - 0.18));
+    return k;
+  }
+
   flashAlpha() {
     const s = this.wx.storm;
     if (!s) return 0;
     let a = 0;
-    s.events.forEach(e => {
-      const d = this.viewTime - e.t;
-      if (d >= 0 && d <= 0.15) a = Math.max(a, 0.35 * (1 - d / 0.15));
-      if (e.double) { const d2 = d - 0.18; if (d2 >= 0 && d2 <= 0.15) a = Math.max(a, 0.25 * (1 - d2 / 0.15)); }
-    });
+    s.events.forEach(e => { a = Math.max(a, 0.2 * this.flashK(e, this.viewTime)); });
     return a;
   }
 
@@ -557,13 +693,22 @@ export class CityLife {
       w.storm.events.forEach(e => {
         if (!e.fired && this.viewTime >= e.t) {
           e.fired = true;
-          if (e.bolt && this.viewTime - e.t < 0.2) this.bolt = this.genBolt(e.t);
+          if (this.stormClouds.length) {
+            e.src = Math.floor(this.rV() * this.stormClouds.length);
+            const sc = this.stormClouds[e.src];
+            e.sx = sc.cx + 66 * sc.S;
+          }
+          if (e.bolt) { this.boltEv = e; this.showBolt(this.genBolt(e.t, e.src)); }
         }
       });
     }
-    if (this.bolt && this.viewTime - this.bolt.t0 > 0.2) this.bolt = null;
+    this.updateBolt();
     const flash = this.flashAlpha();
-    if (!w.dim && !w.rain && !flash && !this.bolt && !this.splashes.length) {
+    // dim eases off while a strike is lit so the clouds and bolt are not buried
+    let K = 0;
+    if (w.storm) w.storm.events.forEach(e => { K = Math.max(K, this.flashK(e, this.viewTime)); });
+    const dimK = 1 - 0.7 * K;
+    if (!w.dim && !w.rain && !flash && !this.boltEv && !this.splashes.length) {
       if (this.drawn) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.drawn = false; }
       return;
     }
@@ -572,7 +717,7 @@ export class CityLife {
     ctx.clearRect(0, 0, W, H);
     // 1 dim
     if (w.dim > 0) {
-      ctx.fillStyle = this.night ? 'rgba(0,0,0,' + (0.28 * w.dim).toFixed(3) + ')' : 'rgba(12,28,18,' + (0.22 * w.dim).toFixed(3) + ')';
+      ctx.fillStyle = this.night ? 'rgba(0,0,0,' + (0.28 * w.dim * dimK).toFixed(3) + ')' : 'rgba(12,28,18,' + (0.22 * w.dim * dimK).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }
     const rainCol = this.night ? 'rgba(200,214,229,.30)' : 'rgba(255,255,255,.35)';
@@ -616,17 +761,7 @@ export class CityLife {
     }
     // 4 flash
     if (flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flash.toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
-    // 5 bolt
-    if (this.bolt) {
-      const b = this.bolt;
-      ctx.globalAlpha = Math.max(0, 1 - (this.viewTime - b.t0) / 0.2);
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(255,255,255,.8)';
-      ctx.beginPath();
-      b.pts.forEach((p, k) => { if (k) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
-      b.branch.forEach((p, k) => { if (k) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
-      ctx.stroke();
-      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-    }
+    // 5 bolt is SVG (this.boltG), drawn under the city by showBolt()/updateBolt()
     // soften the canvas top edge so dim/flash/rain never show a hard line
     if (!this.topFade) {
       this.topFade = ctx.createLinearGradient(0, 0, 0, 140);
