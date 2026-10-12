@@ -45,3 +45,6 @@ next-env.d.ts
 /tools/fidelity/candidate/
 /tools/fidelity/diff/
 /tools/fidelity/node_modules/
+
+# Claude Code agent worktrees
+/.claude/
