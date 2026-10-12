@@ -7,6 +7,7 @@ import MarketSearchSection from '@/components/sections/MarketSearchSection';
 import LandmarksJourneySection from '@/components/sections/LandmarksJourneySection';
 import ContributorsSection from '@/components/sections/ContributorsSection';
 import { lmMapBuild } from '@/lib/lmMapBuild';
+import { CityLife } from '@/lib/cityLife';
 import heroCopy from '@/content/home/hero.json';
 import alertsCopy from '@/content/home/alerts.json';
 import countsCopy from '@/content/home/how-it-counts.json';
@@ -178,6 +179,15 @@ class HomePage extends React.Component {
       + '</g></g></g></g>');
     el.innerHTML = '<svg width="100%" height="320" viewBox="0 0 ' + W + ' 320" preserveAspectRatio="xMinYMax meet" style="display:block;overflow:visible">' + out.join('') + '</svg>';
     if (hero) { this.cityW = W; if (on) this.cityLive(); } else { this.footW = W; this.cityLive(el); }
+    this.cityLifeMake(el, hero, W, G);
+  }
+  cityLifeMake(el, hero, W, G) {
+    const k = hero ? 'cityLifeHero' : 'cityLifeFoot';
+    if (this[k]) this[k].destroy();
+    const svg = el.querySelector('svg'); if (!svg) { this[k] = null; return; }
+    const rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    this[k] = new CityLife(svg, { night: !hero, W, G, seed: hero ? 5 : 19, reducedMotion: rm });
+    this[k].start();
   }
   cityLive(el0) { const el = el0 || this.cityRef.current; if (!el) return; this.cityScroll(el); el.querySelectorAll('[data-live]').forEach(g => { g.style.opacity = '1'; }); el.querySelectorAll('rect[data-w]').forEach((w, i) => { w.style.animation = 'mdTwinkle ' + w.getAttribute('data-w') + 's ease-in-out ' + ((i * 0.37) % 4).toFixed(2) + 's infinite'; }); }
   cityScroll(el0) { const el = el0 || this.cityRef.current; if (!el || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
@@ -389,6 +399,7 @@ class HomePage extends React.Component {
     this.onRoads = () => { const el = this.roadsRef.current; if (!el) return; const r = el.parentElement.getBoundingClientRect(), t = Math.max(0, Math.min(1, -r.top / (window.innerHeight * 0.28))), e = t * t * (3 - 2 * t); el.style.opacity = e.toFixed(3); el.style.transform = 'scale(' + (0.985 + 0.015 * e).toFixed(4) + ')'; };
     this.onHeroScroll = () => { const root = this.heroRef.current, hp = root && root.querySelectorAll('[data-hp]'); if (!hp || hp.length < 2) return; const t = this.heroMax = Math.max(this.heroMax || 0, Math.min(1, window.scrollY / 640)), E = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3), eR = E(t / 0.85), eL = E((t - 0.1) / 0.85); hp[1].style.transform = 'translateY(' + (340 * (1 - eR)).toFixed(1) + 'px) rotate(3deg)'; hp[0].style.transform = 'translateY(' + (380 * (1 - eL)).toFixed(1) + 'px) rotate(-3deg)'; if (!this.cityOn && this.introGone && !this.cityFixedNow() && root.getBoundingClientRect().bottom <= window.innerHeight + 2) this.cityShow(); };
     this.buildCity(); this.buildCity(this.footCityRef.current, '#252422', this.footSky()); if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!this.dead) this.buildCity(this.footCityRef.current, '#252422', this.footSky()); }); this.onCityResize = () => { const el = this.cityRef.current; if (el && Math.abs(el.clientWidth - (this.cityW || 0)) > 40) this.buildCity(); const fe = this.footCityRef.current; if (fe && Math.abs(fe.clientWidth - (this.footW || 0)) > 40) this.buildCity(fe, '#252422', this.footSky()); }; window.addEventListener('resize', this.onCityResize);
+    if (new URLSearchParams(window.location.search).get('citydebug') === '1') { const self = this; window.__city = { get hero() { return self.cityLifeHero; }, get footer() { return self.cityLifeFoot; } }; this.cityDebug = true; }
     window.addEventListener('scroll', this.onHeroScroll, { passive: true }); this.onHeroScroll();
     this.heroIntro();
     this.onTmResize = () => this.tmResize(); window.addEventListener('resize', this.onTmResize);
@@ -397,7 +408,7 @@ class HomePage extends React.Component {
     window.addEventListener('scroll', this.onRoads, { passive: true }); this.onRoads();
     this.faqTick = setInterval(() => { const el = this.faqRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.8 || r.bottom < vh * 0.2 || !this.state.enter) return; const ph = this.state.ph + 1; if (ph >= FAQ_STEPS) this.pickFaq((this.state.faq + 1) % FAQS.length); else this.setState({ ph }); }, 1100);
   }
-  componentWillUnmount() { (this.heroT || []).forEach(clearTimeout); window.removeEventListener('scroll', this.onHeroScroll); cancelAnimationFrame(this.swayRaf); window.removeEventListener('scroll', this.onRoads); clearInterval(this.faqTick); clearInterval(this.glTick); this.tmDead = true; if (this.introOff) this.introOff(); document.documentElement.style.overflow = ''; clearTimeout(this.cityT1); clearTimeout(this.cityT2); clearTimeout(this.cityT3); clearTimeout(this.cityT4); window.removeEventListener('resize', this.onCityResize); cancelAnimationFrame(this.tmRaf); window.removeEventListener('resize', this.onTmResize); clearTimeout(this.enterT); if (this.faqIO) this.faqIO.disconnect(); }
+  componentWillUnmount() { (this.heroT || []).forEach(clearTimeout); window.removeEventListener('scroll', this.onHeroScroll); cancelAnimationFrame(this.swayRaf); window.removeEventListener('scroll', this.onRoads); clearInterval(this.faqTick); clearInterval(this.glTick); this.tmDead = true; if (this.introOff) this.introOff(); document.documentElement.style.overflow = ''; clearTimeout(this.cityT1); clearTimeout(this.cityT2); clearTimeout(this.cityT3); clearTimeout(this.cityT4); window.removeEventListener('resize', this.onCityResize); cancelAnimationFrame(this.tmRaf); window.removeEventListener('resize', this.onTmResize); clearTimeout(this.enterT); if (this.faqIO) this.faqIO.disconnect(); if (this.cityLifeHero) this.cityLifeHero.destroy(); if (this.cityLifeFoot) this.cityLifeFoot.destroy(); this.cityLifeHero = null; this.cityLifeFoot = null; if (this.cityDebug) delete window.__city; }
 
   faqVals() {
     const i = Math.max(0, this.state.faq), P = this.state.ph, q = P % 4, en = this.state.enter, fpos = Math.min(4, P);
