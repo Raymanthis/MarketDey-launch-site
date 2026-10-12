@@ -51,42 +51,20 @@ const G = lmMapBuild(r => rec.push(r));
 const { fr, W, MK, LS, SB } = G;
 
 // ---------------------------------------------------------------- camera (section render())
-const MAP_END = 0.47, RIDE_START = 0.56, RIDE_END = 1;
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const sstep = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-const interp = (p, xs, ys) => { for (let i = 1; i < xs.length; i++) if (p <= xs[i]) { const t = (p - xs[i - 1]) / (xs[i] - xs[i - 1]); const e = t * t * (3 - 2 * t); return ys[i - 1] + (ys[i] - ys[i - 1]) * e; } return ys[ys.length - 1]; };
-const REVEAL = 1 / 17, KP = [0, 0.12, 0.3, 0.48, 0.66, 0.84, 0.95, 1], KS = [-14, 10, 70, 130, 185, 216, 235, 235];
-const TS0 = G.S0 + 4, TS1 = -14, Q_GATE = 0.84;
+// src/lib/rideCamera.js is the section's own camera code (shared with the site); frameCamera()
+// poses it at p with the heading smoothing converged.
+const RC = await import(url.pathToFileURL(path.join(REPO, 'src/lib/rideCamera.js')).href);
+const { MAP_END, RIDE_START, RIDE_END, clamp, sstep } = RC;
+const rig = RC.makeRideCamera(THREE);
 const camera = new THREE.PerspectiveCamera(58, 1.6, 0.1, 700);
-const camP = new THREE.Vector3(), look0 = new THREE.Vector3(), look = new THREE.Vector3(), tgt = new THREE.Vector3();
-const gateCurve = new THREE.CatmullRomCurve3([[216, 1.3], [228, 1.1], [237, -0.6], [242.5, -4.2], [245, -9], [245, -20], [245, -36]].map(([s, l]) => { const [x, z] = W(s, l); return new THREE.Vector3(x, 1.75, z); }), false, 'centripetal');
-const gateFar = (() => { const [x, z] = W(245, -60); return new THREE.Vector3(x, 1.9, z); })();
+for (const [k, v] of [['S0', G.S0], ['DS', G.DS]]) if (RC[k] !== v) throw new Error('rideCamera.js and lmMapBuild.js disagree on ' + k);
 
 function camAt(p) {
-  const k = clamp(p / MAP_END, 0, 1), e = clamp((p - MAP_END) / (RIDE_START - MAP_END), 0, 1), q = clamp((p - RIDE_START) / (RIDE_END - RIDE_START), 0, 1);
-  const f = 0.12 + 0.3 * sstep(0, REVEAL * 1.1, p), e1 = sstep(0, 1, e);
-  const sHead = k < 1 ? TS0 + k * (TS1 - 30 - TS0) : TS1 - 30 + 30 * clamp(e / 0.45, 0, 1), th = fr(sHead)[2];
-  const hdS = th;                                    // smoothing converged
-  const up = sstep(0.25, 0.95, e);
-  const roll = sstep(-338, -302, sHead), ra = Math.PI * (1 - roll), fx = Math.sin(hdS + ra), fz = -Math.cos(hdS + ra), [hx, hz] = W(sHead, 0), Hm = 95, ffin = f + (0.58 - f) * roll, off = (ffin - 0.5) * 105.3;
-  const roadCam = qq => { const s1 = interp(qq, KP, KS), [rx, rz] = W(s1, 1.3), [ax, az] = W(s1 + 26, 0.6); look.set(ax, 1.9, az);
-    let wMax = 0, wi = -1; LS.forEach((ls, i) => { const d = ls - s1, w = Math.max(0, 1 - Math.abs(d - 30) / 22) * 0.5; if (w > wMax) { wMax = w; wi = i; } });
-    if (wi >= 0) { const [mx, mz] = W(LS[wi], MK[wi][0] * 0.8); tgt.set(mx, 3.4, mz); look.lerp(tgt, wMax); }
-    camP.set(rx, 1.75 + Math.sin(s1 * 0.8) * 0.04, rz); return s1; };
-  let sc;
-  if (q <= Q_GATE) sc = roadCam(q);
-  else { roadCam(Q_GATE); look0.copy(look); const u = 0.6 * sstep(0, 1, (q - Q_GATE) / (1 - Q_GATE)); gateCurve.getPointAt(u, camP); camP.y = 1.75;
-    if (u + 0.08 <= 1) gateCurve.getPointAt(u + 0.08, tgt); else { gateCurve.getPointAt(1, tgt); tgt.lerp(gateFar, (u + 0.08 - 1) / 0.08); }
-    tgt.y = 1.9; look.copy(look0).lerp(tgt, sstep(0, 0.3, u)); sc = 216 + u * 29; }
-  const cx = camP.x, cy = camP.y, cz = camP.z;
-  if (e < 1) { const mx = hx + fx * off, mz = hz + fz * off;
-    camera.position.set(mx + (cx - mx) * e1, Hm + (cy - Hm) * e1, mz + (cz - mz) * e1);
-    tgt.set(mx + (look.x - mx) * e1, look.y * e1, mz + (look.z - mz) * e1);
-    camera.up.set(fx * (1 - e1), e1, fz * (1 - e1)).normalize(); camera.lookAt(tgt); }
-  else { camera.position.set(cx, cy, cz); camera.up.set(0, 1, 0); camera.lookAt(look); }
-  camera.updateMatrixWorld();
+  const st = RC.phase(p);
+  const { pos, quat } = RC.frameCamera(THREE, rig, p, camera);
+  const sc = rig.pose(camera, st, RC.headS(st.k, st.e), RC.fr(RC.headS(st.k, st.e))[2]).sc;
   const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  return { p, e, q, s: sc, grow: 0.02 + 0.98 * up, pos: camera.position.toArray(), quat: camera.quaternion.toArray(), dir: dir.toArray() };
+  return { p, e: st.e, q: st.q, s: sc, grow: 0.02 + 0.98 * sstep(0.25, 0.95, st.e), pos, quat, dir: dir.toArray() };
 }
 
 // ---------------------------------------------------------------- frame spacing
