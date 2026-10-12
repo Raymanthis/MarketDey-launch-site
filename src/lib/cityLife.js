@@ -1444,16 +1444,45 @@ export class CityLife {
     }
   }
 
+  // spawn drop d from a storm cloud that is actually on stage (op >= 0.35), picked with
+  // probability proportional to its scale. Two passes over the (tiny) list, so no allocation.
+  // fill: also used when a drop first appears, so the column fills in from cloud base to ground.
+  emit(d, fill) {
+    const cs = this.stormClouds, rr = this.rR;
+    let tot = 0;
+    for (let k = 0; k < cs.length; k++) { const c = cs[k]; if (c.op >= 0.35) tot += c.S; }
+    if (!(tot > 0)) return false;
+    let pick = rr() * tot, c = null, ci = -1, last = -1;
+    for (let k = 0; k < cs.length; k++) {
+      const q = cs[k];
+      if (q.op < 0.35) continue;
+      last = k;
+      pick -= q.S;
+      if (pick <= 0) { c = q; ci = k; break; }
+    }
+    if (!c) { c = cs[last]; ci = last; }
+    // x inside the cloud body's lower half, y in the hidden band just above its bottom edge
+    d.x = c.cx + (10 + rr() * 112) * c.S;
+    d.y = fill ? c.Y + rr() * (this.G - c.Y) : c.Y - rr() * 9 * c.S;
+    d.src = ci;
+    d.wait = false;
+    return true;
+  }
+
   stepRain(dt) {
-    const W = this.W, G = this.G, top = this.top, rr = this.rR;
+    const G = this.G;
     const drops = this.drops, vehicles = this.vehicles;
     const na = Math.round(this.N * this.wx.rain);
-    for (let k = this.nAct; k < na; k++) drops[k].y = top - 40 + rr() * (this.gy + 40);
+    // level up: a newly active drop only appears once a storm cloud can emit it
+    for (let k = this.nAct; k < na; k++) { const d = drops[k]; if (!this.emit(d, true)) d.wait = true; }
     this.nAct = na;
 
     // move drops, spawn roof/ground splashes on impact
     for (let k = 0; k < na; k++) {
-      const d = drops[k], sn = d.sn, cs = d.cs, dist = d.spd * dt;
+      const d = drops[k];
+      // no storm cloud on stage: hold the drop (invisible) and retry on later frames
+      if (d.wait && !this.emit(d, true)) continue;
+      const sn = d.sn, cs = d.cs, dist = d.spd * dt;
       const py = d.y;
       d.x += sn * dist;
       d.y += cs * dist;
@@ -1469,12 +1498,10 @@ export class CityLife {
       if (hit) ry = this.roofAt(hit, hx);
       if (ry != null && py < ry && hy >= ry) {
         this.addRoofSplash(hit, hx - hit.x, ry - (G + hit.dy));
-        d.y = top - d.len - rr() * 60;
-        d.x = rr() * (W + 60) - 60;
+        if (!this.emit(d, false)) d.wait = true;
       } else if (hy >= G) {
         this.addGroundSplash(hx, G);
-        d.y = top - d.len - rr() * 60;
-        d.x = rr() * (W + 60) - 60;
+        if (!this.emit(d, false)) d.wait = true;
       }
     }
 
@@ -1545,6 +1572,7 @@ export class CityLife {
       ctx.strokeStyle = this.rainCol;
       for (let k = 0; k < na; k++) {
         const d = drops[k];
+        if (d.wait) continue;
         ctx.moveTo(d.x - d.sn * d.len, d.y - d.cs * d.len - top);
         ctx.lineTo(d.x, d.y - top);
       }
@@ -1578,14 +1606,15 @@ export class CityLife {
     }
     ctx.globalAlpha = 1;
 
+    // drops now start down at the cloud bases, so the fade only has to soften the canvas edge
     if (!this.rainFade) {
-      this.rainFade = ctx.createLinearGradient(0, 0, 0, 140);
+      this.rainFade = ctx.createLinearGradient(0, 0, 0, 40);
       this.rainFade.addColorStop(0, 'rgba(0,0,0,1)');
       this.rainFade.addColorStop(1, 'rgba(0,0,0,0)');
     }
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = this.rainFade;
-    ctx.fillRect(0, 0, W, 140);
+    ctx.fillRect(0, 0, W, 40);
     ctx.globalCompositeOperation = 'source-over';
   }
 
