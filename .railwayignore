@@ -1,0 +1,11 @@
+# Only the Next.js app is deployed; design sources, Blender pipeline and QA tooling stay out.
+blender/
+reference/
+tools/
+docs/
+scripts/
+Marketdey Site (standalone).html
+Screenshot*
+public/media/spike/
+public/media/spike-synth/
+public/media/ride-stub/
