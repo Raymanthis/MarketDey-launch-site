@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     // Design-export sources and tooling are reference material, not app code.
     "reference/**",
     "tools/**",
+    ".claude/**",
   ]),
 ]);
 
