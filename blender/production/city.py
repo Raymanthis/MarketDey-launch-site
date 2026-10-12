@@ -538,12 +538,15 @@ SIGNS = []        # (text, world matrix of the board face centre, width, height)
 _sign_i = [0]
 
 
-def sign_hook(fa, a0, a1, h0, h1, d_face):
+def sign_hook(fa, a0, a1, h0, h1, d_face, text=None):
     w, h = a1 - a0, h1 - h0
     if w < 0.8 or h < 0.2:
         return
-    name = SHOP_NAMES[_sign_i[0] % len(SHOP_NAMES)]
-    _sign_i[0] += 1
+    if text is None:
+        name = SHOP_NAMES[_sign_i[0] % len(SHOP_NAMES)]
+        _sign_i[0] += 1
+    else:
+        name = text
     if h < 0.45:
         name = name.replace("\n", " ")
     CM = geo.CURRENT_MATRIX if geo.CURRENT_MATRIX is not None else Matrix.Identity(4)
@@ -596,24 +599,49 @@ def lm_filling_station():
     geo.CURRENT_MATRIX = M_at(40)
     x = 11.0
     S = get("lm1_canopy", "lines", union=True)
-    # canopy deck with a deep fascia (the yellow band) and a dark stripe, on four columns
-    S.box((x - 5.5, -3.5, 4.85), (x + 5.5, 3.5, 5.6), mat="canopy_yellow")
-    S.box((x - 5.56, -3.56, 5.12), (x + 5.56, 3.56, 5.3), mat="canopy_band")
-    S.box((x - 5.3, -3.3, 4.75), (x + 5.3, 3.3, 4.86), mat="trim")
+    # canopy: a bright fascia (the "yellow canopy": the lightest value in the scene, crisp
+    # outline) with a dark lower lip, a soffit under it, on four clad columns
+    S.box((x - 5.5, -3.5, 4.95), (x + 5.5, 3.5, 5.75), mat="canopy_yellow")
+    S.box((x - 5.53, -3.53, 4.85), (x + 5.53, 3.53, 4.97), mat="canopy_band")
+    S.box((x - 5.38, -3.38, 4.7), (x + 5.38, 3.38, 4.86), mat="soffit")
     for (p, q) in ((-4.5, -2.8), (4.5, -2.8), (-4.5, 2.8), (4.5, 2.8)):
-        S.box((x + p - 0.2, q - 0.2, 0.0), (x + p + 0.2, q + 0.2, 4.76), mat="trim")
-        S.box((x + p - 0.26, q - 0.26, 0.0), (x + p + 0.26, q + 0.26, 0.9), mat="canopy_band")
+        S.box((x + p - 0.22, q - 0.22, 0.0), (x + p + 0.22, q + 0.22, 4.71), mat="canopy_yellow")
+        S.box((x + p - 0.28, q - 0.28, 0.0), (x + p + 0.28, q + 0.28, 1.0), mat="canopy_band")
     S.box((x - 3.0, -0.7, 0.0), (x + 3.0, 0.7, 0.25), mat="kerb")                     # pump island
-    F = get("lm1_pumps", "figures", union=True)
+    # soffit: panel joints (ink) and eight recessed light boxes
     K = get("lm1_k", "nolines")
+    for k in range(1, 12):
+        K.seg_box((x - 5.38 + k * 0.9, -3.38, 4.695), (x - 5.38 + k * 0.9, 3.38, 4.695), 0.02, 0.006, mat="metal_dark")
+    for yy in (-1.7, 0.0, 1.7):
+        K.seg_box((x - 5.38, yy, 4.695), (x + 5.38, yy, 4.695), 0.02, 0.006, mat="metal_dark")
+    Lt = get("lm1_lights", "fine")
+    for xx in (-3.6, -1.2, 1.2, 3.6):
+        for yy in (-1.6, 1.6):
+            Lt.box((x + xx - 0.45, yy - 0.2, 4.64), (x + xx + 0.45, yy + 0.2, 4.701), mat="lamp")
+    # pumps: two-tone body, header with grade label, display window, two nozzle holsters with
+    # hoses looping from the header down to the nozzles
+    F = get("lm1_pumps", "figures", union=True)
+    Fd = get("lm1_pump_det", "figures", smooth=True)
     for o in (-1.8, 1.8):
-        F.box((x + o - 0.4, -0.3, 0.25), (x + o + 0.4, 0.3, 1.95), mat="fuel_pump")
-        F.box((x + o - 0.42, -0.32, 1.95), (x + o + 0.42, 0.32, 2.15), mat="canopy_band")
-        F.box((x + o - 0.28, 0.299, 1.35), (x + o + 0.28, 0.33, 1.78), mat="vglass")    # display
-        F.box((x + o - 0.2, 0.299, 0.65), (x + o + 0.2, 0.33, 1.0), mat="trim")         # nozzle bay
-        pts = [Vector((x + o + 0.42, 0.0, 1.5)), Vector((x + o + 0.66, 0.2, 0.9)), Vector((x + o + 0.6, 0.35, 0.45)),
-               Vector((x + o + 0.45, 0.4, 0.8))]
-        K.tube(pts, 0.018, n=6, mat="ink")
+        F.box((x + o - 0.45, -0.32, 0.25), (x + o + 0.45, 0.32, 1.35), mat="fuel_pump")
+        F.box((x + o - 0.42, -0.3, 1.34), (x + o + 0.42, 0.3, 1.9), mat="trim")
+        F.box((x + o - 0.47, -0.34, 1.89), (x + o + 0.47, 0.34, 2.25), mat="canopy_yellow")
+        for sd in (-1, 1):
+            yf = sd * 0.302
+            F.box((x + o - 0.3, yf - 0.02 if sd > 0 else yf - 0.012, 1.42), (x + o + 0.3, yf + 0.012 if sd < 0 else yf + 0.02, 1.82), mat="vglass")
+            F.box((x + o - 0.22, yf - 0.02 if sd > 0 else yf - 0.02, 0.55), (x + o + 0.22, yf + 0.02, 1.12), mat="metal_dark")
+            for hx in (-0.36, 0.36):
+                # holster on the side, nozzle in it, hose from the header
+                F.box((x + o + hx - 0.06, sd * 0.32 - 0.05, 1.05), (x + o + hx + 0.06, sd * 0.32 + 0.07 * sd, 1.25), mat="metal_dark")
+                Fd.tube([Vector((x + o + hx, sd * 0.4, 1.2)), Vector((x + o + hx, sd * 0.47, 1.05)), Vector((x + o + hx, sd * 0.43, 0.95))],
+                        0.03, 0.022, n=8, mat="tyre")
+                K.tube([Vector((x + o + hx * 0.6, sd * 0.33, 2.0)), Vector((x + o + hx * 1.3, sd * 0.55, 1.4)),
+                        Vector((x + o + hx * 1.25, sd * 0.62, 0.7)), Vector((x + o + hx * 1.05, sd * 0.5, 0.45)),
+                        Vector((x + o + hx, sd * 0.43, 1.0))], 0.016, n=6, mat="ink")
+        pf_ = facade_frame((x + o - 0.47, 0.342, 0), (0, 1, 0))
+        _text_on(pf_, "PMS" if o < 0 else "AGO", 0.47, 0.8, 2.07, 0, 0.0, 0.24)
+        pb_ = facade_frame((x + o + 0.47, -0.342, 0), (0, -1, 0))
+        _text_on(pb_, "PMS" if o < 0 else "AGO", 0.47, 0.8, 2.07, 0, 0.0, 0.24)
     # kiosk shop behind, with roof slab, louvre window, door, AC
     M = facade_frame((x + 5.5, Y(-1) + 2.0, 0.0), (-1, 0, 0))
     fa = street.Fa("lm1_shop", M, wall="wall")
@@ -628,10 +656,11 @@ def lm_filling_station():
     P.box((x - 4.6, Y(-8) - 1.0, 5.6), (x - 4.2, Y(-8) + 1.0, 8.2), mat="canopy_yellow")
     P.box((x - 4.64, Y(-8) - 1.04, 7.55), (x - 4.16, Y(-8) + 1.04, 7.7), mat="canopy_band")
     geo.CURRENT_MATRIX = M_at(40)
-    # lettering: the fascia (both street faces) and the pylon's product/price boards
-    pf = facade_frame((x - 5.56, -3.4, 0), (-1, 0, 0))
+    # lettering: the fascia, all four faces, and the pylon's product / price boards
+    for (org, n, ln) in (((x - 5.5, -3.5, 0), (-1, 0, 0), 7.0), ((x + 5.5, 3.5, 0), (1, 0, 0), 7.0),
+                         ((x + 5.5, -3.5, 0), (0, -1, 0), 11.0), ((x - 5.5, 3.5, 0), (0, 1, 0), 11.0)):
+        _text_on(facade_frame(org, n), "FILLING STATION", ln / 2, ln * 0.82, 5.35, 0, 0.0, 0.5)
     pyl = facade_frame((x - 4.64, Y(-8) - 0.9, 0), (-1, 0, 0))
-    _text_on(pf, "FILLING STATION", 3.6, 7.0, 5.36, 5.55, 0.0, 0.18)
     for i, t in enumerate(("PMS  ₦ 650", "DPK  ₦ 1100", "AGO  ₦ 1200")):
         _text_on(pyl, t, 0.9, 1.8, 6.15 + i * 0.5, 0.0, 0.0, 0.3, size=0.26)
     _text_on(pyl, "FUEL", 0.9, 1.8, 7.95, 0.0, 0.0, 0.35, size=0.34)
