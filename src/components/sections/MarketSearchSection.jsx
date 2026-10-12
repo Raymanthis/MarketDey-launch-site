@@ -167,10 +167,10 @@ class MarketSearchSection extends React.Component {
             <div style={{ position: 'absolute', inset: '0', pointerEvents: 'none', background: 'radial-gradient(120% 90% at 65% 55%,rgba(22,21,19,0) 40%,rgba(22,21,19,.85) 100%)' }}></div>
             {v.labs.map((l, i) => <React.Fragment key={i}>
               <div ref={l.ref} style={{ position: 'absolute', left: '0', top: '0', opacity: '0', pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', willChange: 'transform' }}>
-                <span style={{ height: '24px', padding: '0 9px', borderRadius: '12px', background: 'rgba(37,36,34,.92)', border: '1px solid rgba(167,201,87,.45)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '900', whiteSpace: 'nowrap' }}><span style={{ color: '#a7c957' }}>{l.n}</span>{l.name}</span>
+                <span style={{ height: '24px', padding: '0 9px', borderRadius: '12px', background: 'rgba(37,36,34,.92)', border: '1px solid rgba(167,201,87,.45)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '900', whiteSpace: 'nowrap' }}><span style={{ color: '#a7c957' }}><span className="sc-interp">{l.n}</span></span><span className="sc-interp">{l.name}</span></span>
               </div>
             </React.Fragment>)}
-            <div ref={v.ringLabRef} style={{ position: 'absolute', left: '0', top: '0', opacity: '0', pointerEvents: 'none', height: '26px', padding: '0 10px', borderRadius: '13px', background: '#a7c957', color: '#252422', display: 'inline-flex', alignItems: 'center', fontSize: '13px', fontWeight: '900', whiteSpace: 'nowrap', willChange: 'transform' }}>{v.rdLabel}</div>
+            <div ref={v.ringLabRef} style={{ position: 'absolute', left: '0', top: '0', opacity: '0', pointerEvents: 'none', height: '26px', padding: '0 10px', borderRadius: '13px', background: '#a7c957', color: '#252422', display: 'inline-flex', alignItems: 'center', fontSize: '13px', fontWeight: '900', whiteSpace: 'nowrap', willChange: 'transform' }}><span className="sc-interp">{v.rdLabel}</span></div>
             <div ref={v.uiRef} style={{ position: 'relative', zIndex: '2', height: '100%', boxSizing: 'border-box', maxWidth: '1264px', margin: '0 auto', padding: 'clamp(48px,11vh,120px) 32px 32px', pointerEvents: 'none' }}>
               <div style={{ width: 'min(100%,440px)', display: 'flex', flexDirection: 'column', gap: 'clamp(14px,2.4vh,22px)' }}>
                 <div style={{ display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: '8px', height: '32px', padding: '0 14px 0 10px', borderRadius: '16px', background: 'rgba(167,201,87,.14)', color: '#a7c957', fontSize: '14px', fontWeight: '900' }}><i className="ri-search-line" style={{ fontSize: '16px' }}></i>{content.badge}</div>
@@ -180,12 +180,12 @@ class MarketSearchSection extends React.Component {
                   {v.steps.map((s, i) => <React.Fragment key={i}>
                     <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ height: '3px', borderRadius: '2px', background: 'rgba(255,255,255,.12)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${s.pct}`, background: '#a7c957' }}></div></div>
-                      <div style={{ fontSize: '13px', fontWeight: '900', color: `${s.fg}`, transition: 'color .3s' }}>{s.label}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '900', color: `${s.fg}`, transition: 'color .3s' }}><span className="sc-interp">{s.label}</span></div>
                     </div>
                   </React.Fragment>)}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', borderRadius: '20px', background: 'rgba(37,36,34,.78)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(10px)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}><div style={{ fontSize: '13px', fontWeight: '900', color: '#ccc5b9', letterSpacing: '.04em' }}>{content.panel.distanceHeading}</div><div style={{ fontSize: '15px', fontWeight: '900', color: '#a7c957' }}>{`${content.panel.within} ${v.rdLabel}`}</div></div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}><div style={{ fontSize: '13px', fontWeight: '900', color: '#ccc5b9', letterSpacing: '.04em' }}>{content.panel.distanceHeading}</div><div style={{ fontSize: '15px', fontWeight: '900', color: '#a7c957' }}>{`${content.panel.within} `}<span className="sc-interp">{v.rdLabel}</span></div></div>
                   <div style={{ position: 'relative', height: '20px' }}>
                     <div style={{ position: 'absolute', left: '0', right: '0', top: '8px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,.12)' }}></div>
                     <div style={{ position: 'absolute', left: '0', top: '8px', height: '4px', borderRadius: '2px', background: '#a7c957', width: `${v.slPct}` }}></div>
@@ -193,28 +193,28 @@ class MarketSearchSection extends React.Component {
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {v.pills.map((p, i) => <React.Fragment key={i}>
-                      <span style={{ height: '30px', padding: '0 12px', borderRadius: '15px', background: `${p.bg}`, color: `${p.fg}`, display: 'inline-flex', alignItems: 'center', fontSize: '13px', fontWeight: '900', transition: 'background .3s,color .3s' }}>{p.label}</span>
+                      <span style={{ height: '30px', padding: '0 12px', borderRadius: '15px', background: `${p.bg}`, color: `${p.fg}`, display: 'inline-flex', alignItems: 'center', fontSize: '13px', fontWeight: '900', transition: 'background .3s,color .3s' }}><span className="sc-interp">{p.label}</span></span>
                     </React.Fragment>)}
                   </div>
                   <div style={{ height: '1px', background: 'rgba(255,255,255,.08)' }}></div>
                   <div style={{ fontSize: '13px', fontWeight: '900', color: '#ccc5b9', letterSpacing: '.04em' }}>{content.panel.goodsHeading}</div>
                   <div ref={v.chipRef} style={{ display: 'flex', gap: '6px', flexWrap: `${v.chipWrap}`, scrollBehavior: 'smooth', overflowX: 'auto', scrollbarWidth: 'none' }}>
                     {v.chips.map((c, i) => <React.Fragment key={i}>
-                      <span style={{ flex: 'none', height: '30px', padding: '0 12px 0 10px', borderRadius: '15px', background: `${c.bg}`, color: `${c.fg}`, border: `1px solid ${c.bd}`, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', transition: 'background .3s,color .3s,border-color .3s' }}><i className={c.icon} style={{ fontSize: '14px' }}></i>{c.label}</span>
+                      <span style={{ flex: 'none', height: '30px', padding: '0 12px 0 10px', borderRadius: '15px', background: `${c.bg}`, color: `${c.fg}`, border: `1px solid ${c.bd}`, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', transition: 'background .3s,color .3s,border-color .3s' }}><i className={c.icon} style={{ fontSize: '14px' }}></i><span className="sc-interp">{c.label}</span></span>
                     </React.Fragment>)}
                   </div>
                 </div>
               </div>
               <div style={{ position: 'absolute', right: '32px', bottom: '32px', flex: 'none', width: 'min(calc(100% - 64px),380px)', borderRadius: '22px', background: 'rgba(37,36,34,.92)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(10px)', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', padding: '16px 18px 12px' }}>
-                  <div style={{ fontSize: '40px', fontWeight: '900', letterSpacing: '-.04em', lineHeight: '1', color: '#a7c957' }}>{v.count}</div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#ccc5b9', lineHeight: '1.3' }}>{v.countLabel}</div>
+                  <div style={{ fontSize: '40px', fontWeight: '900', letterSpacing: '-.04em', lineHeight: '1', color: '#a7c957' }}><span className="sc-interp">{v.count}</span></div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#ccc5b9', lineHeight: '1.3' }}><span className="sc-interp">{v.countLabel}</span></div>
                 </div>
                 {v.rows.map((r, i) => <React.Fragment key={i}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minHeight: '64px', padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
-                    <div style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '46px', height: '50px', borderRadius: '12px', background: 'rgba(167,201,87,.14)' }}><div style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '.06em', color: '#a7c957' }}>{r.dow}</div><div style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1.1' }}>{r.dnum}</div></div>
-                    <div style={{ flex: '1', minWidth: '0', display: 'flex', flexDirection: 'column', gap: '2px' }}><div style={{ fontSize: '16px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><span style={{ color: '#a7c957', marginRight: '6px' }}>{r.n}</span>{r.name}</div><div style={{ fontSize: '13px', color: '#ccc5b9' }}>{r.sub}</div></div>
-                    <span style={{ flex: 'none', height: '26px', padding: '0 10px', borderRadius: '13px', background: 'rgba(255,255,255,.08)', color: '#fff', display: 'inline-flex', alignItems: 'center', fontSize: '12px', fontWeight: '900' }}>{r.when}</span>
+                    <div style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '46px', height: '50px', borderRadius: '12px', background: 'rgba(167,201,87,.14)' }}><div style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '.06em', color: '#a7c957' }}><span className="sc-interp">{r.dow}</span></div><div style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1.1' }}><span className="sc-interp">{r.dnum}</span></div></div>
+                    <div style={{ flex: '1', minWidth: '0', display: 'flex', flexDirection: 'column', gap: '2px' }}><div style={{ fontSize: '16px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><span style={{ color: '#a7c957', marginRight: '6px' }}><span className="sc-interp">{r.n}</span></span><span className="sc-interp">{r.name}</span></div><div style={{ fontSize: '13px', color: '#ccc5b9' }}><span className="sc-interp">{r.sub}</span></div></div>
+                    <span style={{ flex: 'none', height: '26px', padding: '0 10px', borderRadius: '13px', background: 'rgba(255,255,255,.08)', color: '#fff', display: 'inline-flex', alignItems: 'center', fontSize: '12px', fontWeight: '900' }}><span className="sc-interp">{r.when}</span></span>
                   </div>
                 </React.Fragment>)}
                 {v.empty ? <><div style={{ padding: '14px 18px 18px', fontSize: '14px', color: '#ccc5b9', borderTop: '1px solid rgba(255,255,255,.07)' }}>{content.results.empty}</div></> : null}
