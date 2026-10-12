@@ -23,7 +23,7 @@ SPECS = {
     # walls and trims
     "wall": dict(albedo=0.95), "wall_b": dict(albedo=0.89), "wall_c": dict(albedo=0.83),
     "wall_d": dict(albedo=0.77), "trim": dict(albedo=0.98), "plinth": dict(albedo=0.72),
-    "sign": dict(albedo=0.99), "sign_frame": dict(albedo=0.8),
+    "sign": dict(albedo=0.99, kind="sign"), "sign_frame": dict(albedo=0.8),
     "shutter": dict(albedo=0.86, lines=[("Z", 0.085, 0.006, 30.0, 0.55, 0.0)]),
     "shutter_dark": dict(albedo=0.66, lines=[("Z", 0.085, 0.006, 30.0, 0.5, 0.0)]),
     "sheet_x": dict(albedo=0.86, lines=[("X", 0.152, 0.008, 35.0, 0.5, 0.0)]),
@@ -32,7 +32,7 @@ SPECS = {
     "roof_dark": dict(albedo=0.6),
     "breeze": dict(albedo=0.9, kind="breeze"),
     "block": dict(albedo=0.86, kind="block"),
-    "glass": dict(kind="glass", albedo=0.66), "glass_shop": dict(kind="glass", albedo=0.48),
+    "glass": dict(kind="glass", albedo=0.72), "glass_shop": dict(kind="glass", albedo=0.56),
     "glass_louvre": dict(kind="glass", albedo=0.7, lines=[("Z", 0.1, 0.009, 25.0, 0.6, 0.0)]),
     "shop_dark": dict(albedo=0.34, ao=0.0, kind="flat"),
     "ac": dict(albedo=0.92, lines=[("Z", 0.05, 0.006, 15.0, 0.5, 0.0)]),
@@ -45,7 +45,8 @@ SPECS = {
     "ink": dict(albedo=0.2, kind="flat", ao=0.0), "wire": dict(albedo=0.3, kind="flat", ao=0.0),
     "rust": dict(albedo=0.6),
     # nature
-    "bark": dict(albedo=0.56), "foliage": dict(albedo=0.8, kind="foliage"),
+    "bark": dict(albedo=0.56), "bark_dark": dict(albedo=0.36),
+    "palm_trunk": dict(albedo=0.6, lines=[("Z", 0.11, 0.012, 30.0, 0.5, 0.0)]), "foliage": dict(albedo=0.8, kind="foliage"),
     "foliage_dark": dict(albedo=0.68, kind="foliage"), "palm": dict(albedo=0.5),
     # vehicles
     "paint_light": dict(albedo=0.96), "paint_mid": dict(albedo=0.78), "paint_dark": dict(albedo=0.5),
@@ -262,6 +263,22 @@ def make(name, spec):
         for k, v in (("Period", 0.45), ("Width", 0.012), ("Fade end", 30.0), ("Strength", 0.5)):
             g2.inputs[k].default_value = v
         tone = op("MULTIPLY", op("MULTIPLY", tone, g1.outputs[0]), g2.outputs[0])
+    if kind == "sign":
+        # illegible hand-painted lettering: two rows of irregular dashes, lighter than ink
+        geo = N.new("ShaderNodeNewGeometry")
+        sep = N.new("ShaderNodeSeparateXYZ")
+        L.new(geo.outputs["Position"], sep.inputs[0])
+        along = op("ADD", sep.outputs["X"], sep.outputs["Y"])
+        fz = op("FRACT", op("DIVIDE", sep.outputs["Z"], 0.26), 0)
+        row = op("MULTIPLY", op("GREATER_THAN", fz, 0.38), op("LESS_THAN", fz, 0.66))
+        nz = N.new("ShaderNodeTexNoise")
+        nz.inputs["Scale"].default_value = 1.0
+        cx = N.new("ShaderNodeCombineXYZ")
+        L.new(op("MULTIPLY", along, 7.0), cx.inputs["X"])
+        L.new(op("FLOOR", op("DIVIDE", sep.outputs["Z"], 0.26), 0), cx.inputs["Y"])
+        L.new(cx.outputs[0], nz.inputs["Vector"])
+        dash = op("GREATER_THAN", nz.outputs["Fac"], 0.5)
+        tone = op("MULTIPLY", tone, op("SUBTRACT", 1.0, op("MULTIPLY", op("MULTIPLY", row, dash), 0.42)))
     if kind == "breeze":
         # breeze-block screen: square openings that read dark
         geo = N.new("ShaderNodeNewGeometry")
@@ -284,7 +301,7 @@ def make(name, spec):
         g.inputs["Fade end"].default_value = fade_end
         g.inputs["Strength"].default_value = strength
         tone = op("MULTIPLY", tone, g.outputs[0])
-    if kind in ("lit", "foliage", "block", "breeze"):
+    if kind in ("lit", "foliage", "block", "breeze", "sign"):
         lg = N.new("ShaderNodeGroup")
         lg.node_tree = light_group()
         lg.inputs["AO strength"].default_value = spec.get("ao", 0.85)
