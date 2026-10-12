@@ -37,6 +37,8 @@ export function proxy(request: NextRequest) {
     pathname === '/icon.svg' ||
     pathname === '/favicon.ico' ||
     pathname === '/zoho-domain-verification.html' ||
+    pathname.startsWith('/opengraph-image') ||
+    pathname.startsWith('/twitter-image') ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml'
   ) {
