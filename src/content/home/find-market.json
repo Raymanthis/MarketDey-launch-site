@@ -1,0 +1,37 @@
+{
+  "statusTime": "9:41",
+  "statusNetwork": "4G",
+  "centralMarket": "Central Market",
+  "sapeleSapeleLga": "Sapele · Sapele LGA",
+  "verified": "Verified",
+  "details": "Details",
+  "landmarks": "Landmarks",
+  "findTheMarketWhen": "Find the market when you get there.",
+  "manyMarketsHaveNo": "Many markets have no sign at the roadside. Marketdey shows up to five landmarks in the order you pass them on the way in.",
+  "scrollToFollowThe": "Scroll to follow the trail",
+  "tryIt": "Try it",
+  "whenIsTheNext": "When is the next market day?",
+  "everyMarketKeepsIts": "Every market keeps its own rhythm. Some come round every few days, some once a week, some every day. Pick one and Marketdey does the counting.",
+  "pickAMarket": "Pick a market",
+  "sampleSchedules": "Sample schedules",
+  "nextMarketDay": "Next market day",
+  "onTheRoad": "On the road",
+  "afterThat": "After that",
+  "getThisAsAn": "Get this as an alert the evening before.",
+  "getAlerts": "Get alerts",
+  "next": {
+    "today": "Today",
+    "openEveryDay": "Open every day",
+    "tomorrow": "Tomorrow",
+    "marketDayPrefix": "Market day · ",
+    "inDaysPrefix": "Market day · in ",
+    "inDaysSuffix": " days",
+    "marketDay": "Market day"
+  },
+  "card": {
+    "onTodayPrefix": "On today · ",
+    "tomorrowPrefix": "Tomorrow · ",
+    "nextPrefix": "Next · ",
+    "nextAfterPrefix": "Next after this: "
+  }
+}
