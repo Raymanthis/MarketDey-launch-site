@@ -211,6 +211,32 @@ class Fa:
         s.box(b, (a0, d0, h0 + t), (a0 + t, d1, h1 - t))
         s.box(b, (a1 - t, d0, h0 + t), (a1, d1, h1 - t))
 
+    def hatch(s, a0, h0, a1, h1, d=0.003, step=0.07, slope=1.0, jitter=0.15, rng=None):
+        """Illustrator's shadow hatching: parallel diagonal strokes clipped to a wall rect."""
+        rng = rng or R
+        hh = h1 - h0
+        if a1 - a0 < 0.05 or hh < 0.05:
+            return
+        k = -int(hh * abs(slope) / step) - 1
+        while True:
+            a_start = a0 + k * step
+            if a_start > a1:
+                break
+            k += 1
+            # line: a = a_start + slope * (h - h0), clipped to [a0, a1] x [h0, h1]
+            ta, tb = 0.0, hh
+            if slope > 0:
+                ta = max(ta, (a0 - a_start) / slope)
+                tb = min(tb, (a1 - a_start) / slope)
+            else:
+                ta = max(ta, (a1 - a_start) / slope)
+                tb = min(tb, (a0 - a_start) / slope)
+            if tb - ta < 0.04:
+                continue
+            ja, jb = rng.uniform(0, jitter) * (tb - ta), rng.uniform(0, jitter) * (tb - ta)
+            ta, tb = ta + ja, tb - jb
+            s.fin(s.L, (a_start + slope * ta, d, h0 + ta), (a_start + slope * tb, d, h0 + tb), (0, 0.01, 0))
+
     def rectfins(s, b, a0, h0, a1, h1, d, dd):
         o = (0, dd, 0)
         s.fin(b, (a0, d, h0), (a1, d, h0), o)
@@ -295,6 +321,7 @@ class Fa:
         if grille:
             s.grille(a0 + 0.03, h0 + 0.03 if kind != "door" else h0 + 1.0, a1 - 0.03, h1 - 0.03, grille)
         if sunshade:
+            s.hatch(a0 + t, h1 - 0.38, a1 - t, h1 - t, d=0.006, step=0.06)
             s.box(s.D, (a0 - 0.22, 0, h1 + 0.12), (a1 + 0.22, 0.42, h1 + 0.22))
             s.box(s.F, (a0 - 0.22, 0.38, h1 + 0.04), (a1 + 0.22, 0.42, h1 + 0.12))
 
@@ -354,6 +381,8 @@ class Fa:
         ht = h1 - 0.5
         s.box(s.D, (a0 + 0.08, 0, ht - 0.03), (a1 - 0.08, 0.05, ht + 0.03))
         s.box(s.D, (a0 + 0.08, 0, h0 + 0.5), (a1 - 0.08, 0.05, h0 + 0.56))
+        # dark interior: dense vertical-ish hatching behind the glass
+        s.hatch(a0 + 0.08, h0 + 0.56, a1 - 0.08, ht - 0.03, d=0.004, step=0.06, slope=0.18, jitter=0.25)
         # display goods in the window (fine shelf lines)
         for k in range(3):
             hh = h0 + 0.75 + k * 0.42
