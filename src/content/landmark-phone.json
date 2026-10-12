@@ -1,0 +1,30 @@
+{
+  "header": {
+    "market": "Central Market · Sapele",
+    "badge": "Placeholder route"
+  },
+  "title": "Check I’m here",
+  "progress": {
+    "intro": "Landmarks appear in the order you pass them",
+    "all": "5 of 5 seen",
+    "seenSuffix": " of 5 seen"
+  },
+  "arrived": {
+    "title": "You’re at the gate",
+    "body": "Green gate with a painted arch, on your left.",
+    "done": "Done"
+  },
+  "photoPrefix": "photo · ",
+  "landmarks": [
+    { "name": "Filling station", "cue": "Yellow canopy on your right. Keep going straight.", "photo": "canopy from the road" },
+    { "name": "Water tank on stilts", "cue": "Tall water tank behind a fence, on your left.", "photo": "tank above the fence" },
+    { "name": "Umbrella stalls", "cue": "Row of umbrellas on your right. Slow down here.", "photo": "umbrellas along the verge" },
+    { "name": "St Paul’s Anglican Church", "cue": "White walls, blue roof, on your left. The main gate is 150 m further on, same side.", "photo": "church from the road" },
+    { "name": "Market gate", "cue": "Green gate with a painted arch, on your left.", "photo": "gate and arch" }
+  ],
+  "seen": "Seen",
+  "actions": {
+    "yes": "I see it",
+    "no": "Not yet"
+  }
+}
