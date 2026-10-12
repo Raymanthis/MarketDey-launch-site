@@ -1,0 +1,16 @@
+body{margin:0;background:#faf9f6;font-family:'Lato',ui-sans-serif,system-ui,'Segoe UI',Helvetica,Arial,sans-serif;color:#252422;-webkit-font-smoothing:antialiased}
+a{color:#386641;text-decoration:none}
+a:hover{color:#252422}
+input,select,button{font-family:inherit}
+@keyframes mdTwinkle{0%,100%{fill-opacity:0}50%{fill-opacity:.8}}
+@keyframes mdSway{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.22)}}
+@keyframes mdRoad{to{stroke-dashoffset:-64}}
+@keyframes mdFly{from{transform:translateX(-80px)}to{transform:translateX(calc(100vw + 80px))}}
+@keyframes mdFlyBack{from{transform:translateX(calc(100vw + 120px))}to{transform:translateX(-160px)}}
+@keyframes mdFlap{0%,100%{transform:scaleY(1)}50%{transform:scaleY(-.6)}}
+@keyframes mdRotor{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.15)}}
+@keyframes mdBob{0%,100%{transform:translateY(0px)}50%{transform:translateY(-5px)}}
+@keyframes mdHint{0%,100%{transform:translateY(0px)}50%{transform:translateY(-8px)}}
+@keyframes mdCloud{from{transform:translateX(-260px)}to{transform:translateX(calc(100vw + 60px))}}
+@keyframes mdSteam{0%{opacity:0;transform:translateY(4px)}35%{opacity:1}100%{opacity:0;transform:translateY(-12px)}}
+@keyframes mdDrive{from{transform:translateX(-160px)}to{transform:translateX(calc(100vw + 60px))}}
