@@ -1,0 +1,10 @@
+/* style-hover rules from the runtime: :hover with !important on every declaration.
+   Class names use the runtime's scp* form, scoped under the HomePage root. */
+.root {}
+.root :global(.scph1):hover{background:#f3f1ec !important}
+.root :global(.scph2):hover{background:#403d39 !important}
+.root :global(.scph3):hover{background:#fff !important}
+.root :global(.scph4):hover{background:#4f4b45 !important}
+.root :global(.scph5):hover{background:#b8d66a !important}
+.root :global(.scph6):hover{background:#a7c957 !important;color:#252422 !important;border-color:#a7c957 !important;transform:translateY(-2px) !important}
+.root :global(.scph7):hover{color:#a7c957 !important}
