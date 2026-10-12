@@ -49,15 +49,22 @@ SPECS = {
     "palm_trunk": dict(albedo=0.6, lines=[("Z", 0.11, 0.012, 30.0, 0.5, 0.0)]), "foliage": dict(albedo=0.8, kind="foliage"),
     "foliage_dark": dict(albedo=0.68, kind="foliage"), "palm": dict(albedo=0.5),
     # vehicles
-    "paint_light": dict(albedo=0.96), "paint_mid": dict(albedo=0.78), "paint_dark": dict(albedo=0.5),
-    "danfo": dict(albedo=0.9), "stripe": dict(albedo=0.28, kind="flat"), "keke": dict(albedo=0.82),
-    "tyre": dict(albedo=0.24), "rim": dict(albedo=0.82), "chrome": dict(albedo=0.94),
-    "vglass": dict(kind="glass", albedo=0.52), "lamp": dict(albedo=0.97), "seat": dict(albedo=0.34),
-    "canvas": dict(albedo=0.62), "plate": dict(albedo=0.99), "under": dict(albedo=0.3, kind="flat"),
+    "paint_light": dict(toon=True, albedo=0.96), "paint_mid": dict(toon=True, albedo=0.78), "paint_dark": dict(toon=True, albedo=0.5),
+    "danfo": dict(toon=True, albedo=0.9), "stripe": dict(albedo=0.28, kind="flat"), "keke": dict(toon=True, albedo=0.82),
+    "tyre": dict(toon=True, albedo=0.24), "rim": dict(toon=True, albedo=0.82), "chrome": dict(albedo=0.94),
+    "vglass": dict(kind="glass", albedo=0.52), "lamp": dict(albedo=0.97), "seat": dict(toon=True, albedo=0.34),
+    "canvas": dict(toon=True, albedo=0.62), "plate": dict(albedo=0.99), "under": dict(albedo=0.3, kind="flat"),
     # people
-    "skin": dict(albedo=0.44), "hair": dict(albedo=0.2), "top": dict(albedo=0.94), "bottom": dict(albedo=0.58),
-    "shoes": dict(albedo=0.32), "cloth_light": dict(albedo=0.95), "cloth_dark": dict(albedo=0.6),
-    "basin": dict(albedo=0.8), "goods": dict(albedo=0.62),
+    "skin": dict(toon=True, albedo=0.44), "hair": dict(toon=True, albedo=0.2), "top": dict(toon=True, albedo=0.94), "bottom": dict(toon=True, albedo=0.58),
+    "shoes": dict(toon=True, albedo=0.32), "cloth_light": dict(toon=True, albedo=0.95), "cloth_dark": dict(toon=True, albedo=0.6),
+    "basin": dict(toon=True, albedo=0.8), "goods": dict(toon=True, albedo=0.62),
+    # production additions
+    "tile": dict(albedo=0.92, lines=[("Z", 0.3, 0.008, 25.0, 0.5, 0.0), ("X", 0.3, 0.008, 25.0, 0.45, 0.0),
+                                     ("Y", 0.3, 0.008, 25.0, 0.45, 0.0)]),
+    "earth": dict(albedo=0.88, ao=0.4), "canopy_yellow": dict(albedo=0.9), "canopy_band": dict(albedo=0.42),
+    "roof_blue": dict(albedo=0.48, lines=[("OX", 0.42, 0.01, 40.0, 0.4, 0.0)]),
+    "gate_green": dict(albedo=0.52), "gate_paint": dict(albedo=0.95), "lettering": dict(albedo=0.16, kind="flat", ao=0.0),
+    "fuel_pump": dict(albedo=0.85), "church_wall": dict(albedo=0.98),
     # misc
     "wood": dict(albedo=0.7), "umbrella": dict(albedo=0.93), "umbrella_b": dict(albedo=0.7),
     "plastic": dict(albedo=0.9),
@@ -301,11 +308,39 @@ def make(name, spec):
         g.inputs["Fade end"].default_value = fade_end
         g.inputs["Strength"].default_value = strength
         tone = op("MULTIPLY", tone, g.outputs[0])
-    if kind in ("lit", "foliage", "block", "breeze", "sign"):
+    if kind in ("lit", "foliage", "block", "breeze", "sign") and not spec.get("toon"):
         lg = N.new("ShaderNodeGroup")
         lg.node_tree = light_group()
         lg.inputs["AO strength"].default_value = spec.get("ao", 0.85)
         tone = op("MULTIPLY", tone, lg.outputs[0])
+    elif spec.get("toon"):
+        # drawn style for people and vehicles: light in three flat steps (paper / light grey /
+        # mid grey) and diagonal pencil hatching laid over the shadow steps only
+        lg = N.new("ShaderNodeGroup")
+        lg.node_tree = light_group()
+        lg.inputs["AO strength"].default_value = 0.5
+        ramp = N.new("ShaderNodeValToRGB")
+        ramp.color_ramp.interpolation = "CONSTANT"
+        els = ramp.color_ramp.elements
+        els[0].position, els[0].color = 0.0, (0.66, 0.66, 0.66, 1)
+        els[1].position, els[1].color = 0.8, (0.86, 0.86, 0.86, 1)
+        e = els.new(0.93)
+        e.color = (1, 1, 1, 1)
+        L.new(lg.outputs[0], ramp.inputs[0])
+        step = N.new("ShaderNodeRGBToBW")
+        L.new(ramp.outputs[0], step.inputs[0])
+        shade = op("SUBTRACT", 1.0, step.outputs[0])            # 0 lit .. 0.34 darkest
+        hg = N.new("ShaderNodeGroup")
+        hg.node_tree = lines_group()
+        geo_ = N.new("ShaderNodeNewGeometry")
+        sep = N.new("ShaderNodeSeparateXYZ")
+        L.new(geo_.outputs["Position"], sep.inputs[0])
+        L.new(op("ADD", op("ADD", sep.outputs["X"], sep.outputs["Y"]), op("MULTIPLY", sep.outputs["Z"], 1.4)), hg.inputs["Coord"])
+        for k, v in (("Period", 0.045), ("Width", 0.006), ("Fade end", 40.0), ("Strength", 1.0)):
+            hg.inputs[k].default_value = v
+        hatch = op("SUBTRACT", 1.0, hg.outputs[0])              # 1 on a hatch line
+        hk = op("MINIMUM", op("MULTIPLY", shade, 2.4), 0.75)    # hatch only where in shade
+        tone = op("MULTIPLY", op("MULTIPLY", tone, step.outputs[0]), op("SUBTRACT", 1.0, op("MULTIPLY", hatch, hk)))
     elif kind == "glass":
         # glass is not lit, but deep reveals and cast shadows still darken it a little
         lg = N.new("ShaderNodeGroup")
