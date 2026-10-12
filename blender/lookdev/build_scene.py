@@ -73,7 +73,7 @@ def add_people(placements):
     with bpy.data.libraries.load(PEOPLE_BLEND, link=False) as (src, dst):
         dst.meshes = list(src.meshes)
     mats = {m.name: m for m in bpy.data.materials}
-    coll = bpy.data.collections["lines"]
+    coll = bpy.data.collections["figures"]
     for (name, pos, heading) in placements:
         me = bpy.data.meshes.get(name)
         if me is None:
