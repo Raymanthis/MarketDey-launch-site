@@ -265,13 +265,14 @@ class HomePage extends React.Component {
   tryRef = React.createRef();
   tmSetup() {
     const sec = this.tryRef.current; if (!sec || !lmMapBuild) return false;
-    const q = s => sec.querySelector('[data-tm="' + s + '"]'), T = { cv: q('cv'), dark: q('dark'), cvd: q('cvd'), map: q('map'), hole: q('hole'), top: q('top'), ui: q('ui'), card: q('card'), clip: q('clip'), c1: q('c1'), tip: q('tip'), content: q('content'), pins: [] };
-    if (!T.cv || !T.dark || !T.cvd || !T.content || !T.tip) return false;
+    const q = s => sec.querySelector('[data-tm="' + s + '"]'), T = { cv: q('cv'), map: q('map'), hole: q('hole'), top: q('top'), ui: q('ui'), card: q('card'), clip: q('clip'), c1: q('c1'), tip: q('tip'), content: q('content'), pins: [] };
+    if (!T.cv || !T.content || !T.tip) return false;
     sec.querySelectorAll('[data-pin]').forEach(el => { const i = +el.getAttribute('data-pin'); T.pins[i] = { el, in: el.firstElementChild, on: null, op: null, seen: false }; });
     if (T.pins.filter(Boolean).length < TM_PINS.length) return false;
     this.tm = T; this.tipOn = false; this.tipAt = null; this.tmBuild(); this.tmResize(); return true;
   }
-  tmResize() { const T = this.tm; if (!T) return; this.dpr = Math.min(1.5, window.devicePixelRatio || 1); const de = document.documentElement; T.cv.width = Math.round(de.clientWidth * this.dpr); T.cv.height = Math.round(window.innerHeight * this.dpr); T.cvd.width = T.cv.width; T.cvd.height = T.cv.height; this.tmKey = null; this.tmKeyD = null; this.tmN = 0; }
+  tmDarkEl() { const T = this.tm; if (!T.dark || !T.dark.isConnected) { T.dark = document.querySelector('[data-md-dark]'); T.cvd = T.dark ? T.dark.querySelector('canvas') : null; T.dkSize = null; this.tmKeyD = null; T.dk = null; } return T.dark; }
+  tmResize() { const T = this.tm; if (!T) return; this.dpr = Math.min(1.5, window.devicePixelRatio || 1); const de = document.documentElement; T.cv.width = Math.round(de.clientWidth * this.dpr); T.cv.height = Math.round(window.innerHeight * this.dpr); this.tmDarkEl(); T.dkSize = null; this.tmKey = null; this.tmKeyD = null; this.tmN = 0; }
   tmBuild() {
     const G = lmMapBuild(), { S0, SMAX, FILL, sideQ, patches, fr, W, MK, SIDES } = G, TS0 = S0 + 4;
     const road = []; for (let s = S0; s <= SMAX + 1e-6; s += 1) { const p = fr(s); road.push([p[0], p[1]]); }
@@ -329,8 +330,10 @@ class HomePage extends React.Component {
     if (VW !== this.tmVW) { this.tmVW = VW; this.tmResize(); }
     if (r.bottom < 0 || r.top > VH) return;
     const rv = window.__mdReveal, on = r.top <= 0.5, full = Math.hypot(VW, VH), stg = sec.firstElementChild; if (stg) { stg.style.opacity = on ? '1' : '0'; stg.style.visibility = on ? 'visible' : 'hidden'; stg.style.clipPath = on && rv && rv.r < full ? 'circle(' + rv.r.toFixed(1) + 'px at ' + rv.x.toFixed(1) + 'px ' + rv.y.toFixed(1) + 'px)' : 'none'; }
-    const dA = rv && rv.d != null ? sst(0.35, 0.95, rv.d) : 0, revealed = on && (!rv || rv.r >= full), dk = dA > 0.002 && !revealed;
-    { const dv = dk ? 'visible' : 'hidden', dop = dA.toFixed(3); if (T.dv !== dv) { T.dv = dv; T.dark.style.visibility = dv; } if (T.dop !== dop) { T.dop = dop; T.dark.style.opacity = dop; } }
+    const dEl = this.tmDarkEl(), dA = dEl && rv && rv.d != null ? sst(0.35, 0.95, rv.d) : 0, revealed = on && (!rv || rv.r >= full), dk = dA > 0.002 && !revealed;
+    if (dEl) { const sz = VW + 'x' + VH; if (T.dkSize !== sz) { dEl.style.width = VW + 'px'; dEl.style.height = VH + 'px'; T.cvd.width = T.cv.width; T.cvd.height = T.cv.height; T.dkSize = sz; this.tmKeyD = null; }
+      const dv = dk ? 'visible' : 'hidden', dop = dA.toFixed(3); if (T.dv !== dv) { T.dv = dv; dEl.style.visibility = dv; } if (T.dop !== dop) { T.dop = dop; dEl.style.opacity = dop; }
+      if (dk) { const pr = dEl.parentElement.getBoundingClientRect(), tf = 'translate(' + (-pr.left) + 'px,' + (-pr.top) + 'px)'; if (T.dtf !== tf) { T.dtf = tf; dEl.style.transform = tf; } } }
     const tg = clampN((-r.top - 0.5 * VH) / VH, 0, TM_END); this.tu = this.tu == null ? tg : this.tu + (tg - this.tu) * 0.12; if (Math.abs(tg - this.tu) < 0.0005) this.tu = tg;
     const u = this.tu, narrow = VW < 900; this.tmN = (this.tmN || 0) + 1;
     const Hp0 = narrow ? Math.min(VH * 0.6, 540) : Math.min(VH * 0.72, 620), Wp0 = Hp0 * 402 / 874;
@@ -690,7 +693,7 @@ class HomePage extends React.Component {
                     </div>{' '}
                   </div>
                 </div>
-              </div><div data-tm="dark" style={{position:"fixed",inset:"0",zIndex:"-1",pointerEvents:"none",visibility:"hidden",opacity:"0",background:"#161513"}}><canvas data-tm="cvd" style={{position:"absolute",left:"0",top:"0",width:"100%",height:"100%",display:"block"}}></canvas></div></section>
+              </div></section>
           <section id="landmarks" style={{position:"relative",zIndex:"1",marginTop:"-250vh"}}><LandmarksJourneySection /></section>
           <section data-screen-label="07 Roads" style={{position:"relative",zIndex:"2",marginTop:"-100vh"}}><div ref={v.roadsRef} style={{position:"sticky",top:"0",boxSizing:"border-box",padding:"96px 0 0",background:"#f3ebdc",opacity:"0",transformOrigin:"50% 30%"}}>{' '}
               <div style={{maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
