@@ -42,7 +42,7 @@ def clear():
 
 
 def poles_and_wires():
-    lp = [(-5.3, 8.0), (-5.3, 50.0), (-5.3, 92.0)]
+    lp = [(-5.3, 8.0), (-5.3, 39.6), (-5.3, 92.0)]
     arms = [street.pole("pole0", *lp[0]), street.pole("pole1", *lp[1], transformer=True),
             street.pole("pole2", *lp[2], lamp=True)]
     arm_r = street.pole("pole3", 5.1, 71.0, h=8.6, cross_dir=-1)
@@ -55,8 +55,10 @@ def poles_and_wires():
     street.wire("wire_t1", street.catenary(a[0] + Vector((0.05, 0, -0.03)), b[0] + Vector((0.04, 0, 0.02)), 1.65, 48,
                                             tangle=0.22, seed=8))
     street.wire("wire_x0", street.catenary(arms[1][2.4][3], arm_r[2.4][0], 0.9, 40, tangle=0.05, seed=5))
-    # service drops from pole1 to the buildings either side
-    street.wire("wire_d0", street.catenary(arms[1][1.7][1], Vector((-6.2, 47.0, BASE + 5.8)), 0.4, 24, seed=6))
+    # service drops from pole1 to the buildings either side, and one across the street
+    street.wire("wire_d0", street.catenary(arms[1][1.7][1], Vector((-6.2, 47.5, BASE + 5.8)), 0.4, 24, seed=6))
+    street.wire("wire_d2", street.catenary(arms[1][2.4][3], Vector((6.0, 45.5, BASE + 6.2)), 0.6, 30, tangle=0.04, seed=9))
+    street.wire("wire_d3", street.catenary(arms[1][2.4][2], Vector((6.0, 36.0, BASE + 9.0)), 0.5, 30, seed=10))
     street.wire("wire_d1", street.catenary(arms[0][1.7][1], Vector((-6.2, 13.0, BASE + 5.2)), 0.35, 24, seed=7))
     # an earlier span arriving from behind the camera, so wires cross the sky in shot (a)
     street.wire("wire_b0", street.catenary(Vector((-5.0, -34.0, 8.9)), arms[0][2.4][0], 0.8, 40))
