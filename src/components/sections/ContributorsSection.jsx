@@ -3,7 +3,7 @@
 import React from 'react';
 import IOSDevice from '@/components/shared/IOSDevice';
 import content from '@/content/contributors.json';
-import styles from './ContributorsSection.module.css';
+import './ContributorsSection.global.css';
 
 const START = 82;
 const PLACES = content.card.places;
@@ -355,10 +355,10 @@ class ContributorsSection extends React.Component {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#403d39' }}>
                       <i className="ri-map-pin-line" style={{ fontSize: '15px' }}>
                       </i>
-                      {v.q.place}
+                      <span className="sc-interp">{v.q.place}</span>
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: '900', color: '#8a857b' }}>
-                      {v.q.count}
+                      <span className="sc-interp">{v.q.count}</span>
                     </div>
                   </div>
                   {v.asking ? (
@@ -367,12 +367,12 @@ class ContributorsSection extends React.Component {
                         {content.card.question}
                       </div>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button data-pts="3" onClick={v.ansYes} style={{ height: '48px', padding: '0 20px', borderRadius: '24px', border: '0', background: '#386641', color: '#fff', font: '900 15px Lato,sans-serif', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'transform .15s ease,background .2s' }} className={`${styles.yesHover} ${styles.press}`}>
+                        <button data-pts="3" onClick={v.ansYes} style={{ height: '48px', padding: '0 20px', borderRadius: '24px', border: '0', background: '#386641', color: '#fff', font: '900 15px Lato,sans-serif', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'transform .15s ease,background .2s' }} className="scpcyes scpcpress">
                           <i className="ri-check-line">
                           </i>
                           {content.card.yes}
                         </button>
-                        <button data-pts="3" onClick={v.ansNo} style={{ height: '48px', padding: '0 20px', borderRadius: '24px', border: '1.5px solid rgba(37,36,34,.16)', background: '#fff', color: '#252422', font: '900 15px Lato,sans-serif', cursor: 'pointer', transition: 'transform .15s ease,border-color .2s' }} className={`${styles.noHover} ${styles.press}`}>
+                        <button data-pts="3" onClick={v.ansNo} style={{ height: '48px', padding: '0 20px', borderRadius: '24px', border: '1.5px solid rgba(37,36,34,.16)', background: '#fff', color: '#252422', font: '900 15px Lato,sans-serif', cursor: 'pointer', transition: 'transform .15s ease,border-color .2s' }} className="scpcno scpcpress">
                           {content.card.no}
                         </button>
                         <button onClick={v.ansSkip} style={{ height: '48px', padding: '0 16px', borderRadius: '24px', border: '0', background: 'none', color: '#403d39', font: '700 15px Lato,sans-serif', cursor: 'pointer' }}>
@@ -390,7 +390,7 @@ class ContributorsSection extends React.Component {
                         </span>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           <div style={{ fontSize: '18px', fontWeight: '900' }}>
-                            {v.thanksTitle}
+                            <span className="sc-interp">{v.thanksTitle}</span>
                           </div>
                           <div style={{ fontSize: '14px', color: '#403d39' }}>
                             {content.card.thanksNote}
@@ -403,18 +403,18 @@ class ContributorsSection extends React.Component {
                 <div style={{ borderTop: '1px solid rgba(37,36,34,.08)' }}>
                   {v.acts.map((a, i) => (
                     <React.Fragment key={i}>
-                      <button data-pts={a.pts} onClick={a.go} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', minHeight: '54px', padding: '8px 20px', border: '0', borderBottom: '1px solid rgba(37,36,34,.06)', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background .2s' }} className={`${styles.rowHover}`}>
+                      <button data-pts={a.pts} onClick={a.go} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', minHeight: '54px', padding: '8px 20px', border: '0', borderBottom: '1px solid rgba(37,36,34,.06)', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background .2s' }} className="scpcrow">
                         <span style={{ flex: 'none', width: '34px', height: '34px', borderRadius: '17px', background: a.bg, color: a.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px' }}>
-                          <i className="{{ a.icon }}">
+                          <i className={a.icon}>
                           </i>
                         </span>
                         <span style={{ flex: '1', fontSize: '16px', fontWeight: '700', color: '#252422' }}>
-                          {a.label}
+                          <span className="sc-interp">{a.label}</span>
                         </span>
                         <span style={{ flex: 'none', height: '30px', minWidth: '52px', padding: '0 10px', borderRadius: '15px', background: '#e4eed4', color: '#386641', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '15px', fontWeight: '900' }}>
                           <i className="ri-add-line" style={{ fontSize: '14px' }}>
                           </i>
-                          {a.pts}
+                          <span className="sc-interp">{a.pts}</span>
                         </span>
                       </button>
                     </React.Fragment>
@@ -427,12 +427,12 @@ class ContributorsSection extends React.Component {
                         {content.card.standingLabel}
                       </div>
                       <div style={{ fontSize: '19px', fontWeight: '900' }}>
-                        {v.tierName}
+                        <span className="sc-interp">{v.tierName}</span>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                       <span ref={v.ptsRef} style={{ display: 'inline-block', fontSize: '30px', fontWeight: '900', letterSpacing: '-.03em', color: '#386641' }}>
-                        {v.pts}
+                        <span className="sc-interp">{v.pts}</span>
                       </span>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#403d39' }}>
                         {content.card.pointsUnit}
@@ -455,13 +455,13 @@ class ContributorsSection extends React.Component {
                     {v.nodes.map((n, i) => (
                       <React.Fragment key={i}>
                         <span style={{ height: '28px', padding: '0 10px', borderRadius: '14px', background: n.cbg, color: n.cfg, display: 'inline-flex', alignItems: 'center', fontSize: '13px', fontWeight: '900', transition: 'background .4s,color .4s' }}>
-                          {n.label}
+                          <span className="sc-interp">{n.label}</span>
                         </span>
                       </React.Fragment>
                     ))}
                   </div>
                   <div style={{ fontSize: '14px', lineHeight: '1.4', color: '#403d39' }}>
-                    {v.hint}
+                    <span className="sc-interp">{v.hint}</span>
                   </div>
                 </div>
               </div>
