@@ -378,7 +378,7 @@ def keke(tag, pos, heading, paint="keke", roof="canvas", stripe="paint_mid"):
         win = [(-1.18, 1.22), (-0.86, 1.22), (-0.86, 1.52), (-1.12, 1.52)]
         pw = [V(sg * (W + 0.009), y, z) for (y, z) in win]
         G.poly(pw if sg > 0 else pw[::-1], "vglass")
-    rw = [V(0.3, -1.352, 1.2), V(-0.3, -1.352, 1.2), V(-0.28, -1.345, 1.42), V(0.28, -1.345, 1.42)]
+    rw = [V(0.32, -1.372, 1.18), V(-0.32, -1.372, 1.18), V(-0.3, -1.362, 1.44), V(0.3, -1.362, 1.44)]
     G.poly(rw, "vglass")
     # B-pillars and grab rails
     for sg in (-1, 1):
