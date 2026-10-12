@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: "Marketdey",
   twitter: { card: "summary_large_image" },
   description:
-    "Know which markets are on today across Delta State — market days, alerts and landmarks that work offline.",
+    "Which market dey today? Marketdey knows. Shop the market or dodge its traffic: market days, alerts and landmark directions across Nigeria, even offline.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
