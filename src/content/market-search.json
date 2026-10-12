@@ -1,0 +1,82 @@
+{
+  "badge": "Explore",
+  "headline": "Find markets by distance or by what they sell.",
+  "intro": "Set how far you can travel, then add the goods you need. Marketdey lights up the markets that match and tells you when each one next opens.",
+  "steps": {
+    "distance": "1  Distance",
+    "goods": "2  Goods"
+  },
+  "panel": {
+    "distanceHeading": "DISTANCE",
+    "within": "Within",
+    "goodsHeading": "GOODS"
+  },
+  "unit": "km",
+  "goods": [
+    "Foodstuff",
+    "Yam & tubers",
+    "Livestock",
+    "Fish",
+    "Textiles & fabric",
+    "Electronics",
+    "Building materials",
+    "Fruits & vegetables",
+    "Palm oil",
+    "Spices"
+  ],
+  "sequence": [
+    "Foodstuff",
+    "Yam & tubers",
+    "Livestock",
+    "Fish",
+    "Textiles & fabric"
+  ],
+  "towns": [
+    "Ogwashi-Uku",
+    "Okpanam",
+    "Ubulu-Uku",
+    "Issele-Uku",
+    "Ibusa",
+    "Asaba",
+    "Onicha-Ugbo",
+    "Akwukwu-Igbo",
+    "Illah",
+    "Abraka",
+    "Agbor",
+    "Umunede",
+    "Igbodo",
+    "Obiaruku",
+    "Kwale",
+    "Ubulu-Unor",
+    "Ezi",
+    "Idumuje-Ugboko",
+    "Ogbe-Ogonogo",
+    "Eku",
+    "Oghara",
+    "Sapele",
+    "Ozoro",
+    "Ughelli"
+  ],
+  "marketSuffixes": [
+    "Nkwọ market",
+    "Eke market",
+    "Orie market",
+    "Afọ market",
+    "main market",
+    "central market",
+    "night market",
+    "roadside market"
+  ],
+  "weekdays": ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"],
+  "results": {
+    "market": "market",
+    "markets": "markets",
+    "selling": " selling ",
+    "within": " within ",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "inDaysPrefix": "In ",
+    "inDaysSuffix": " days",
+    "empty": "No match yet. Try a wider distance."
+  }
+}
