@@ -8,11 +8,12 @@ Freestyle (ink RGBA) and Depth, then composite.py turns that into the drawing. P
 seconds per frame.
 
 Ink, per lineset (all thicknesses in px at 900 px image height, scaled to the frame height):
-  outline   silhouettes, borders and the external contour of solid objects   1.9 px near
-  crease    creases that are not outlines                                    1.15 px near
-  material  material boundaries that are neither                            0.75 px near
-  fine      everything on small solids (pipes, insulators, goods, people)    0.95 px near
-  foliage   canopy outlines, scalloped                                       1.2 px near
+  outline   silhouettes, borders and the external contour of solid objects   1.6 px near
+  crease    creases that are not outlines                                    1.0 px near
+  material  material boundaries that are neither                            0.7 px near
+  fine      everything on small solids (pipes, insulators, goods, people)    0.85 px near
+  foliage   canopy outlines, scalloped and broken                            1.1 px near
+  wires     overhead cables                                                  0.75 px near
 Thickness falls with camera distance (x1 at 4 m to x0.32 at 140 m) and tapers at stroke ends;
 colour and alpha fade toward paper with distance. A little Perlin wobble (0.3 px) and a
 calligraphic pressure term keep the lines from looking plotted.
@@ -48,8 +49,12 @@ def args():
             o["samples"] = int(v)
         elif k == "--tag":
             o["tag"] = v
+        elif k == "--cam":   # name=px,py,pz,tx,ty,tz  (ad-hoc preview camera)
+            nm, vals = v.split("=")
+            f = [float(x) for x in vals.split(",")]
+            o.setdefault("cams", []).append((nm, {"pos": tuple(f[:3]), "target": tuple(f[3:])}))
         i += 2
-    if not o["shots"] and not o["ride"]:
+    if not o["shots"] and not o["ride"] and not o.get("cams"):
         o["shots"] = ["a", "b", "c"]
     return o
 
@@ -152,13 +157,15 @@ def curve_points(mapping, pts):
 
 LINESETS = {
     # name: (collections, types, excluded types, thickness px @900, fade range m, wobble px)
-    "outline": (("lines",), ("silhouette", "border", "external_contour"), (), 1.9, (70.0, 260.0), 0.32),
-    "crease": (("lines",), ("crease",), ("silhouette", "border", "external_contour"), 1.15, (55.0, 220.0), 0.25),
-    "material": (("lines",), ("material_boundary",), ("silhouette", "border", "external_contour", "crease"), 0.75,
-                 (35.0, 160.0), 0.2),
-    "fine": (("fine",), ("silhouette", "border", "external_contour", "crease", "material_boundary"), (), 0.95,
-             (40.0, 170.0), 0.22),
-    "foliage": (("foliage",), ("silhouette", "border", "external_contour"), (), 1.2, (60.0, 240.0), 0.0),
+    "outline": (("lines",), ("silhouette", "border", "external_contour"), (), 1.6, (70.0, 260.0), 0.3),
+    "crease": (("lines",), ("crease",), ("silhouette", "border", "external_contour"), 1.0, (55.0, 220.0), 0.22),
+    "material": (("lines",), ("material_boundary",), ("silhouette", "border", "external_contour", "crease"), 0.7,
+                 (35.0, 160.0), 0.18),
+    "fine": (("fine",), ("silhouette", "border", "external_contour", "crease", "material_boundary"), (), 0.85,
+             (40.0, 170.0), 0.2),
+    "wires": (("wires",), ("silhouette", "border", "external_contour"), (), 0.75, (90.0, 320.0), 0.12),
+    # foliage: only the outline of each tree's whole leaf mass (contour), never clump-by-clump
+    "foliage": (("foliage",), ("silhouette", "external_contour"), (), 1.1, (60.0, 240.0), 0.0),
 }
 
 
@@ -239,13 +246,25 @@ def style(st, name, thick, fade, wobble):
     if name == "foliage":
         # scalloped leafy edge: small regular bumps plus irregular ones
         sd = st.geometry_modifiers.new("scallop", "SINUS_DISPLACEMENT")
-        sd.wavelength = 9.0 * thick / 1.2
-        sd.amplitude = 1.6 * thick / 1.2
+        sd.wavelength = 4.5 * thick / 1.2
+        sd.amplitude = 1.1 * thick / 1.2
         pn = st.geometry_modifiers.new("leafy", "PERLIN_NOISE_1D")
-        pn.frequency = 14.0
-        pn.amplitude = 1.4 * thick / 1.2
-        pn.octaves = 2
+        pn.frequency = 22.0
+        pn.amplitude = 1.2 * thick / 1.2
+        pn.octaves = 3
         pn.seed = 3
+        # only the longer contour runs survive: the mass outline, not every lobe
+        st.use_length_min = True
+        st.length_min = 14.0 * thick / 1.1
+        # broken, pressure-varying strokes
+        an = st.alpha_modifiers.new("broken", "NOISE")
+        an.blend = "MULTIPLY"
+        an.amplitude = 0.7
+        an.period = 18.0
+        tn = st.thickness_modifiers.new("press", "NOISE")
+        tn.blend = "MULTIPLY"
+        tn.amplitude = 0.6
+        tn.period = 12.0
     elif wobble > 0:
         gm = st.geometry_modifiers.new("wobble", "PERLIN_NOISE_1D")
         gm.frequency = 6.0
@@ -280,6 +299,7 @@ def main():
     jobs = []
     for s in o["shots"]:
         jobs.append((s, C.SHOTS[s]))
+    jobs += o.get("cams", [])
     if o["ride"]:
         a, b = o["ride"]
         for k in range(a, b + 1):
