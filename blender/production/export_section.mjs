@@ -88,6 +88,65 @@ const tiltC = cumulative(MAP_END, RIDE_START, 4000, (a, b) => angle(a, b));
 const rideC = cumulative(RIDE_START, RIDE_END, 20000, (a, b) => dist(a, b) / STEP_M + angle(a, b) / STEP_DEG);
 const pTilt = pick(tiltC, TILT, false), pRide = pick(rideC, COUNT - TILT, true);
 const frames = [...pTilt, ...pRide].map((p, i) => ({ i, ...camAt(p) }));
+
+// ---------------------------------------------------------------- portrait camera (contract rev 2)
+// Same positions; during the ride the portrait camera yaws (about world up) toward each landmark
+// as it is approached and passed, just enough that the landmark's footprint stays inside the
+// 780x1688 frame, eased with a Gaussian over frames so it never snaps, back to the road heading
+// in between. Landmark footprints (street frame at LS: [lat0, lat1] x [z0, z1], height) from the
+// section's own clearance quads.
+// key feature of each landmark (street frame at LS: lat0, lat1, z0, z1, y0, y1): the canopy, the
+// tank, the umbrella row, nave + tower, the gate
+const LM_BOX = [[5.5, 16.5, -3.5, 3.5, 0, 5.6], [-14.6, -9.4, -2.6, 2.6, 6, 13.9], [6.0, 9.8, -9.6, 9.6, 0, 3.2],
+  [-18, -10, -6, 6, 0, 13], [-7.2, -5.6, -5.75, 5.75, 0, 9.4]];
+const lmPts = LM_BOX.map(([a, b, c, d, y0, y1], i) => { const s0 = LS[i], [x, z, t] = fr(s0), pts = [];
+  for (const lat of [a, b]) for (const zz of [c, d]) for (const y of [y0, y1]) { const X = x + lat * Math.cos(t) - zz * Math.sin(t), Z = z + lat * Math.sin(t) + zz * Math.cos(t); pts.push(new THREE.Vector3(X, y, Z)); }
+  return pts; });
+const tanHp = Math.tan(29 * Math.PI / 180) * 780 / 1688, HPF = Math.atan(tanHp), HP = Math.atan(tanHp * 0.9);
+const YAW_MAX = 38 * Math.PI / 180;
+const yawOf = v => Math.atan2(-v.x, -v.z);            // + = target is to the left (turn left)
+const need = frames.map(f => {
+  if (f.e < 1) return 0;
+  const P = new THREE.Vector3(...f.pos), qi = new THREE.Quaternion(...f.quat).invert();
+  const cand = [];
+  lmPts.forEach(pts => {
+    const c = pts.reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(1 / pts.length), d = c.distanceTo(P);
+    if (d > 75) return;
+    const ac = yawOf(c.clone().sub(P).applyQuaternion(qi));
+    if (Math.abs(ac) > 75 * Math.PI / 180) return;      // being passed: let it go
+    const ang = pts.map(pt => yawOf(pt.clone().sub(P).applyQuaternion(qi)));
+    cand.push({ d, lo: Math.max(...ang) - HP, hi: Math.min(...ang) + HP });   // yaws keeping every point in
+  });
+  cand.sort((a, b) => a.d - b.d);
+  // keep the nearest landmark in; also keep any farther one in when both fit at once
+  let lo = -YAW_MAX, hi = YAW_MAX, first = true;
+  for (const c of cand) {
+    const nlo = Math.max(lo, c.lo), nhi = Math.min(hi, c.hi);
+    if (nlo <= nhi) { lo = nlo; hi = nhi; first = false; }
+    else if (first) { const m = Math.max(-YAW_MAX, Math.min(YAW_MAX, (c.lo + c.hi) / 2)); lo = hi = m; first = false; }
+  }
+  return Math.min(Math.max(0, lo), hi); });
+// ease: running max of |need| over a window (so the turn starts early and holds), then two Gaussian passes
+const W1 = 3, held = need.map((_, j) => { let m = 0; for (let k = -W1; k <= W1; k++) { const jj = j + k; if (jj >= 0 && jj < need.length && Math.abs(need[jj]) > Math.abs(m)) m = need[jj]; } return frames[j].e < 1 ? 0 : m; });
+const gauss = (arr, sg) => arr.map((_, j) => { let a = 0, w = 0; for (let k = -3 * sg; k <= 3 * sg; k++) { const jj = j + k; if (jj < 0 || jj >= arr.length) continue; const g = Math.exp(-0.5 * (k / sg) ** 2); a += arr[jj] * g; w += g; } return frames[j].e < 1 ? 0 : a / w; });
+const yawSm = gauss(gauss(held, 10), 10).map((y, j) => y * sstep(TILT - 1, TILT + 10, j));
+const UP = new THREE.Vector3(0, 1, 0);
+frames.forEach((f, j) => { const q = new THREE.Quaternion().setFromAxisAngle(UP, yawSm[j]).multiply(new THREE.Quaternion(...f.quat)); f.quatP = q.toArray(); f.yawP = yawSm[j]; });
+const maxRate = Math.max(...yawSm.slice(1).map((y, j) => Math.abs(y - yawSm[j]))) * 180 / Math.PI;
+const jmax = yawSm.slice(1).reduce((m, y, j) => Math.abs(y - yawSm[j]) > Math.abs(yawSm[m + 1] - yawSm[m]) ? j : m, 0);
+console.log(`[export] max yaw step at frame ${jmax}`);
+console.log(`[export] portrait yaw: max ${(Math.max(...yawSm.map(Math.abs)) * 180 / Math.PI).toFixed(1)} deg, max step ${maxRate.toFixed(2)} deg/frame`);
+// visibility report: for each landmark, frames where its key feature is entirely inside the frame,
+// and the closest distance at which it still is (landscape vs portrait)
+const fullyIn = (f, quat, pts, tanH) => { const P = new THREE.Vector3(...f.pos), qi = new THREE.Quaternion(...quat).invert();
+  return pts.every(pt => { const v = pt.clone().sub(P).applyQuaternion(qi); return v.z < -0.5 && Math.abs(v.x / -v.z) <= tanH && Math.abs(v.y / -v.z) <= Math.tan(29 * Math.PI / 180); }); };
+const VIS = lmPts.map((pts, i) => { const c = pts.reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(1 / pts.length), r = {};
+  for (const [v, key, tanH] of [['l', 'quat', Math.tan(29 * Math.PI / 180) * 1.6], ['p', 'quatP', tanHp], ['p0', 'quat', tanHp]]) {
+    let n = 0, dmin = 1e9; frames.forEach(f => { if (f.e < 1) return; if (fullyIn(f, f[key], pts, tanH)) { n++; dmin = Math.min(dmin, c.distanceTo(new THREE.Vector3(...f.pos))); } });
+    r[v] = { frames: n, closest_m: +dmin.toFixed(1) }; }
+  return r; });
+if (process.env.DEBUG) for (let j = 300; j < 400; j += 4) console.log(j, (need[j] * 57.3).toFixed(1), (yawSm[j] * 57.3).toFixed(1), fullyIn(frames[j], frames[j].quatP, lmPts[4], tanHp), fullyIn(frames[j], frames[j].quat, lmPts[4], tanHp));
+VIS.forEach((r, i) => console.log(`[export] L${i + 1} fully in frame: landscape ${r.l.frames} fr (to ${r.l.closest_m} m), portrait ${r.p.frames} fr (to ${r.p.closest_m} m), portrait without yaw ${r.p0.frames} fr (to ${r.p0.closest_m} m)`));
 let travel = 0; for (let i = TILT + 1; i < frames.length; i++) travel += dist(frames[i - 1], frames[i]);
 const stops = LS.map((ls, i) => { const [x, z] = W(MK[i][2], MK[i][0]); let best = 0, bd = 1e9; frames.forEach((f, j) => { const d = Math.hypot(f.pos[0] - x, f.pos[2] - z); if (d < bd) { bd = d; best = j; } }); return { landmark: i + 1, frame: best, dist: +bd.toFixed(2), p: +frames[best].p.toFixed(5) }; });
 // closest frame from which the landmark is still in view in the narrow portrait variant
