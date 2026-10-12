@@ -2690,7 +2690,9 @@ export class CityLife {
   clearScreenBg() {
     [document.documentElement, document.body, this.skyHost].forEach(el => {
       if (!el) return;
-      el.style.removeProperty('background-color');
+      // the hero section's own green comes from its inline style: restore it rather than deleting it
+      if (el === this.skyHost) el.style.backgroundColor = '#386641';
+      else el.style.removeProperty('background-color');
       el.style.removeProperty('transition');
     });
   }
