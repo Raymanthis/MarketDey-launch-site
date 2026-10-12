@@ -220,6 +220,7 @@ class MarketSearchSection extends React.Component {
                 {v.empty ? <><div style={{ padding: '14px 18px 18px', fontSize: '14px', color: '#ccc5b9', borderTop: '1px solid rgba(255,255,255,.07)' }}>{content.results.empty}</div></> : null}
               </div>
             </div>
+            <div data-md-dark="1" style={{ position: 'absolute', left: '0', top: '0', width: '0', height: '0', zIndex: '5', pointerEvents: 'none', visibility: 'hidden', opacity: '0', background: '#161513' }}><canvas style={{ position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', display: 'block' }}></canvas></div>
             <div ref={v.dotRef} style={{ position: 'absolute', left: '0', top: '0', width: '0', height: '0', zIndex: '6', pointerEvents: 'none', visibility: 'hidden' }}><span data-c="1" style={{ position: 'absolute', left: '0', top: '0', display: 'flex', width: '48px', height: '48px', margin: '-24px 0 0 -24px', borderRadius: '24px', background: '#4f772d', border: '3px solid #fff', boxSizing: 'border-box', boxShadow: '0 8px 18px rgba(0,0,0,.45)', color: '#fff', alignItems: 'center', justifyContent: 'center', fontSize: '22px', willChange: 'transform,opacity' }}><i className="ri-map-pin-2-fill"></i></span></div>
             <div ref={v.dayRef} style={{ position: 'absolute', inset: '0', zIndex: '5', pointerEvents: 'none', background: '#ebe8e1', clipPath: 'circle(0px at 50% 50%)', visibility: 'hidden' }}></div>
           </div>
