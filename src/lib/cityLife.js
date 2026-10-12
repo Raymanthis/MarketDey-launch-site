@@ -71,6 +71,7 @@ export class CityLife {
     this.target = 0;
     this.lastSpawn = -1e9;
     this.queue = [];
+    this.overtakes = 0;
 
     // weather schedule
     this.storms = [];
@@ -115,12 +116,14 @@ export class CityLife {
       try { bb = g.getBBox(); } catch { bb = null; }
       if (!bb || !(bb.width > 0)) bb = { x: 0, y: -40, width: 70, height: 40 };
       return {
-        g, wrapper: g.parentNode, i: +g.getAttribute('data-veh'), x: -600, v: 0, v0: +g.getAttribute('data-v') || 40,
+        g, wrapper: g.parentNode, i: +g.getAttribute('data-veh'), x: -600, v: 0,
+        vBase: +g.getAttribute('data-v') || 40, v0: 0,
         bx0: bb.x, len: bb.width, bbY: bb.y, bbH: bb.height,
         extra: g.hasAttribute('data-extra'), active: false, queued: false,
-        lane: 0, dy: 0, drift: null, wdy: null, s0: S0,
+        lane: 0, dy: 0, drift: null, wdy: null, s0: S0, lc: null, lcCool: 0,
       };
     });
+    this.vehicles.forEach(v => { this.pickV0(v); v.lcCool = this.rT() * 2; });
     if (this.vehicles.length) {
       const last = this.vehicles[this.vehicles.length - 1];
       this.vehParent = last.wrapper.parentNode;
@@ -157,6 +160,16 @@ export class CityLife {
     });
     base.forEach(v => { v.x = v.fr - v.bx0 - v.len; delete v.fr; this.setActive(v, true); });
     this.orderDirty = true;
+  }
+
+  // varied desired speed per shape, skewed fast/slow around vBase
+  pickV0(v) {
+    const r = this.rT();
+    let f;
+    if (v.i === 5 || v.i === 0 || v.i === 4) f = 0.7 + 0.65 * Math.pow(r, 0.55);
+    else if (v.i === 3 || v.i === 6 || v.i === 7) f = 0.7 + 0.65 * Math.pow(r, 1.9);
+    else f = 0.7 + 0.65 * r;
+    v.v0 = v.vBase * f;
   }
 
   // night mode: headlights, tail lights and lit windows
@@ -310,6 +323,8 @@ export class CityLife {
     v.g.style.visibility = on ? '' : 'hidden';
     if (!on) {
       v.drift = null;
+      v.lc = null;
+      v.lcCool = 0;
       v.x = -600;
       v.g.style.transform = 'translateX(-600px)';
       this.orderDirty = true;
@@ -519,7 +534,7 @@ export class CityLife {
     // okada/keke start filtering (drifting) in slow traffic
     if ((this.tPhase === 'build' || this.tPhase === 'hold') && this.C > 0.5) {
       act.forEach(v => {
-        if (v.drift || (v.i !== 5 && v.i !== 2)) return;
+        if (v.drift || v.lc || (v.i !== 5 && v.i !== 2)) return;
         const front = frontOf(v);
         if (front >= Z0 - 200 && front <= Z1 && v.v < 15) {
           const ns = [];
@@ -534,14 +549,63 @@ export class CityLife {
     }
 
     const drifters = act.filter(v => v.drift);
-    const groups = [];
-    for (let L = 0; L < this.lanes; L++) {
-      groups.push(act.filter(v => !v.drift && v.lane === L).sort((a, b) => frontOf(b) - frontOf(a)));
-    }
+    const buildGroups = () => {
+      const g = [];
+      for (let L = 0; L < this.lanes; L++) {
+        g.push(act.filter(v => !v.drift && (v.lane === L || (v.lc && v.lc.from === L)))
+          .sort((a, b) => frontOf(b) - frontOf(a)));
+      }
+      return g;
+    };
 
-    // car-following within each lane only
-    groups.forEach(group => {
+    // overtaking: decide lane changes (gap acceptance) before car-following
+    let groups = buildGroups();
+    act.forEach(v => {
+      if (v.drift || v.lc || v.lcCool > 0) return;
+      const front = frontOf(v), rear = rearOf(v);
+      const L = v.lane;
+      const g = groups[L];
+      let ld = null;
+      for (let n = 0; n < g.length; n++) {
+        if (g[n] === v) { ld = n > 0 ? g[n - 1] : null; break; }
+      }
+      if (!ld) return;
+      const gap = rearOf(ld) - front;
+      if (gap >= 70 || ld.v >= v.v0 * 0.85 || v.v0 <= ld.v + 6) return;
+      if ((this.tPhase === 'build' || this.tPhase === 'hold') && front >= Z0 - 200) return;
+      if (front < 0 || rear > W - 40) return;
+      const cands = [];
+      if (L - 1 >= 0) cands.push(L - 1);
+      if (L + 1 < this.lanes) cands.push(L + 1);
+      if (cands.length === 2 && this.rT() < 0.5) cands.reverse();
+      for (const C of cands) {
+        let a = null, b = null, aRear = Infinity, bFront = -Infinity, overlap = false;
+        act.forEach(o => {
+          if (o === v || o.drift) return;
+          if (!(o.lane === C || (o.lc && (o.lc.to === C || o.lc.from === C)))) return;
+          const of = frontOf(o), or = rearOf(o);
+          if (or >= front && or < aRear) { aRear = or; a = o; }
+          if (of <= rear && of > bFront) { bFront = of; b = o; }
+          if (or < front && of > rear) overlap = true;
+        });
+        if (overlap) continue;
+        if ((!a || aRear - front >= Math.max(18, v.v * 0.9))
+          && (!b || rear - bFront >= Math.max(18, b.v * 0.8))
+          && (!a || a.v > ld.v + 4)) {
+          v.lc = { from: L, to: C, t: 0, dur: 0.6 };
+          v.lane = C;
+          v.lcCool = 2.5;
+          this.overtakes++;
+          return;
+        }
+      }
+    });
+
+    // car-following within each lane only (mid-change vehicles are obstacles in their old lane)
+    groups = buildGroups();
+    groups.forEach((group, L) => {
       group.forEach((v, n) => {
+        if (v.lane !== L) return; // obstacle-only here: acceleration comes from its target lane
         const front = frontOf(v), rear = rearOf(v);
         const inZone = front >= Z0 - 30 && rear <= Z1;
         const s0 = inZone ? 6 : 10, T = inZone ? 0.35 : HEADWAY;
@@ -571,6 +635,7 @@ export class CityLife {
     act.forEach(v => {
       v.v = Math.max(0, v.v + (v._a || 0) * dt);
       v.x += v.v * dt;
+      if (v.lcCool > 0) v.lcCool -= dt;
     });
 
     // drifters slide sideways at 3 px/s toward the target lane
@@ -582,10 +647,25 @@ export class CityLife {
       else if (target < v.dy) v.dy = Math.max(target, v.dy - stepDy);
     });
 
+    // progress active lane changes: lerp dy, re-sort at the half and the end
+    act.forEach(v => {
+      if (!v.lc) return;
+      v.lc.t += dt;
+      const p = v.lc.t / v.lc.dur;
+      v.dy = lerp(this.laneDys[v.lc.from], this.laneDys[v.lc.to], smooth(p));
+      if (!v.lc.half && p >= 0.5) { v.lc.half = true; this.orderDirty = true; }
+      if (v.lc.t >= v.lc.dur) {
+        v.dy = this.laneDys[v.lc.to];
+        v.lc = null;
+        this.orderDirty = true;
+      }
+    });
+
     // hard no-overlap clamp within each lane (front to back)
-    groups.forEach(group => {
+    groups.forEach((group, L) => {
       for (let n = 1; n < group.length; n++) {
         const ld = group[n - 1], v = group[n];
+        if (v.lane !== L) continue; // mid-change obstacle: never moved in its old lane
         const gap = ld.x + ld.bx0 - (v.x + v.bx0 + v.len);
         if (gap < v.s0) { v.x += gap - v.s0; v.v = Math.min(v.v, ld.v); }
       }
@@ -635,6 +715,7 @@ export class CityLife {
       if (this.queue.length) cand = this.queue[0];
       else if (count < this.target) cand = this.vehicles.find(v => !v.active && !v.queued);
       if (cand) {
+        this.pickV0(cand);
         let bestLane = -1, bestRoom = -Infinity, bestRear = null;
         for (let L = 0; L < this.lanes; L++) {
           let rearMost = null, rearMostRear = Infinity;
@@ -1092,7 +1173,10 @@ export class CityLife {
       const group = nonDrift.filter(v => v.lane === L)
         .map(v => ({ v, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0 }))
         .sort((a, b) => b.front - a.front);
-      for (let n = 1; n < group.length; n++) minGap = Math.min(minGap, group[n - 1].rear - group[n].front);
+      for (let n = 1; n < group.length; n++) {
+        if (group[n - 1].v.lc || group[n].v.lc) continue;
+        minGap = Math.min(minGap, group[n - 1].rear - group[n].front);
+      }
     }
     let minGapDrift = Infinity;
     const ds = drifters.map(v => ({ v, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0 })).sort((a, b) => b.front - a.front);
@@ -1114,7 +1198,8 @@ export class CityLife {
       weather: this.wx.phase, weatherP: this.wx.p, dim: this.wx.dim, rain: this.wx.rain,
       lightningLeft: s && this.wx.phase !== 'clear' ? s.events.filter(e => e.t > this.viewTime).length : 0,
       minGap, minGapDrift, crossLaneOverlaps,
-      vehicles: act.map(v => ({ i: v.i, x: v.x, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0, v: v.v, v0: v.v0, len: v.len, lane: v.lane, dy: v.dy, drifting: !!v.drift }))
+      laneChanges: act.filter(v => v.lc).length, overtakes: this.overtakes,
+      vehicles: act.map(v => ({ i: v.i, x: v.x, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0, v: v.v, v0: v.v0, len: v.len, lane: v.lane, dy: v.dy, drifting: !!v.drift, lc: !!v.lc }))
         .sort((a, b) => b.front - a.front),
     };
   }
