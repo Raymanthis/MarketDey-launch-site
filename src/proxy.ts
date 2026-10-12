@@ -34,6 +34,7 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/fonts/') ||
+    pathname.startsWith('/images/badges/') ||
     pathname === '/icon.svg' ||
     pathname === '/favicon.ico' ||
     pathname === '/zoho-domain-verification.html' ||
