@@ -47,7 +47,9 @@ const SIGN_K = 400, SIGN_C = 2;
 const SIGN_RING_CY = 8.8, SIGN_HOLE_R = 3.68, SIGN_LOOP_R = 5.6, SIGN_RING_D = 11.2;
 const SIGN_PEND_K = 700, SIGN_PEND_C = 3, SIGN_PEND_MAX = 55, SIGN_PEND_VMAX = 260;
 const SIGN_IDLE_AMP = 2.6, SIGN_IDLE_T = 4.2;
-const SIGN_ROPE_LAG = 0.22, SIGN_ROPE_BOUNCE = 0, SIGN_ROPE_K1 = 90, SIGN_ROPE_C1 = 4, SIGN_ROPE_K2 = 300, SIGN_ROPE_C2 = 7;
+// elastic rope: stretch s (px along the rope) springs back and bounces past rest (slack, s < 0)
+const SIGN_STRETCH_K = 90, SIGN_STRETCH_C = 7.6, SIGN_STRETCH_SOFT = 60, SIGN_STRETCH_MAX = 120, SIGN_STRETCH_MIN = -40, SIGN_STRETCH_VMAX = 1500;
+const SIGN_ROPE_LAG = 0.22, SIGN_ROPE_BOUNCE = 0.03, SIGN_ROPE_K1 = 90, SIGN_ROPE_C1 = 4, SIGN_ROPE_K2 = 300, SIGN_ROPE_C2 = 7;
 const SIGN_FLICK_WIN = 200, SIGN_FLICK_MIN = 400, SIGN_FLICK_K = 0.3, SIGN_FLICK_MAX = 700;
 
 class HomePage extends React.Component {
@@ -308,7 +310,7 @@ class HomePage extends React.Component {
   // drawn from the anchor (0,0) to exactly that point; only its middle bends (modes vanish at both ends).
   signRopeX(u, E, now) {
     const p = this.signPhys(), st = p.s || 0, taut = 1 / (1 + Math.max(0, st) / 50);
-    const slack = st < 0 ? 0.5 * (2 / Math.PI) * Math.sqrt(-st * E) : 0; // a rope cannot push: on the up-bounce it bows out
+    const slack = st < 0 ? 0.3 * (2 / Math.PI) * Math.sqrt(-st * E) : 0; // a rope cannot push: on the up-bounce it bows out
     const idle = this.reducedMotion ? 0 : 1.1 * Math.sin(Math.PI * 3 * u - now / 1000 * 2.4); // faint travelling wobble
     return ((p.q1 * taut + slack + idle) * Math.sin(Math.PI * u)) + p.q2 * taut * Math.sin(Math.PI * 2 * u);
   }
@@ -350,7 +352,7 @@ class HomePage extends React.Component {
     now = now || performance.now();
     const p = this.signPhys(), body = this.signBodyRef.current, ang = p.phi + this.signIdle(now), dy = this.signDropY(now);
     const xf = 'translate(0px,' + dy.toFixed(2) + 'px) rotate(' + ang.toFixed(3) + 'deg)';
-    if (this.signRef.current) this.signRef.current.style.transform = xf;
+    if (this.signRef.current) this.signRef.current.style.transform = xf + ' translate(0px,' + (p.s || 0).toFixed(2) + 'px)';
     if (this.signRopeLayerRef.current) this.signRopeLayerRef.current.style.transform = xf;
     if (body && !this.reducedMotion) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
     this.signRope(now);
@@ -381,7 +383,7 @@ class HomePage extends React.Component {
     const step = () => {
       const now = performance.now(), dt = Math.min(0.033, Math.max(0.001, (now - p.last) / 1000)); p.last = now;
       if (!p.drag) {
-        if (rm) { p.phi = Math.abs(p.phi) < 0.15 ? 0 : p.phi * Math.exp(-dt * 10); p.phv = 0; }
+        if (rm) { p.phi = Math.abs(p.phi) < 0.15 ? 0 : p.phi * Math.exp(-dt * 10); p.phv = 0; p.s = Math.abs(p.s) < 0.3 ? 0 : p.s * Math.exp(-dt * 10); p.vs = 0; }
         else {
           p.phv += (-SIGN_PEND_K * Math.sin(p.phi * Math.PI / 180) - SIGN_PEND_C * p.phv) * dt;
           p.phi += p.phv * dt;
@@ -389,11 +391,14 @@ class HomePage extends React.Component {
           if (p.phi < -SIGN_PEND_MAX) { p.phi = -SIGN_PEND_MAX; if (p.phv < 0) p.phv = 0; }
           p.omega += (-SIGN_K * Math.sin(p.theta * Math.PI / 90) - SIGN_C * p.omega) * dt;
           p.theta += p.omega * dt;
+          p.vs += (-SIGN_STRETCH_K * p.s - SIGN_STRETCH_C * p.vs) * dt;
+          p.s += p.vs * dt;
+          if (p.s < SIGN_STRETCH_MIN) { p.s = SIGN_STRETCH_MIN; if (p.vs < 0) p.vs = 0; }
         }
       }
       this.signRopeStep(dt, now);
       const face = Math.round(p.theta / 180) * 180;
-      const calmP = !p.drag && Math.abs(p.phi) < 0.15 && Math.abs(p.phv) < 1;
+      const calmP = !p.drag && Math.abs(p.phi) < 0.15 && Math.abs(p.phv) < 1 && Math.abs(p.s) < 0.3 && Math.abs(p.vs) < 2;
       const calmT = rm || (!p.drag && Math.abs(p.theta - face) < 0.05 && Math.abs(p.omega) < 0.5);
       // pendulum settled: hand back to the idle sway, which starts at angle 0 so there is no jump
       if (calmP && !rm && !p.idleOn) { p.phi = 0; p.phv = 0; p.idleOn = true; p.idleT0 = now; }
@@ -401,21 +406,22 @@ class HomePage extends React.Component {
       this.signRender(now);
       // idle sway and the drop-in keep the loop alive; reduced motion stops once the pendulum is still
       if (!rm || !calmP) this.signRaf = requestAnimationFrame(step);
-      else { this.signRaf = null; p.phi = 0; p.phv = 0; this.signRender(now); }
+      else { this.signRaf = null; p.phi = 0; p.phv = 0; p.s = 0; p.vs = 0; this.signRender(now); }
     };
     this.signRaf = requestAnimationFrame(step);
   }
   signDown(e) {
     const p = this.signPhys();
     const rect = e.currentTarget.getBoundingClientRect();
-    const root = this.signRef.current ? this.signRef.current.getBoundingClientRect() : null;
+    const root = this.signRopeLayerRef.current ? this.signRopeLayerRef.current.getBoundingClientRect() : null; // anchor: swing transform only, no stretch
     const now = performance.now();
     p.ax = root ? root.left + root.width / 2 : window.innerWidth / 2; p.ay = root ? root.top : 0;
     p.down = true; p.drag = false; p.moved = false;
     p.cx = rect.left + rect.width / 2;
     p.sx = e.clientX; p.sy = e.clientY; p.stx = p.theta; p.st0 = p.phi;
     p.px = e.clientX; p.py = e.clientY; p.pt = now; p.dt0 = now; p.vx = 0; p.vy = 0;
-    p.a0 = Math.atan2(p.ax - e.clientX, e.clientY - p.ay); // CSS rotate(+phi) swings the card LEFT, so measure the pointer angle with x mirrored
+    p.a0 = Math.atan2(p.ax - e.clientX, e.clientY - p.ay);
+    p.l0 = Math.hypot(e.clientX - p.ax, e.clientY - p.ay); p.s0 = p.s; // CSS rotate(+phi) swings the card LEFT, so measure the pointer angle with x mirrored
     p.hist = [];
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
     e.currentTarget.style.cursor = 'grabbing';
@@ -433,7 +439,11 @@ class HomePage extends React.Component {
     const phi = Math.max(-SIGN_PEND_MAX, Math.min(SIGN_PEND_MAX, p.st0 + ang * 180 / Math.PI));
     p.phv = Math.max(-SIGN_PEND_VMAX, Math.min(SIGN_PEND_VMAX, (phi - p.phi) / dt));
     p.phi = phi;
-    p.hist.push({ x: e.clientX, y: e.clientY, phi, t: now });
+    // pulling away from the anchor stretches the rope (never compresses while held), stiffening past SIGN_STRETCH_SOFT
+    const raw = Math.max(0, p.s0 + Math.hypot(e.clientX - p.ax, e.clientY - p.ay) - p.l0);
+    const st = raw <= SIGN_STRETCH_SOFT ? raw : SIGN_STRETCH_SOFT + (SIGN_STRETCH_MAX - SIGN_STRETCH_SOFT) * Math.tanh((raw - SIGN_STRETCH_SOFT) / (SIGN_STRETCH_MAX - SIGN_STRETCH_SOFT));
+    p.vs = Math.max(-SIGN_STRETCH_VMAX, Math.min(SIGN_STRETCH_VMAX, (st - p.s) / dt)); p.s = st;
+    p.hist.push({ x: e.clientX, y: e.clientY, phi, s: st, t: now });
     while (p.hist.length > 2 && now - p.hist[0].t > SIGN_FLICK_WIN) p.hist.shift();
     this.signRender();
     p.px = e.clientX; p.py = e.clientY; p.pt = now;
@@ -447,8 +457,9 @@ class HomePage extends React.Component {
       p.drag = false;
       const h = p.hist || [], now = performance.now();
       while (h.length > 2 && now - h[0].t > SIGN_FLICK_WIN) h.shift();
-      let vx = 0, vy = 0, vphi = 0;
-      if (h.length > 1) { const span = (h[h.length - 1].t - h[0].t) / 1000; if (span > 0.02) { vx = (h[h.length - 1].x - h[0].x) / span; vy = (h[h.length - 1].y - h[0].y) / span; vphi = (h[h.length - 1].phi - h[0].phi) / span; } }
+      let vx = 0, vy = 0, vphi = 0, vst = 0;
+      if (h.length > 1) { const span = (h[h.length - 1].t - h[0].t) / 1000; if (span > 0.02) { vx = (h[h.length - 1].x - h[0].x) / span; vy = (h[h.length - 1].y - h[0].y) / span; vphi = (h[h.length - 1].phi - h[0].phi) / span; vst = (h[h.length - 1].s - h[0].s) / span; } }
+      p.vs = this.reducedMotion ? 0 : Math.max(-SIGN_STRETCH_VMAX, Math.min(SIGN_STRETCH_VMAX, vst)); // release: the stretched rope springs back and bounces
       p.vx = vx; p.vy = vy;
       p.phv = this.reducedMotion ? 0 : Math.max(-SIGN_PEND_VMAX, Math.min(SIGN_PEND_VMAX, vphi));
       if (!this.reducedMotion && Math.abs(vx) >= SIGN_FLICK_MIN && Math.abs(vx) >= Math.abs(vy)) p.omega += Math.max(-SIGN_FLICK_MAX, Math.min(SIGN_FLICK_MAX, vx * SIGN_FLICK_K));
