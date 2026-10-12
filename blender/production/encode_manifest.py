@@ -1,5 +1,5 @@
 """Encode the composited ride frames and write public/media/ride/manifest.json (the contract in
-docs/plans/ride-frames-format.md).
+docs/plans/ride-frames-format.md, rev 2: per-variant cameras).
 
     python3 blender/production/encode_manifest.py [--variants l,p] [--jobs 6] [--dry]
 
@@ -78,7 +78,9 @@ def main():
         "variants": VARIANTS,
         "formats": ["avif", "webp"],
         "bytes": bytes_,
-        "camera": [{"pos": [round(c, 5) for c in f["pos"]], "quat": [round(c, 7) for c in f["quat"]]} for f in frames],
+        "camera": {v: [{"pos": [round(c, 5) for c in f["pos"]],
+                        "quat": [round(c, 7) for c in f["quatP" if v == "p" else "quat"]]} for f in frames]
+                   for v in ("l", "p")},
         "order": coarse_to_fine(n),
     }
     os.makedirs(DST, exist_ok=True)
