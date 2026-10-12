@@ -136,12 +136,22 @@ def setup_render(scene, samples):
     r.film_transparent = False
     r.resolution_percentage = 100
     r.use_compositing = True
-    vl = scene.view_layers[0]
-    vl.use_pass_combined = True
-    vl.use_pass_z = True
+    # Two view layers. "tone" renders everything with EEVEE (no ink); "ink" renders only the
+    # inked collections and runs Freestyle there. The thin ink geometry, glass and leaf cards in
+    # `nolines` are tens of thousands of tiny faces that Freestyle would otherwise put in its
+    # view map: excluding them from the ink layer makes a frame ~10x faster.
+    tone = scene.view_layers[0]
+    tone.name = "tone"
+    tone.use_pass_combined = True
+    tone.use_pass_z = True
+    tone.use_freestyle = False
+    ink = scene.view_layers.get("ink") or scene.view_layers.new("ink")
+    ink.use_pass_combined = True
+    ink.use_freestyle = True
+    ink.freestyle_settings.as_render_pass = True
+    for lc in ink.layer_collection.children:
+        lc.exclude = lc.name == "nolines"
     r.use_freestyle = True
-    vl.use_freestyle = True
-    vl.freestyle_settings.as_render_pass = True
 
 
 def curve_points(mapping, pts):
@@ -170,7 +180,7 @@ LINESETS = {
 
 
 def setup_freestyle(scene, px_scale):
-    vl = scene.view_layers[0]
+    vl = scene.view_layers["ink"]
     fs = vl.freestyle_settings
     fs.mode = "EDITOR"
     fs.crease_angle = math.radians(140.0)
@@ -277,6 +287,9 @@ def setup_compositor(scene, out_dir, name):
     ng.nodes.clear()
     scene.compositing_node_group = ng
     rl = ng.nodes.new("CompositorNodeRLayers")
+    rl.layer = "tone"
+    ri = ng.nodes.new("CompositorNodeRLayers")
+    ri.layer = "ink"
     fo = ng.nodes.new("CompositorNodeOutputFile")
     fo.directory = out_dir + os.sep
     fo.file_name = name
@@ -285,7 +298,7 @@ def setup_compositor(scene, out_dir, name):
     fo.format.exr_codec = "ZIP"
     for nm, typ in (("Image", "RGBA"), ("Freestyle", "RGBA"), ("Depth", "FLOAT")):
         fo.file_output_items.new(typ, nm)
-        ng.links.new(rl.outputs[nm], fo.inputs[nm])
+        ng.links.new((ri if nm == "Freestyle" else rl).outputs[nm], fo.inputs[nm])
     return fo
 
 
@@ -311,6 +324,8 @@ def main():
         setup_freestyle(scene, h / 900.0)
         materials.set_pixel_scale(2.0 * math.tan(math.radians(C.FOV) / 2) / h)
         for (name, shot) in jobs:
+            if h > w and "target_portrait" in shot:
+                shot = dict(shot, target=shot["target_portrait"], pos=shot.get("pos_portrait", shot["pos"]))
             setup_camera(scene, shot)
             base = f"{name}{o['tag']}-{w}x{h}"
             setup_compositor(scene, C.PASSES, base)
