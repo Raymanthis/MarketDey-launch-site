@@ -48,12 +48,12 @@ def walk(stride=1.0, arm=1.0):
     s, a = stride, arm
     return ARMS_DOWN + [
         ("pelvis", Z, 4 * s),
-        ("spine_02", Z, -6 * s), ("spine_01", X, -3),
+        ("spine_02", Z, -6 * s), ("spine_01", X, 3),
         ("thigh_l", X, -24 * s), ("calf_l", X, 6 * s), ("foot_l", X, -6 * s),
         ("thigh_r", X, 15 * s), ("calf_r", X, 26 * s), ("foot_r", X, 14 * s),
         ("upperarm_l", X, 14 * a), ("lowerarm_l", X, -6 * a),
         ("upperarm_r", X, -16 * a), ("lowerarm_r", X, -14 * a),
-        ("head", X, 4),
+        ("head", X, -2),
     ]
 
 
@@ -89,9 +89,14 @@ def seated(hands_fwd=True, knee=88):
 
 
 def rider():
-    """Okada rider: seated astride, knees out, hands forward on the bars, slight forward lean."""
-    return seated(True, knee=70) + [("spine_01", X, -10), ("thigh_l", Y, 10), ("thigh_r", Y, -10),
-                                    ("calf_l", Y, -10), ("calf_r", Y, 10), ("head", X, 8)]
+    """Okada rider: astride the seat (hips 0.92 m), feet back on the pegs, hands forward on the
+    bars, a slight forward lean. (+X tilts an upright bone forward, -X swings a hanging one.)"""
+    return ARMS_DOWN + [
+        ("thigh_l", X, -55), ("thigh_r", X, -55), ("calf_l", X, 75), ("calf_r", X, 75),
+        ("thigh_l", Y, 9), ("thigh_r", Y, -9), ("calf_l", Y, -9), ("calf_r", Y, 9),
+        ("spine_01", X, 12), ("head", X, -10),
+        ("upperarm_l", X, -48), ("upperarm_r", X, -48), ("lowerarm_l", X, -28), ("lowerarm_r", X, -28),
+        ("upperarm_l", Z, 12), ("upperarm_r", Z, -12)]
 
 
 def talk():
@@ -125,6 +130,8 @@ CAST = {
                 {"male_worksuit01": "top"}),
     "seated_m": (macro(1.0, 0.65, 0.6, 0.5, 0.5), ["male_casualsuit05", "shoes01"], "short04", seated(False), [],
                  {"male_casualsuit05": "top"}),
+    "driver_m": (macro(1.0, 0.5, 0.55, 0.55, 0.5), ["male_casualsuit03", "shoes02"], "short01",
+                 seated(True, knee=82) + [("spine_01", X, 6)], [], {"male_casualsuit03": "top"}),
 }
 
 
@@ -145,6 +152,27 @@ def apply_pose(rig, ops):
         R = Matrix.Translation(head) @ Matrix.Rotation(math.radians(deg), 4, axis) @ Matrix.Translation(-head)
         pb.matrix = R @ pb.matrix
         bpy.context.view_layer.update()
+
+
+def island_ids(bm):
+    """Face index -> connected-component id (faces sharing an edge)."""
+    bm.faces.ensure_lookup_table()
+    ids = [-1] * len(bm.faces)
+    cur = 0
+    for f0 in bm.faces:
+        if ids[f0.index] >= 0:
+            continue
+        stack = [f0]
+        ids[f0.index] = cur
+        while stack:
+            f = stack.pop()
+            for e in f.edges:
+                for g in e.link_faces:
+                    if ids[g.index] < 0:
+                        ids[g.index] = cur
+                        stack.append(g)
+        cur += 1
+    return ids
 
 
 def curl_fingers(rig, deg=(28, 38, 25)):
@@ -370,14 +398,20 @@ def build_person(name, spec):
             body_vs += [v.co.copy() for v in bm.verts if asset != "body" or v.co.z < top * 0.36]
         if asset == "body":
             head_vs = [v.co.copy() for v in bm.verts if v.co.z > top - 0.3]
+        # suits are shirt + trousers (or blouse + skirt) as separate mesh islands: give each
+        # island one tone by where it sits, so the waist line follows the garment's real hem
+        island = island_ids(bm)
+        zsum, cnt = {}, {}
+        for f in bm.faces:
+            k = island[f.index]
+            zsum[k] = zsum.get(k, 0.0) + f.calc_center_median().z
+            cnt[k] = cnt.get(k, 0) + 1
+        lower = "cloth_dark" if asset.startswith("female_elegant") else "bottom"
         for f in bm.faces:
             t = tone
-            if tone == "top" and asset.startswith(("male_casual", "female_casual", "male_work")):
-                cz = f.calc_center_median().z
-                t = "top" if cz > top * 0.54 else "bottom"
-            if tone == "top" and asset.startswith("female_elegant"):
-                cz = f.calc_center_median().z
-                t = "top" if cz > top * 0.55 else "cloth_dark"
+            if tone == "top" and not asset.startswith("male_work"):
+                k = island[f.index]
+                t = "top" if zsum[k] / cnt[k] > top * 0.55 else lower
             f.material_index = slot(t)
             f.smooth = True
         tmp = bpy.data.meshes.new("tmp")
