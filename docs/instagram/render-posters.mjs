@@ -1,7 +1,8 @@
 import { chromium } from '/Volumes/theBigTank M2 Drive/thebigtank works/marketdey marketing site/tools/fidelity/node_modules/playwright/index.mjs';
 const out = process.argv[2];
 const b = await chromium.launch({ args: ['--use-angle=metal','--ignore-gpu-blocklist'] });
-for (const mode of ['day', 'night']) {
+const MODES = (process.argv[3] || 'day,night,minimal').split(',');
+for (const mode of MODES) {
   const p = await b.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 2 });
   await p.goto('http://localhost:3000/launching?citydebug=1', { waitUntil: 'networkidle' }); await p.waitForTimeout(9000);
   if (mode === 'night') { await p.evaluate(() => window.__city.hero.setPhaseTime(150)); await p.waitForTimeout(2500); }
@@ -17,21 +18,24 @@ for (const mode of ['day', 'night']) {
     const lr = logo.getBoundingClientRect();
     return { lr: [lr.top, lr.bottom, lr.left, lr.right] };
   });
-  const C = mode === 'day'
-    ? { h: 'Market dey today?', sub: 'Shop the market or dodge its traffic.', pill: 'We\u2019re launching soon', bg: '#a7c957', fg: '#252422' }
-    : { h: 'We\u2019re launching soon', sub: 'Things suppose cheap for market today', pill: 'I go lie for you?', bg: '#ffffff', fg: '#252422' };
+  const C = {
+    day: { h: 'Market dey today?', sub: 'Shop the market or dodge its traffic.', pill: 'We\u2019re launching soon', bg: '#a7c957', fg: '#252422', url: true },
+    night: { h: 'We\u2019re launching soon', sub: 'Things suppose cheap for market today', pill: 'I go lie for you?', bg: '#ffffff', fg: '#252422', url: true },
+    // just the wordmark, the launching-soon label and the store logos
+    minimal: { h: '', sub: '', pill: 'We\u2019re launching soon', bg: '#a7c957', fg: '#252422', url: false },
+  }[mode];
   await p.evaluate(({ lr, C }) => {
     const F = 'font-family:Lato,sans-serif;';
     const top = document.createElement('div');
     top.style.cssText = 'position:fixed;left:0;right:0;z-index:60;text-align:center;color:#fff;pointer-events:none;' + F + 'top:' + (lr[0] - 170) + 'px';
     top.innerHTML = '<div style="font-weight:900;font-size:58px;letter-spacing:-.5px">' + C.h + '</div>';
-    document.body.appendChild(top);
+    if (C.h) document.body.appendChild(top);
     const under = document.createElement('div');
     under.style.cssText = 'position:fixed;left:0;right:0;z-index:60;text-align:center;color:#fff;pointer-events:none;' + F + 'top:' + (lr[1] + 26) + 'px';
-    under.innerHTML = '<div style="font-size:32px;opacity:.9">' + C.sub + '</div>'
-      + '<div style="margin-top:34px;display:inline-block;background:' + C.bg + ';color:' + C.fg + ';font-weight:900;font-size:30px;padding:14px 34px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.18);transform:rotate(-4deg)">' + C.pill + '</div>'
-      + '<div style="margin-top:22px;font-weight:900;font-size:26px;letter-spacing:.5px;opacity:.95">marketdey.com</div>'
-      + '<div style="margin-top:26px;display:flex;gap:40px;justify-content:center;align-items:center"><img src="/images/badges/apple-logo.svg" style="height:50px"><img src="/images/badges/google-play-icon.svg" style="height:47px"></div>';
+    under.innerHTML = (C.sub ? '<div style="font-size:32px;opacity:.9">' + C.sub + '</div>' : '')
+      + '<div style="margin-top:' + (C.sub ? 34 : 40) + 'px;display:inline-block;background:' + C.bg + ';color:' + C.fg + ';font-weight:900;font-size:30px;padding:14px 34px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.18);transform:rotate(-4deg)">' + C.pill + '</div>'
+      + (C.url ? '<div style="margin-top:22px;font-weight:900;font-size:26px;letter-spacing:.5px;opacity:.95">marketdey.com</div>' : '')
+      + '<div style="margin-top:' + (C.url ? 26 : 44) + 'px;display:flex;gap:40px;justify-content:center;align-items:center"><img src="/images/badges/apple-logo.svg" style="height:50px"><img src="/images/badges/google-play-icon.svg" style="height:47px"></div>';
     document.body.appendChild(under);
   }, { ...info, C });
   await p.evaluate(() => {
@@ -68,7 +72,7 @@ for (const mode of ['day', 'night']) {
   });
   await p.waitForFunction(() => [...document.images].filter(i => i.src.includes('/badges/')).every(i => i.complete && i.naturalWidth));
   await p.waitForTimeout(400);
-  await p.screenshot({ path: `${out}/poster6-${mode}.png` });
+  await p.screenshot({ path: `${out}/poster-${mode}.png` });
   console.log(mode, JSON.stringify(info));
   await p.close();
 }
