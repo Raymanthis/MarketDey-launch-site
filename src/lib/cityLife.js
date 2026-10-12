@@ -1388,7 +1388,7 @@ export class CityLife {
     this.updateStormClouds();
     this.applyVehicles();
     this.stepRain(dt);
-    this.draw(dt);
+    this.draw();
   }
 
   // flash envelope of event e at viewTime t: 0..1, with a second pulse for double strikes
@@ -1408,7 +1408,7 @@ export class CityLife {
     return a;
   }
 
-  draw(dt) {
+  draw() {
     const ctx = this.ctx;
     if (!ctx) return;
     const w = this.wx, W = this.W, H = this.H;
