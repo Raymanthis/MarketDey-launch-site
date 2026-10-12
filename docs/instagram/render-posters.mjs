@@ -7,7 +7,7 @@ for (const mode of ['day', 'night']) {
   if (mode === 'night') { await p.evaluate(() => window.__city.hero.setPhaseTime(150)); await p.waitForTimeout(2500); }
   const info = await p.evaluate(() => {
     const css = document.createElement('style');
-    css.textContent = 'nextjs-portal,[data-h="sign"],[data-rope]{display:none!important}';
+    css.textContent = 'nextjs-portal,[data-h="sign"],[data-h="badges"],[data-rope]{display:none!important}';
     document.head.appendChild(css);
     // hide every fixed layer that holds the sign/rope
     document.querySelectorAll('[data-eyelet]').forEach(e => { let n = e; for (let i = 0; i < 8 && n; i++) n = n.parentElement; });
@@ -30,7 +30,8 @@ for (const mode of ['day', 'night']) {
     under.style.cssText = 'position:fixed;left:0;right:0;z-index:60;text-align:center;color:#fff;pointer-events:none;' + F + 'top:' + (lr[1] + 26) + 'px';
     under.innerHTML = '<div style="font-size:32px;opacity:.9">' + C.sub + '</div>'
       + '<div style="margin-top:34px;display:inline-block;background:' + C.bg + ';color:' + C.fg + ';font-weight:900;font-size:30px;padding:14px 34px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.18);transform:rotate(-4deg)">' + C.pill + '</div>'
-      + '<div style="margin-top:22px;font-weight:900;font-size:26px;letter-spacing:.5px;opacity:.95">marketdey.com</div>';
+      + '<div style="margin-top:22px;font-weight:900;font-size:26px;letter-spacing:.5px;opacity:.95">marketdey.com</div>'
+      + '<div style="margin-top:26px;display:flex;gap:14px;justify-content:center;align-items:center"><img src="/images/badges/app-store.svg" style="height:52px"><img src="/images/badges/google-play.svg" style="height:52px"></div>';
     document.body.appendChild(under);
   }, { ...info, C });
   await p.evaluate(() => {
@@ -65,8 +66,9 @@ for (const mode of ['day', 'night']) {
       g.style.display = 'none';   // no free spot: drop it rather than cover something
     });
   });
+  await p.waitForFunction(() => [...document.images].filter(i => i.src.includes('/badges/')).every(i => i.complete && i.naturalWidth));
   await p.waitForTimeout(400);
-  await p.screenshot({ path: `${out}/poster4-${mode}.png` });
+  await p.screenshot({ path: `${out}/poster5-${mode}.png` });
   console.log(mode, JSON.stringify(info));
   await p.close();
 }
