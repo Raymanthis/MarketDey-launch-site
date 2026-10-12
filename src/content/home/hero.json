@@ -2,6 +2,12 @@
   "scrollUp": "Scroll up",
   "launchingSoon": "We're launching soon",
   "launchingSoonBack": "i go lie for you?",
+  "storeBadges": {
+    "appStoreAlt": "Download on the App Store",
+    "appStoreUrl": "",
+    "googlePlayAlt": "Get it on Google Play",
+    "googlePlayUrl": ""
+  },
   "logo": "Marketdey",
   "howItWorks": "How it works",
   "forContributors": "For contributors",
