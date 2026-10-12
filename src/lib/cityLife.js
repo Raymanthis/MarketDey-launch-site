@@ -146,7 +146,7 @@ export class CityLife {
     this.readVehicles();
     this.layerize();
     this.makeCanvas();
-    if (this.night) { this.addLights(); this.lightWindows(); }
+    if (this.night) { this.addLights(); this.lightWindows(); } else this.addLights(true);
   }
 
   // ---------- setup ----------
@@ -324,20 +324,44 @@ export class CityLife {
   }
 
   // night mode: headlights, tail lights and lit windows
-  addLights() {
+  // headlights (lamp + soft cone) and tail lights. Night: always on. Day (hero): a dimmer set, grouped per vehicle,
+  // switched on by updateLights() while it rains.
+  addLights(day = false) {
     const id = 'cl-cone-' + this.seed;
     const defs = document.createElementNS(SVGNS, 'defs');
     defs.setAttribute('data-cl', '1');
-    defs.innerHTML = '<linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffd66b" stop-opacity=".35"></stop><stop offset="1" stop-color="#ffd66b" stop-opacity="0"></stop></linearGradient>';
+    defs.innerHTML = '<linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffd66b" stop-opacity="' + (day ? '.26' : '.35') + '"></stop><stop offset="1" stop-color="#ffd66b" stop-opacity="0"></stop></linearGradient>';
     this.svg.insertBefore(defs, this.svg.firstChild);
     this.vehicles.forEach(v => {
       const y = v.bbY + v.bbH * 0.62, F = v.bx0 + v.len - 0.5;
-      const tmp = document.createElementNS(SVGNS, 'g');
-      tmp.innerHTML = '<polygon data-cl="1" points="' + F + ',' + (y - 2) + ' ' + F + ',' + (y + 2) + ' ' + (F + 48) + ',' + (y + 10) + ' ' + (F + 48) + ',' + (y - 8) + '" fill="url(#' + id + ')"></polygon>'
-        + '<circle data-cl="1" cx="' + F + '" cy="' + y + '" r="2" fill="#ffd66b"></circle>'
+      const g = document.createElementNS(SVGNS, 'g');
+      g.setAttribute('data-cl', '1');
+      g.innerHTML = '<polygon data-cl="1" points="' + F + ',' + (y - 2) + ' ' + F + ',' + (y + 2) + ' ' + (F + 48) + ',' + (y + 10) + ' ' + (F + 48) + ',' + (y - 8) + '" fill="url(#' + id + ')"></polygon>'
+        + '<circle data-cl="1" cx="' + F + '" cy="' + y + '" r="' + (day ? '1.6' : '2') + '" fill="#ffd66b"></circle>'
         + '<rect data-cl="1" x="' + (v.bx0 - 1) + '" y="' + (y - 1.5) + '" width="2.5" height="3" rx=".6" fill="#e63946"></rect>';
-      while (tmp.firstChild) v.g.appendChild(tmp.firstChild);
+      if (day) { g.setAttribute('opacity', '0'); v.lightG = g; v.L = 0; v.lightDelay = this.rT() * 1.5; }
+      v.g.appendChild(g);
     });
+  }
+
+  // day lights: off when clear; in the storm each driver switches on after a 0–1.5 s stagger (0.5 s fade, all on
+  // within ~2 s of the rain starting); after the rain has stopped (clearing ends) they switch off the same way
+  updateLights() {
+    if (this.night) return;
+    const w = this.wx, t = this.viewTime;
+    if (w.storm) this.lastStorm = w.storm;
+    const s = this.lastStorm;
+    let tOn = -1, tOff = -1;
+    if (w.phase === 'storm' || w.phase === 'clearing') tOn = t - s.gEnd;
+    else if (w.phase === 'clear' && s && t >= s.end) tOff = t - s.end;
+    const vs = this.vehicles;
+    for (let k = 0; k < vs.length; k++) {
+      const v = vs[k];
+      if (!v.lightG) continue;
+      const L = tOn >= 0 ? clamp01((tOn - v.lightDelay) / 0.5) : tOff >= 0 ? 1 - clamp01((tOff - v.lightDelay) / 0.5) : 0;
+      const q = Math.round(L * 50) / 50;
+      if (q !== v.L) { v.L = q; v.lightG.setAttribute('opacity', q); }
+    }
   }
 
   lightWindows() {
@@ -1394,6 +1418,7 @@ export class CityLife {
     this.fireLightning();
     this.updateStormClouds();
     this.applyVehicles();
+    this.updateLights();
     this.stepRain(dt);
     this.draw();
   }
@@ -1836,6 +1861,7 @@ export class CityLife {
       lightningLeft: s && this.wx.phase !== 'clear' ? s.events.filter(e => e.t > this.viewTime).length : 0,
       minGap, minGapDrift, crossLaneOverlaps,
       stopLines: this.stopLines ? this.stopLines.slice() : null, laneHeads,
+      lightL: this.night ? 1 : (act.length ? act.reduce((m, v) => m + (v.L || 0), 0) / act.length : 0),
       laneChanges: act.filter(v => v.lc).length, overtakes: this.overtakes,
       vehicles: act.map(v => ({ i: v.i, x: v.x, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0, v: v.v, v0: v.v0, len: v.len, lane: v.lane, dy: v.dy, drifting: !!v.drift, lc: !!v.lc, crawl: !!v.crawling }))
         .sort((a, b) => b.front - a.front),
