@@ -20,6 +20,27 @@ const mixHex = (a, b, t) => {
   return '#' + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
 };
 
+// the same mix in OKLab: green -> navy stays a clean deepening teal instead of passing through a muddy grey
+const toLin = c => (c /= 255) <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const toSrgb = c => Math.round(255 * clamp01(c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055));
+const hexOk = h => {
+  const n = parseInt(h.slice(1), 16), r = toLin(n >> 16 & 255), g = toLin(n >> 8 & 255), b = toLin(n & 255);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const q = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * q, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * q,
+    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q];
+};
+const mixOk = (a, b, t) => {
+  const A = hexOk(a), B = hexOk(b), L = lerp(A[0], B[0], t), M = lerp(A[1], B[1], t), S = lerp(A[2], B[2], t);
+  const l = (L + 0.3963377774 * M + 0.2158037573 * S) ** 3, m = (L - 0.1055613458 * M - 0.0638541728 * S) ** 3;
+  const q = (L - 0.0894841542 * M - 1.2914855480 * S) ** 3;
+  const r = toSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q);
+  const g = toSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q);
+  const bl = toSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * q);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+};
+
 const SVGNS = 'http://www.w3.org/2000/svg';
 const CLOUD_D = 'M0 0H120Q132 0 130 -10Q128 -22 112 -20Q108 -40 86 -38Q76 -56 52 -50Q32 -46 30 -28Q12 -32 6 -18Q-4 -16 -2 -6Q-1 0 0 0Z';
 // distant-cloud body: same silhouette flattened to half height (low over the far skyline)
@@ -33,17 +54,18 @@ const PHONE_S = 0.6;             // their scale on phones, relative to desktop
 
 // ---- day/night cycle (loading splash only: launching page + the full site's opening intro) ----
 const SKY_DAY = '#386641';       // hero sky by day (same green as today)
-const SKY_NIGHT = '#0f1c2e';     // hero sky at night
-const SKY_DUSK = '#4a3b4f';      // warm dusky mid-tone the sky passes through at dusk/dawn
+const SKY_NIGHT = '#081120';     // hero sky at night: deeper than the city so the skyline stands out
 const FILL_DAY = '#386641';      // hero skyline fill by day
 // night palette: like the footer skyline at night, but neither the buildings nor the clouds may go black —
 // they stay a shade lighter than the night sky with their light outlines and window lines kept as by day
-const FILL_NIGHT = '#16263b';    // skyline buildings / vehicles at night
+const FILL_NIGHT = '#1a2c45';    // skyline buildings / vehicles at night
 const CLOUD_FILL_DAY = '#386641';
-const CLOUD_FILL_NIGHT = '#1b2c43';   // normal (and storm) clouds at night: dark blue-grey
-const SKY_STORM_NIGHT = mixHex(SKY_NIGHT, '#000000', 0.15);   // night blue, ~15% darker in a storm
-const FILL_STORM_NIGHT = mixHex(FILL_NIGHT, '#000000', 0.15);
-const CLOUD_STORM_NIGHT = mixHex(CLOUD_FILL_NIGHT, '#000000', 0.15);
+const CLOUD_FILL_NIGHT = '#16263c';   // normal (and storm) clouds at night: dark blue-grey
+const STORM_K = 0.38;          // splash storms: sky, city and clouds go ~38% towards black (day and night)
+const SKY_STORM_NIGHT = mixHex(SKY_NIGHT, '#000000', STORM_K);
+const FILL_STORM_NIGHT = mixHex(FILL_NIGHT, '#000000', STORM_K);
+const CLOUD_STORM_NIGHT = mixHex(CLOUD_FILL_NIGHT, '#000000', STORM_K);
+const SKY_STORM_DAY = mixHex(SKY_DAY, '#000000', STORM_K);
 const DN_DAY = 90, DN_DUSK = 20, DN_NIGHT = 90, DN_DAWN = 20, DN_TOTAL = DN_DAY + DN_DUSK + DN_NIGHT + DN_DAWN;
 // the sun has no fill of its own any more (outline only); the moon's crescent is MOON_COL
 const MOON_COL = '#f1ede0', WIN_COL = '#f6c453', STAR_COL = '#eef3ff';
@@ -2572,12 +2594,13 @@ export class CityLife {
     return { name: 'dawn', u, q: 1 - u };
   }
   // sky green <-> night blue through the warm dusky mid-tone; the skyline fill walks its own two ends
-  dnSky(q) { return q <= 0.5 ? mixHex(SKY_DAY, SKY_DUSK, q * 2) : mixHex(SKY_DUSK, SKY_NIGHT, (q - 0.5) * 2); }
-  dnFill(q) { return mixHex(FILL_DAY, FILL_NIGHT, q); }
-  dnCloudFill(q) { return mixHex(CLOUD_FILL_DAY, CLOUD_FILL_NIGHT, q); }
-  dnStormSky(q) { return mixHex(DARK_FILL, SKY_STORM_NIGHT, q); }
-  dnStormFill(q) { return mixHex(DARK_FILL, FILL_STORM_NIGHT, q); }
-  dnStormCloud(q) { return mixHex(DARK_FILL, CLOUD_STORM_NIGHT, q); }
+  // straight green -> navy in OKLab (no dusky mid-tone: it turned the blend muddy)
+  dnSky(q) { return mixOk(SKY_DAY, SKY_NIGHT, q); }
+  dnFill(q) { return mixOk(FILL_DAY, FILL_NIGHT, q); }
+  dnCloudFill(q) { return mixOk(CLOUD_FILL_DAY, CLOUD_FILL_NIGHT, q); }
+  dnStormSky(q) { return mixOk(SKY_STORM_DAY, SKY_STORM_NIGHT, q); }
+  dnStormFill(q) { return mixOk(SKY_STORM_DAY, FILL_STORM_NIGHT, q); }
+  dnStormCloud(q) { return mixOk(SKY_STORM_DAY, CLOUD_STORM_NIGHT, q); }
   dnDark() { const p = this.wx.phase; return p === 'gathering' || p === 'storm'; }
   // night-ness as it is actually painted: smoothstepped, so dusk and dawn walk in and out of the colours
   dnQs() { return smooth(this.dnPhaseAt(this.dnT).q); }
@@ -2742,7 +2765,7 @@ export class CityLife {
     const st = this.el && this.el.style;
     if (!st) return;
     st.setProperty('--cl-ln', LN_DAY.map((v, k) => Math.round(lerp(v, LN_NIGHT[k], qs))).join(' '));
-    st.setProperty('--cl-wa', (1 + 0.6 * qs).toFixed(3));
+    st.setProperty('--cl-wa', (1 - 0.25 * qs).toFixed(3));   // night lines a little fainter, so they read finer
     st.setProperty('--cl-win', LN_DAY.map((v, k) => Math.round(lerp(v, WIN_NIGHT[k], qs))).join(' '));
   }
 
@@ -2847,10 +2870,10 @@ export class CityLife {
     sun.setAttribute('viewBox', '-70 -70 140 140');
     let rays = '';
     for (let k = 0; k < 8; k++) {
-      rays += '<path d="M33 0h11" stroke="rgba(255,255,255,.8)" stroke-width="2.6" stroke-linecap="round" transform="rotate(' + k * 45 + ')"></path>';
+      rays += '<path d="M33 0h11" stroke="rgba(255,255,255,.8)" stroke-width="1.5" stroke-linecap="round" transform="rotate(' + k * 45 + ')"></path>';
     }
     sun.innerHTML = '<g>' + (this.reducedMotion ? '' : '<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="90s" repeatCount="indefinite"></animateTransform>') + rays + '</g>'
-      + '<circle r="26" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2.4"></circle>';
+      + '<circle r="26" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.4"></circle>';
     // moon: crescent with a soft glow, same place in the sky as the sun
     const moon = mk(mz);
     moon.setAttribute('viewBox', '-60 -60 120 120');
