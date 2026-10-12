@@ -118,7 +118,9 @@ class Body:
             import vehicles
             vehicles.cut_arches(ob, M, arches, arch_r)
         bpy.context.scene.collection.objects.unlink(ob)
-        geo.ensure_collections()[coll].objects.link(ob)
+        geo.ensure_collections()[geo.coll_for(coll)].objects.link(ob)
+        if geo.PARENT is not None:
+            ob.parent = geo.PARENT
         return ob
 
     # ------------------------------------------------------------------ decals
