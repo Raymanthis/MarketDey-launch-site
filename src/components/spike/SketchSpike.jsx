@@ -187,12 +187,14 @@ export default function SketchSpike({ src = 'spike', stats = false }) {
       const start = performance.now();
       placeCamera(p);
       renderer.render(scene, camera);
+      // stats mode only: wait for the GPU so the timing includes it, not just command submission
+      if (stats) renderer.getContext().finish();
       const end = performance.now();
       if (loaded && tFirstLines == null) tFirstLines = end - t0;
       // frame ms = interval between consecutive renders while scrolling; the render's own
-      // CPU time if the previous render was a while ago (idle gap).
+      // CPU time if the previous render was a while ago (idle gap, >1.5 s).
       const gap = start - lastRenderAt;
-      const ms = lastRenderAt && gap < 250 ? end - lastRenderAt : end - start;
+      const ms = lastRenderAt && gap < 1500 ? end - lastRenderAt : end - start;
       lastRenderAt = end;
       frameTimes.push(ms);
       if (frameTimes.length > 120) frameTimes.shift();
