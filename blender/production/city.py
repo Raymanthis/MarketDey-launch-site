@@ -455,9 +455,9 @@ def place_trees():
         geo.CURRENT_MATRIX = rec_M(r)
         x = r["x"]
         roll = rng.random()
-        if roll < 0.55:
+        if roll < 0.75:
             trees.almond(f"alm{k}", x, 0.0, scale, seed=31 + k)
-        elif roll < 0.8:
+        elif roll < 0.85:
             trees.rounded_tree(f"rnd{k}", x, 0.0, scale * 0.9, seed=41 + k)
         else:
             trees.oil_palm(f"palm{k}", x, 0.0, 8.0 + rng.random() * 1.5, seed=51 + k)
