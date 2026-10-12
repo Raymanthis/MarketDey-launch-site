@@ -24,7 +24,8 @@ WALK_IN, WALK_OUT = 4.1, 9.0   # walkway runs under the building fronts so they 
 R = random.Random(11)
 
 WALL_TONES = ["wall", "wall", "wall_b", "wall_c", "wall_b", "wall_d"]
-# called as SIGN_HOOK(fa, a0, a1, h0, h1, d_face) for every signboard (production adds lettering)
+# called as SIGN_HOOK(fa, a0, a1, h0, h1, d_face[, text]) for every signboard and painted wall
+# message (production adds lettering)
 SIGN_HOOK = None
 
 
@@ -265,6 +266,8 @@ def building_at(tag, M, W, floors, Dp, rng, roof=None, detail=True, over=None):
                 ac = (i + 0.5) * W / nb
                 S.frame(M, ac - 0.6, f * FL + 0.9, ac + 0.6, f * FL + 2.2, 0.07, -0.01, 0.05, "trim")
                 fa.glass(ac - 0.53, f * FL + 0.97, ac + 0.53, f * FL + 2.13, 0.02, "glass_louvre")
+        if CLUTTER.get("sides"):
+            end_walls(fa, W, Dp, floors, rng, plain=True)
         return dict(tag=tag, W=W, H=H, top=H + 0.9, Dp=Dp, roof="flat", M=M, fa=fa)
     roof = roof or ("pitched" if floors == 2 and rng.random() < 0.65 else "flat")
     st = dict(
@@ -368,7 +371,47 @@ def building_at(tag, M, W, floors, Dp, rng, roof=None, detail=True, over=None):
         for i in range(max(1, round(W / 3.6)) + 1):
             a = i * W / max(1, round(W / 3.6))
             fa.box(S, (max(0, a - 0.16), -0.01, 0.0), (min(W, a + 0.16), 0.115, 2.85), "tile")
+    if CLUTTER.get("sides"):
+        end_walls(fa, W, Dp, floors, rng)
     return dict(tag=tag, W=W, H=H, top=top, Dp=Dp, roof=roof, M=M, fa=fa)
+
+
+WALL_PAINT = ["THIS HOUSE IS\nNOT FOR SALE", "POST NO BILL", "NO URINATING\nHERE", "BEWARE OF\n419", "GOD DEY"]
+
+
+def end_walls(fa, W, Dp, floors, rng, plain=False):
+    """Break up both gable ends: floor bands, small barred windows per floor, a downpipe, AC units,
+    and now and then a painted wall message or an advert board. Joins the building's union."""
+    for (origin, n) in (((0, -Dp, 0), (-1, 0, 0)), ((W, 0, 0), (1, 0, 0))):
+        Ms = fa.M @ facade_frame(origin, n)
+        sw = Fa(fa.tag, Ms, wall=fa.wall)
+        S = sw.S
+        for f in range(1, floors):
+            sw.box(S, (-0.02, -0.01, f * FL - 0.1), (Dp + 0.02, 0.06, f * FL + 0.06), "trim")
+        nb = max(1, int(Dp / 3.6))
+        paint = (not plain) and rng.random() < 0.35
+        for f in range(floors):
+            for i in range(nb):
+                if rng.random() < (0.55 if plain else 0.35) or (paint and f == 0):
+                    continue
+                a = (i + 0.5) * Dp / nb
+                if plain:
+                    S.frame(Ms, a - 0.5, f * FL + 1.0, a + 0.5, f * FL + 2.1, 0.07, -0.01, 0.05, "trim")
+                    sw.glass(a - 0.43, f * FL + 1.07, a + 0.43, f * FL + 2.03, 0.02, "glass_louvre")
+                else:
+                    sw.window(a - 0.5, f * FL + 1.0, 1.0, 1.1, "louvre", grille="bars" if rng.random() < 0.8 else None,
+                              sunshade=rng.random() < 0.5)
+        if plain:
+            continue
+        sw.drainpipe(Dp - 0.4 if rng.random() < 0.5 else 0.4, floors * FL)
+        for k in range(rng.randint(0, 2) if floors > 1 else 0):
+            a = rng.uniform(0.6, Dp - 1.6)
+            sw.ac_unit(a, rng.randint(1, floors - 1) * FL + 0.4)
+        if paint and SIGN_HOOK is not None:
+            txt = rng.choice(WALL_PAINT)
+            SIGN_HOOK(sw, 0.8, Dp - 0.8, 0.7, 2.3, 0.002, txt)
+        elif rng.random() < 0.3 and floors > 1:
+            sw.signboard(1.0, min(Dp - 1.0, 5.0), FL + 0.6, FL + 2.4, 0.05)
 
 
 def dish(fa, a, d, h):
