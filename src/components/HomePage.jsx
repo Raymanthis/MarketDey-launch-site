@@ -35,6 +35,8 @@ const clampN = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a +
 const sst = (a, b, v) => { const t = clampN((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }, ez = x => 1 - Math.pow(1 - clampN(x, 0, 1), 3);
 const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const crSpline = (pts, n) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2; for (let j = 0; j < n; j++) { const t = j / n, t2 = t * t, t3 = t2 * t, c = d => 0.5 * (2 * p1[d] + (-p0[d] + p2[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2 + (-p0[d] + 3 * p1[d] - 3 * p2[d] + p3[d]) * t3); out.push([c(0), c(1)]); } } out.push(pts[pts.length - 1]); return out; };
+const TM_LIGHT = { base: '#ebe8e1', blocks: '#ddd6c9', parks: '#dde3cf', alleyCas: '#d6d0c4', alley: '#f7f5ef', streetCas: '#d6d0c4', street: '#ffffff', riverCas: '#c4d0ca', river: '#d0dbd6', stubCas: '#d6d0c4', stub: '#ffffff', patch: '#f0e2c8', roadCas: '#d6d0c4', road: '#ffffff', foot: '#ddd6c9', trail: '#4f772d' };
+const TM_DARK = { base: '#161513', blocks: '#201f1c', parks: '#1c2118', alleyCas: '#1b1a18', alley: '#26251f', streetCas: '#1b1a18', street: '#2c2b26', riverCas: '#18201e', river: '#1c2522', stubCas: '#1b1a18', stub: '#2c2b26', patch: '#2a2619', roadCas: '#24231f', road: '#3d3b34', foot: '#262520', trail: '#a7c957' };
 const TM_PINS = [{t:'main'},{t:'mkt',ox:118,oy:-150,init:350},{t:'mkt',ox:-96,oy:150,init:500},{t:'warn',ox:-120,oy:-10,init:650},
   {t:'mkt',ox:420,oy:-300},{t:'mkt',ox:-430,oy:-260},{t:'mkt',ox:640,oy:160},{t:'mkt',ox:-380,oy:420},{t:'mkt',ox:880,oy:-120},{t:'mkt',ox:-820,oy:80},{t:'mkt',ox:250,oy:560},{t:'mkt',ox:-700,oy:-520},{t:'mkt',ox:1100,oy:300},{t:'mkt',ox:-1050,oy:-200},
   {t:'warn',ox:520,oy:10},{t:'warn',ox:-600,oy:250},{t:'warn',ox:815,oy:-420},{t:'warn',ox:-1000,oy:-105},
@@ -301,25 +303,25 @@ class HomePage extends React.Component {
     const pos = TM_PINS.map(p => p.t === 'main' ? M : p.t === 'arrow' ? head : p.t === 'lm' ? W(MK[p.n - 1][2], MK[p.n - 1][0]) : [M[0] - p.ox / TM_P0, M[1] - p.oy / TM_P0]);
     this.md = { fr, blocks, parks, streets, alleys, stubs, ring, river, patchP, sideP, sideCas, roadP, foot, road, RB, M, head, pos, S0, TS0, LS: G.LS };
   }
-  tmDraw(P) {
-    const T = this.tm, k = T.cv.getContext('2d'), D = this.md, dp = this.dpr, z = P.ppu;
-    k.setTransform(1, 0, 0, 1, 0, 0); k.globalAlpha = 1; k.fillStyle = '#ebe8e1'; k.fillRect(0, 0, T.cv.width, T.cv.height);
+  tmDraw(P, k, C) {
+    const T = this.tm, D = this.md, dp = this.dpr, z = P.ppu;
+    k.setTransform(1, 0, 0, 1, 0, 0); k.globalAlpha = 1; k.fillStyle = C.base; k.fillRect(0, 0, T.cv.width, T.cv.height);
     k.setTransform(-z * dp, 0, 0, -z * dp, dp * (P.Ox + z * P.cx), dp * (P.Oy + z * P.cz)); k.lineJoin = 'round';
     if (P.townA > 0.002) { k.globalAlpha = P.townA; k.lineCap = 'round';
-      k.fillStyle = '#ddd6c9'; k.fill(D.blocks); k.fillStyle = '#dde3cf'; k.fill(D.parks);
+      k.fillStyle = C.blocks; k.fill(D.blocks); k.fillStyle = C.parks; k.fill(D.parks);
       const sw = (3 + 1.6 * z) / z;
-      k.strokeStyle = '#d6d0c4'; k.lineWidth = sw * 0.6 + 1.2 / z; k.stroke(D.alleys); k.strokeStyle = '#f7f5ef'; k.lineWidth = sw * 0.6; k.stroke(D.alleys);
-      k.strokeStyle = '#d6d0c4'; k.lineWidth = sw + 1.6 / z; k.stroke(D.streets); k.strokeStyle = '#ffffff'; k.lineWidth = sw; k.stroke(D.streets);
-      k.strokeStyle = '#c4d0ca'; k.lineWidth = 78; k.stroke(D.river); k.strokeStyle = '#d0dbd6'; k.lineWidth = 70; k.stroke(D.river);
-      k.lineCap = 'butt'; k.strokeStyle = '#d6d0c4'; k.lineWidth = 9.4; k.stroke(D.stubs); k.lineWidth = 16; k.stroke(D.ring); k.strokeStyle = '#ffffff'; k.lineWidth = 7.2; k.stroke(D.stubs); k.lineWidth = 13.4; k.stroke(D.ring);
+      k.strokeStyle = C.alleyCas; k.lineWidth = sw * 0.6 + 1.2 / z; k.stroke(D.alleys); k.strokeStyle = C.alley; k.lineWidth = sw * 0.6; k.stroke(D.alleys);
+      k.strokeStyle = C.streetCas; k.lineWidth = sw + 1.6 / z; k.stroke(D.streets); k.strokeStyle = C.street; k.lineWidth = sw; k.stroke(D.streets);
+      k.strokeStyle = C.riverCas; k.lineWidth = 78; k.stroke(D.river); k.strokeStyle = C.river; k.lineWidth = 70; k.stroke(D.river);
+      k.lineCap = 'butt'; k.strokeStyle = C.stubCas; k.lineWidth = 9.4; k.stroke(D.stubs); k.lineWidth = 16; k.stroke(D.ring); k.strokeStyle = C.stub; k.lineWidth = 7.2; k.stroke(D.stubs); k.lineWidth = 13.4; k.stroke(D.ring);
       k.globalAlpha = 1; }
     k.lineCap = 'butt';
-    k.fillStyle = '#f0e2c8'; k.fill(D.patchP);
-    k.strokeStyle = '#d6d0c4'; k.lineWidth = 11.6; k.stroke(D.roadP); k.fillStyle = '#d6d0c4'; k.fill(D.sideCas);
-    k.strokeStyle = '#ffffff'; k.lineWidth = 9.4; k.stroke(D.roadP); k.fillStyle = '#ffffff'; k.fill(D.sideP);
-    k.fillStyle = '#ddd6c9'; k.fill(D.foot);
-    if (P.sT > D.TS0 + 0.5 && P.trailA > 0.002) { const i0 = D.TS0 - D.S0, i1 = Math.min(D.road.length - 1, Math.floor(P.sT - D.S0)); k.globalAlpha = P.trailA; k.beginPath(); k.moveTo(D.road[i0][0], D.road[i0][1]); for (let i = i0 + 1; i <= i1; i++) k.lineTo(D.road[i][0], D.road[i][1]); k.strokeStyle = '#4f772d'; k.lineWidth = 2.3; k.stroke(); k.globalAlpha = 1; }
-    if (P.sL > D.TS0 + 0.2) { const i0 = D.TS0 - D.S0, i1 = Math.floor(P.sL - D.S0), e2 = D.fr(P.sL); k.beginPath(); k.moveTo(D.road[i0][0], D.road[i0][1]); for (let i = i0 + 1; i <= i1; i++) k.lineTo(D.road[i][0], D.road[i][1]); k.lineTo(e2[0], e2[1]); k.strokeStyle = '#4f772d'; k.lineWidth = 2.3; k.stroke(); }
+    k.fillStyle = C.patch; k.fill(D.patchP);
+    k.strokeStyle = C.roadCas; k.lineWidth = 11.6; k.stroke(D.roadP); k.fillStyle = C.roadCas; k.fill(D.sideCas);
+    k.strokeStyle = C.road; k.lineWidth = 9.4; k.stroke(D.roadP); k.fillStyle = C.road; k.fill(D.sideP);
+    k.fillStyle = C.foot; k.fill(D.foot);
+    if (P.sT > D.TS0 + 0.5 && P.trailA > 0.002) { const i0 = D.TS0 - D.S0, i1 = Math.min(D.road.length - 1, Math.floor(P.sT - D.S0)); k.globalAlpha = P.trailA; k.beginPath(); k.moveTo(D.road[i0][0], D.road[i0][1]); for (let i = i0 + 1; i <= i1; i++) k.lineTo(D.road[i][0], D.road[i][1]); k.strokeStyle = C.trail; k.lineWidth = 2.3; k.stroke(); k.globalAlpha = 1; }
+    if (P.sL > D.TS0 + 0.2) { const i0 = D.TS0 - D.S0, i1 = Math.floor(P.sL - D.S0), e2 = D.fr(P.sL); k.beginPath(); k.moveTo(D.road[i0][0], D.road[i0][1]); for (let i = i0 + 1; i <= i1; i++) k.lineTo(D.road[i][0], D.road[i][1]); k.lineTo(e2[0], e2[1]); k.strokeStyle = C.trail; k.lineWidth = 2.3; k.stroke(); }
   }
   tmFrame(t) {
     const T = this.tm, D = this.md, sec = this.tryRef.current; if (!sec) return;
@@ -346,7 +348,7 @@ class HomePage extends React.Component {
       const Ax = lerp(Aov[0], Ah[0], e), Ay = lerp(Aov[1], Ah[1], e); mcx = HD[0] - (Ox - Ax) / ppu; mcz = HD[1] - (Oy - Ay) / ppu; }
     const sT = D.TS0 + (245 - D.TS0) * sst(3.0, 3.55, u), trailA = 1 - sst(3.7, 3.85, u), townA = 1 - sst(4.05, TM_HAND, u), hand = u >= TM_HAND - 0.001;
     const mv = hand ? 'hidden' : 'visible'; if (T.mv !== mv) { T.mv = mv; T.map.style.visibility = mv; }
-    if (!hand) { const key = [ppu.toFixed(5), Ox.toFixed(1), Oy.toFixed(1), mcx.toFixed(3), mcz.toFixed(3), sT.toFixed(1), trailA.toFixed(3), townA.toFixed(3), sL.toFixed(2), VW, VH].join(); if (key !== this.tmKey) { this.tmKey = key; this.tmDraw({ ppu, Ox, Oy, cx: mcx, cz: mcz, sT, trailA, townA, sL }); } }
+    if (!hand) { const key = [ppu.toFixed(5), Ox.toFixed(1), Oy.toFixed(1), mcx.toFixed(3), mcz.toFixed(3), sT.toFixed(1), trailA.toFixed(3), townA.toFixed(3), sL.toFixed(2), VW, VH].join(); if (key !== this.tmKey) { this.tmKey = key; this.tmDraw({ ppu, Ox, Oy, cx: mcx, cz: mcz, sT, trailA, townA, sL }, T.cv.getContext('2d'), TM_LIGHT); } }
     const H = T.hole.style, hv = u > 2.85 ? 'hidden' : 'visible'; if (T.hv !== hv) { T.hv = hv; H.visibility = hv; }
     if (hv === 'visible') { const fa = 0.74 * (1 - sst(2.4, 2.75, u)); H.transform = 'translate(' + x + 'px,' + y + 'px)'; H.width = w + 'px'; H.height = h + 'px'; H.borderRadius = 31 * k + 'px';
       H.boxShadow = '0 0 0 ' + 8 * k + 'px #0b0b0b, 0 0 0 ' + 10.5 * k + 'px #8f8c87, 0 0 0 ' + 12 * k + 'px #4a4743, 0 ' + 30 * k + 'px ' + 60 * k + 'px ' + (-10 * k) + 'px rgba(37,36,34,' + (0.3 * (1 - g)).toFixed(3) + '), 0 0 0 4000px rgba(250,249,246,' + fa.toFixed(3) + ')'; }
