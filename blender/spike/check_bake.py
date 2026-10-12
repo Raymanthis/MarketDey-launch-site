@@ -214,7 +214,7 @@ def main():
     os.makedirs(C.OUT, exist_ok=True)
     topdown(P, cls, os.path.join(C.OUT, "bake-topdown.png"))
     cam_frames = json.load(open(os.path.join(C.MEDIA, "camera.json")))
-    assert len(cam_frames["frames"]) == C.N_FRAMES and cam_frames["fov"] == C.FOV
+    assert len(cam_frames["frames"]) == C.N_FRAMES and float(cam_frames["fov"]) == C.FOV
     tris = load_glb(os.path.join(C.MEDIA, "fills.glb"))
     print(f"[check] fills.glb triangles {len(tris)}; bounds min {np.round(tris.reshape(-1, 3).min(0), 2).tolist()} "
           f"max {np.round(tris.reshape(-1, 3).max(0), 2).tolist()}")
