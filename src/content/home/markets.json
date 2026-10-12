@@ -1,0 +1,155 @@
+{
+  "MARKETS": [
+    {
+      "id": "sapele",
+      "name": "Central Market",
+      "short": "Sapele",
+      "town": "Sapele",
+      "lga": "Sapele",
+      "day": 3,
+      "road": "Sits on the Sapele–Warri road"
+    },
+    {
+      "id": "abraka",
+      "name": "Abraka Market",
+      "short": "Abraka",
+      "town": "Abraka",
+      "lga": "Ethiope East",
+      "day": 0,
+      "road": "Sits on the Abraka–Obiaruku road"
+    },
+    {
+      "id": "warri",
+      "name": "Main Market",
+      "short": "Warri",
+      "town": "Warri",
+      "lga": "Warri South",
+      "day": 1,
+      "road": ""
+    },
+    {
+      "id": "ughelli",
+      "name": "Ughelli Market",
+      "short": "Ughelli",
+      "town": "Ughelli",
+      "lga": "Ughelli North",
+      "day": 2,
+      "road": ""
+    },
+    {
+      "id": "asaba",
+      "name": "Asaba Main Market",
+      "short": "Asaba",
+      "town": "Asaba",
+      "lga": "Oshimili South",
+      "daily": true,
+      "road": "Sits on Nnebisi Road"
+    }
+  ],
+  "LGAS": [
+    "Aniocha North",
+    "Aniocha South",
+    "Bomadi",
+    "Burutu",
+    "Ethiope East",
+    "Ethiope West",
+    "Ika North East",
+    "Ika South",
+    "Isoko North",
+    "Isoko South",
+    "Ndokwa East",
+    "Ndokwa West",
+    "Okpe",
+    "Oshimili North",
+    "Oshimili South",
+    "Patani",
+    "Sapele",
+    "Udu",
+    "Ughelli North",
+    "Ughelli South",
+    "Ukwuani",
+    "Uvwie",
+    "Warri North",
+    "Warri South",
+    "Warri South West"
+  ],
+  "TOWNS": [
+    "Sapele",
+    "Warri",
+    "Ughelli",
+    "Abraka",
+    "Asaba",
+    "Agbor",
+    "Oleh",
+    "Kwale",
+    "Burutu"
+  ],
+  "FLM": [
+    {
+      "name": "Filling station",
+      "cue": "Yellow canopy on your right."
+    },
+    {
+      "name": "Water tank on stilts",
+      "cue": "Tall tank behind a fence, on your left."
+    },
+    {
+      "name": "Umbrella stalls",
+      "cue": "Row of umbrellas on your right."
+    },
+    {
+      "name": "The church",
+      "cue": "White walls, blue roof, on your left."
+    },
+    {
+      "name": "Market gate",
+      "cue": "Green gate with a painted arch, on your left."
+    }
+  ],
+  "DOW": [
+    "Sun",
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat"
+  ],
+  "MON": [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "June",
+    "July",
+    "Aug",
+    "Sept",
+    "Oct",
+    "Nov",
+    "Dec"
+  ],
+  "DOWF": [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday"
+  ],
+  "MONF": [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ]
+}
