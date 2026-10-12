@@ -42,12 +42,18 @@ drawn over the paper colour `#f7f5ef` with `mix-blend-mode: multiply` (paper tin
   },
   "formats": ["avif", "webp"],
   "bytes": { "l": { "avif": 0, "webp": 0 }, "p": { "avif": 0, "webp": 0 } },
-  "camera": [ { "pos": [0, 0, 0], "quat": [0, 0, 0, 1] } ],
+  "camera": {
+    "l": [ { "pos": [0, 0, 0], "quat": [0, 0, 0, 1] } ],
+    "p": [ { "pos": [0, 0, 0], "quat": [0, 0, 0, 1] } ]
+  },
   "order": [0, 200, 100, 300, "… coarse-to-fine preload order (every 64th, 32nd, … 1st)"]
 }
 ```
 
-- `camera[i]` is in the **section's Three.js scene coordinates** (Y up, metres — the same frame as
+- `camera.l[i]` / `camera.p[i]` are per variant (rev. 2, owner-approved 2026-10-12): the portrait
+  camera yaws toward each landmark as it is passed so landmarks stay in the narrow frame; positions
+  are identical, only orientation differs.
+- Cameras are in the **section's Three.js scene coordinates** (Y up, metres — the same frame as
   `W(s, side)` / `MK` in `LandmarksJourneySection.jsx`), so in-scene overlays (pins, signboards)
   project correctly through a `PerspectiveCamera` with the variant's vertical `fov`.
 - `order` lists every index exactly once.
@@ -57,4 +63,4 @@ drawn over the paper colour `#f7f5ef` with `mix-blend-mode: multiply` (paper tin
 - Variant by **aspect**: viewport aspect ≥ 1 → `l`, else `p`. Image is `object-fit: cover` centred.
 - Show the frame whose `pAt` is nearest the current (smoothed) `p`; **cut, never crossfade** between
   adjacent frames. If that frame isn't loaded yet, show the nearest loaded frame.
-- Overlays use `camera[i]` of the frame being shown (not an interpolated camera).
+- Overlays use `camera[variant][i]` of the frame being shown (not an interpolated camera).
