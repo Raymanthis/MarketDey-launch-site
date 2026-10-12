@@ -274,11 +274,11 @@ def make(name, spec):
         nz = N.new("ShaderNodeTexNoise")
         nz.inputs["Scale"].default_value = 1.0
         cx = N.new("ShaderNodeCombineXYZ")
-        L.new(op("MULTIPLY", along, 11.0), cx.inputs["X"])
+        L.new(op("MULTIPLY", along, 16.0), cx.inputs["X"])
         L.new(op("FLOOR", op("DIVIDE", sep.outputs["Z"], 0.17), 0), cx.inputs["Y"])
         L.new(cx.outputs[0], nz.inputs["Vector"])
         dash = op("GREATER_THAN", nz.outputs["Fac"], 0.5)
-        tone = op("MULTIPLY", tone, op("SUBTRACT", 1.0, op("MULTIPLY", op("MULTIPLY", row, dash), 0.3)))
+        tone = op("MULTIPLY", tone, op("SUBTRACT", 1.0, op("MULTIPLY", op("MULTIPLY", row, dash), 0.17)))
     if kind == "breeze":
         # breeze-block screen: square openings that read dark
         geo = N.new("ShaderNodeNewGeometry")
