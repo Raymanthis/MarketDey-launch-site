@@ -3,6 +3,7 @@
 import React from 'react';
 import LandmarkPhone from '@/components/sections/LandmarkPhone';
 import content from '@/content/landmarks-journey.json';
+import { RideFramesPlayer, openRide, rideSource, rideFrameStats } from '@/components/sections/RideFrames';
 import { MAP_END, RIDE_START, RIDE_END, REVEAL, clamp, sstep, S0, PX, PZ, SMAX, fr, W, LS, LSD, SB, MK, TS0, TS1, headS, makeRideCamera } from '@/lib/rideCamera';
 import './LandmarksJourneySection.global.css';
 
@@ -27,6 +28,8 @@ class LandmarksJourneySection extends React.Component {
   p = 0; cur = 0; vis = false;
 
   componentDidMount() {
+    // Street source: pre-rendered frames (default, ?ride=stub) or the procedural street (?ride=live, or if the manifest fails).
+    this.rideSrc = rideSource(window.location.search); this.rideDebug = new URLSearchParams(window.location.search).get('ridedebug') === '1';
     this.onScroll = () => this.measure();
     this.onResize = () => { this.measure(); this.layout(); if (this.three) this.three.resize(); };
     window.addEventListener('scroll', this.onScroll, { passive: true });
@@ -39,6 +42,7 @@ class LandmarksJourneySection extends React.Component {
     this.dead = true; cancelAnimationFrame(this.raf);
     window.removeEventListener('scroll', this.onScroll); window.removeEventListener('resize', this.onResize);
     if (this.three) this.three.dispose();
+    if (this.rideDebug && window.__ride) delete window.__ride;
   }
   layout() {
     const wide = window.innerWidth >= 1100, zoom = Math.round(clamp((window.innerHeight - 110) / 898, 0.4, 0.68) * 100) / 100;
@@ -72,7 +76,7 @@ class LandmarksJourneySection extends React.Component {
     });
     if (ph) { const sIn = can && e >= 1 ? sstep(0.03, 0.1, q) : 0, sOut = sstep(0.86, 0.93, q); ph.style.visibility = sIn > 0.001 && sOut < 0.999 ? 'visible' : 'hidden'; ph.style.transform = 'translateY(-50%) translateX(' + ((1 - sIn) * 130 + sOut * 130).toFixed(1) + '%)'; }
     if (!can) return;
-    const pr = this.three.render({ k, e, q, f }, t);
+    const pr = this.three.render({ k, e, q, f, p }, t);
     if (ar && pr) { const o = 1 - sstep(0.05, 0.4, e); ar.style.visibility = o > 0.001 ? 'visible' : 'hidden'; ar.style.left = (pr[0] * 100).toFixed(2) + '%'; ar.style.top = (pr[1] * 100).toFixed(2) + '%'; ar.style.transform = 'translate(-50%,-50%) scale(' + (1 + 0.5 * sstep(0, 0.4, e)).toFixed(3) + ')'; ar.style.opacity = o.toFixed(3); if (ai) ai.style.transform = 'rotate(' + (180 * (1 - pr[2])).toFixed(1) + 'deg)'; }
     if (wh) { const v = sstep(0.972, 1, q); wh.style.background = '#faf9f6'; wh.style.opacity = v.toFixed(3); }
   }
@@ -80,11 +84,13 @@ class LandmarksJourneySection extends React.Component {
   async init3D() {
     const host = this.glRef.current; if (!host) return;
     let THREE;
+    const rideP = openRide(this.rideSrc);
     try { THREE = await import('three'); } catch (e) { this.setState({ glFail: true }); return; }
     try { await Promise.all([document.fonts.load('900 34px Lato'), document.fonts.load('400 24px Lato')]); } catch (e) {}
     if (this.dead || !this.glRef.current) return;
     let renderer;
-    try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch (e) { this.setState({ glFail: true }); return; }
+    const ride = await rideP; if (this.dead || !this.glRef.current) return;
+    try { renderer = new THREE.WebGLRenderer(ride ? { antialias: true, alpha: true } : { antialias: true }); } catch (e) { this.setState({ glFail: true }); return; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%';
@@ -94,7 +100,7 @@ class LandmarksJourneySection extends React.Component {
     const camera = new THREE.PerspectiveCamera(58, host.clientWidth / host.clientHeight, 0.1, 700);
     const fillMat = new THREE.MeshBasicMaterial({ color: PAPER, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     const LMAT = {}, lineMat = c => LMAT[c] || (LMAT[c] = new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: 0.92 }));
-    const groundMat = new THREE.MeshBasicMaterial({ color: PAPER }); { const gp = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), groundMat); gp.rotation.x = -Math.PI / 2; gp.position.set(0, -0.02, -150); scene.add(gp); }
+    const groundMat = new THREE.MeshBasicMaterial({ color: PAPER }); let ground; { const gp = ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), groundMat); gp.rotation.x = -Math.PI / 2; gp.position.set(0, -0.02, -150); scene.add(gp); }
     let seed = 11; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
     // road centreline, fr, W: src/lib/rideCamera.js
     let TX = 0, TZ = 0, TC = 1, TS = 0, TR = 0;
@@ -359,6 +365,11 @@ class LandmarksJourneySection extends React.Component {
     const TDS = 1, trailMesh = new THREE.Mesh(ribbon(TS0, TS1, 1.15, 0.35, TDS), trailMat); trailMesh.renderOrder = 10; mapGrp.add(trailMesh);
     const C_BLOCK = new THREE.Color('#ddd6c9'), C_PAPER = new THREE.Color(PAPER), C_BG = new THREE.Color('#ebe8e1'), prj = new THREE.Vector3();
     let hdS, keyS, ltS = 0, projS = null;
+    // Pre-rendered frames (p >= MAP_END): drawn by RideFramesPlayer on a canvas under this one; the
+    // street meshes are hidden and only pins + signboards render here, through the shown frame's camera.
+    const player = ride ? new RideFramesPlayer(host, ride) : null, sceneBg = scene.background, XF = 0.005;
+    if (player) renderer.domElement.style.position = 'relative'; // paint above the (absolutely positioned) frame canvas
+    let overlay = false, viewSet = false, liveA = 1, shownFrame = null;
     const rig = makeRideCamera(THREE), { gX, gZ } = rig;
     // signboards + number markers
     const roundRect = (k, x, y, w, h, r) => { k.beginPath(); k.moveTo(x + r, y); k.arcTo(x + w, y, x + w, y + h, r); k.arcTo(x + w, y + h, x, y + h, r); k.arcTo(x, y + h, x, y, r); k.arcTo(x, y, x + w, y, r); k.closePath(); };
@@ -398,21 +409,34 @@ class LandmarksJourneySection extends React.Component {
     const self = this;
     this.three = {
       resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); },
-      dispose() { renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); },
+      dispose() { if (player) player.destroy(); renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); },
       render(st, t) {
         const { k, e, q } = st, e1 = sstep(0, 1, e);
         const sHead = headS(k, e), th = fr(sHead)[2];
         if (hdS === undefined) hdS = th; hdS += (th - hdS) * 0.12;
-        const key = [k, e, q, hdS, st.f].map(v => v.toFixed(4)).join();
+        let fi = null, key = [k, e, q, hdS, st.f].map(v => v.toFixed(4)).join();
+        if (player) { const W = host.clientWidth, H = host.clientHeight, p = st.p;
+          if (p >= MAP_END) fi = player.update(p, W, H); else { player.setVisible(false); if (p > MAP_END - 0.07) player.warm(MAP_END, W, H); }
+          // map -> frame crossfade over p in [MAP_END, MAP_END + XF]; with no decoded frame the live street stays up
+          const a = fi ? 1 - clamp((p - MAP_END) / XF, 0, 1) : 1, op = fi && a <= 0 ? 1 : a;
+          if (op !== liveA) { liveA = op; renderer.domElement.style.opacity = op < 1 ? op.toFixed(3) : ''; }
+          overlay = !!fi && a <= 0; shownFrame = fi;
+          if (fi) key += '|' + fi.key + '|' + W + 'x' + H + (overlay ? 'o' : ''); }
         if (key === keyS && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS; keyS = key; ltS = t;
         const lineK = sstep(0.15, 0.7, e), roadK = 1 - sstep(0.35, 0.9, e), trailK = 1 - sstep(0.05, 0.4, e), up = sstep(0.25, 0.95, e);
         mats.ink.opacity = 0.92 * lineK; mats.green.opacity = 0.92 * lineK; mats.fine.opacity = 0.85 * lineK; [mats.ink, mats.green, mats.fine].forEach(m => { m.visible = lineK > 0.002; });
         city.scale.y = 0.02 + 0.98 * up;
-        fillMat.color.copy(C_BLOCK).lerp(C_PAPER, sstep(0.3, 1, e)); groundMat.color.copy(C_BG).lerp(C_PAPER, sstep(0.2, 0.9, e)); scene.background.copy(groundMat.color);
+        fillMat.color.copy(C_BLOCK).lerp(C_PAPER, sstep(0.3, 1, e)); groundMat.color.copy(C_BG).lerp(C_PAPER, sstep(0.2, 0.9, e)); sceneBg.copy(groundMat.color);
         [casingMat, roadMat, patchMat].forEach(m => { m.opacity = roadK; m.visible = roadK > 0.002; }); trailMat.opacity = trailK; trailMat.visible = trailK > 0.002;
         scene.fog.near = 60 + (1 - e1) * 3000; scene.fog.far = 290 + (1 - e1) * 6000;
         trailMesh.geometry.setDrawRange(0, Math.max(0, Math.round((sHead - TS0) / TDS)) * 6);
         const { sc, hx, hz, roll } = rig.pose(camera, st, sHead, hdS);
+        if (player) {
+          city.visible = mapGrp.visible = ground.visible = !overlay; scene.background = overlay ? null : sceneBg;
+          if (overlay) { const W = host.clientWidth, H = host.clientHeight, c = shownFrame.cam;
+            camera.position.fromArray(c.pos); camera.quaternion.fromArray(c.quat); camera.fov = shownFrame.fov; camera.aspect = shownFrame.w / shownFrame.h;
+            camera.setViewOffset(shownFrame.drawW, shownFrame.drawH, shownFrame.offX, shownFrame.offY, W, H); viewSet = true; }
+          else if (viewSet) { camera.fov = 58; camera.aspect = host.clientWidth / host.clientHeight; camera.clearViewOffset(); viewSet = false; } }
         boards.forEach(b => { const d = b.s - sc, rise = sstep(70, 34, d); b.grp.position.y = -8 * (1 - rise); b.grp.visible = e >= 1; });
         const step = stepFor(q);
         pins.forEach((sp, i) => { sp.visible = e >= 1; if (sp.userData.coin) { const at = sp.userData.at; sp.position.set(at[0], 1.25 + Math.sin(t / 520) * 0.18, at[1]); sp.rotation.y = t / 650; sp.scale.set(1.6, 1.6, 1.6); return; } const cur = step === i + 1; const s2 = cur ? 3 + Math.sin(t / 280) * 0.15 : 2.1; sp.scale.set(s2, s2, 1); });
@@ -422,6 +446,7 @@ class LandmarksJourneySection extends React.Component {
       }
     };
     this.three.resize();
+    if (this.rideDebug) window.__ride = { mode: player ? 'frames' : 'live', src: this.rideSrc, manifest: ride ? ride.manifest : null, stats: rideFrameStats, get cur() { return self.cur; }, get p() { return self.p; }, get frame() { return overlay && shownFrame ? { i: shownFrame.i, v: shownFrame.v, p: self.cur } : null; }, camera, pins, boards: boards.map(b => b.grp) };
   }
 
   renderVals() {
