@@ -81,8 +81,11 @@ const DN_RE_WHITE = /^rgba\(255,\s*255,\s*255,\s*([\d.]+)\)$/;
 // Clouds ([data-cl-cld]) take their own night fill; everything else green is skyline (buildings, vehicles).
 const DN_SEL_FILL = '[data-cl-sky][data-cl-dn] [fill="#386641"]:not([data-cl-wxc]):not([data-cl-cld])';
 const DN_SEL_CLD = '[data-cl-sky][data-cl-dn] [data-cl-cld]';
+// the vehicles' opaque underlays carry the skyline green as their stroke too: it follows the fill
+const DN_SEL_STROKE = '[data-cl-sky][data-cl-dn] [stroke="#386641"]:not([data-cl-wxc])';
 const DN_CSS = DN_SEL_FILL + '{fill:#386641!important}'
   + DN_SEL_CLD + '{fill:#386641!important}'
+  + DN_SEL_STROKE + '{stroke:#386641!important}'
   // in splash mode the colours are written continuously from JS, so nothing may ease between them:
   // the CSS transitions (sky background, skyline fills, cloud bodies) are switched off wholesale
   + '[data-cl-sky][data-cl-dn]{transition:none!important}'
@@ -2784,6 +2787,7 @@ export class CityLife {
     this.dnRules = {
       fill: rs.find(r => sel(r) === DN_SEL_FILL),
       cld: rs.find(r => sel(r) === DN_SEL_CLD),
+      stroke: rs.find(r => sel(r) === DN_SEL_STROKE),
     };
   }
 
@@ -2802,6 +2806,7 @@ export class CityLife {
     }
     if (R.fill) R.fill.style.fill = fill;
     if (R.cld) R.cld.style.fill = cloud;
+    if (R.stroke) R.stroke.style.stroke = fill;
     if (this.splash) this.setScreenBg(sky, dur);
   }
 
