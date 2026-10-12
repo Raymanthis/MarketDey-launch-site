@@ -1,0 +1,157 @@
+{
+  "commuters": {
+    "slots": {
+      "bg": {
+        "id": "who-commuters-bg",
+        "placeholder": "Wide photo: traffic jam on a road beside a busy market (2400×1500)",
+        "src": null,
+        "alt": "Wide photo: traffic jam on a road beside a busy market (2400×1500)"
+      },
+      "detail": {
+        "id": "who-commuters-detail",
+        "placeholder": "Portrait: driver or okada rider stuck in traffic (1200×1500)",
+        "src": null,
+        "alt": "Portrait: driver or okada rider stuck in traffic (1200×1500)"
+      },
+      "detail2": {
+        "id": "who-commuters-detail-2",
+        "placeholder": "Close-up: danfo or keke in traffic (1200×900)",
+        "src": null,
+        "alt": "Close-up: danfo or keke in traffic (1200×900)"
+      },
+      "m1": {
+        "id": "who-commuters-m1",
+        "placeholder": "keke passenger",
+        "src": null,
+        "alt": "keke passenger"
+      },
+      "m2": {
+        "id": "who-commuters-m2",
+        "placeholder": "roadside hawker",
+        "src": null,
+        "alt": "roadside hawker"
+      },
+      "m3": {
+        "id": "who-commuters-m3",
+        "placeholder": "traffic warden",
+        "src": null,
+        "alt": "traffic warden"
+      }
+    },
+    "number": "01",
+    "label": "COMMUTERS",
+    "heading": "Know before you drive into a market-day jam.",
+    "body": "On market day, the roads around a market fill with traders, buyers and loading trucks. Marketdey tells you the evening before, so you can leave early or take another road.",
+    "card": {
+      "title": "Tomorrow · Ogwashi-Uku Nkwọ market",
+      "text": "Expect slow traffic on Old Asaba Road."
+    }
+  },
+  "shoppers": {
+    "slots": {
+      "bg": {
+        "id": "who-shoppers-bg",
+        "placeholder": "Wide photo: crowded open market, traders and buyers at stalls (2400×1500)",
+        "src": null,
+        "alt": "Wide photo: crowded open market, traders and buyers at stalls (2400×1500)"
+      },
+      "detail": {
+        "id": "who-shoppers-detail",
+        "placeholder": "Portrait: hands exchanging tomatoes, peppers or naira notes (1200×1500)",
+        "src": null,
+        "alt": "Portrait: hands exchanging tomatoes, peppers or naira notes (1200×1500)"
+      },
+      "detail2": {
+        "id": "who-shoppers-detail-2",
+        "placeholder": "Close-up: basins of produce on a stall (1200×900)",
+        "src": null,
+        "alt": "Close-up: basins of produce on a stall (1200×900)"
+      },
+      "m1": {
+        "id": "who-shoppers-m1",
+        "placeholder": "trader weighing garri",
+        "src": null,
+        "alt": "trader weighing garri"
+      },
+      "m2": {
+        "id": "who-shoppers-m2",
+        "placeholder": "pepper and tomatoes",
+        "src": null,
+        "alt": "pepper and tomatoes"
+      },
+      "m3": {
+        "id": "who-shoppers-m3",
+        "placeholder": "buyer with shopping bag",
+        "src": null,
+        "alt": "buyer with shopping bag"
+      }
+    },
+    "label": "MARKET-DAY SHOPPERS",
+    "number": "02",
+    "heading": "Shop on the day the market is full.",
+    "card": {
+      "dow": "SAT",
+      "day": "17",
+      "title": "Market day",
+      "text": "Afọ market · 2.4 km"
+    },
+    "body": "Market day brings traders in from nearby farms and towns, so there's more to choose from and more room to haggle. Follow the markets near you and Marketdey tells you when each one is on."
+  },
+  "seekers": {
+    "slots": {
+      "bg": {
+        "id": "who-seekers-bg",
+        "placeholder": "Wide photo: person on their phone at a roadside or bus stop (2400×1500)",
+        "src": null,
+        "alt": "Wide photo: person on their phone at a roadside or bus stop (2400×1500)"
+      },
+      "detail": {
+        "id": "who-seekers-detail",
+        "placeholder": "Portrait: a stack of yams or bolts of fabric at a well-known market (1200×1500)",
+        "src": null,
+        "alt": "Portrait: a stack of yams or bolts of fabric at a well-known market (1200×1500)"
+      },
+      "detail2": {
+        "id": "who-seekers-detail-2",
+        "placeholder": "Close-up: phone screen showing a market search (1200×900)",
+        "src": null,
+        "alt": "Close-up: phone screen showing a market search (1200×900)"
+      },
+      "m1": {
+        "id": "who-seekers-m1",
+        "placeholder": "bolts of ankara fabric",
+        "src": null,
+        "alt": "bolts of ankara fabric"
+      },
+      "m2": {
+        "id": "who-seekers-m2",
+        "placeholder": "person checking a map",
+        "src": null,
+        "alt": "person checking a map"
+      },
+      "m3": {
+        "id": "who-seekers-m3",
+        "placeholder": "yam barn",
+        "src": null,
+        "alt": "yam barn"
+      }
+    },
+    "number": "03",
+    "label": "BARGAIN SEEKERS",
+    "heading": "Go to the market known for what you need.",
+    "body": "Some markets are known for one thing, like yams in one town and fabric in the next. Search by what you want to buy, see how far it is, and arrive on the right day.",
+    "card": {
+      "dow": "FRI",
+      "day": "16",
+      "title": "Ubulu-Uku central market",
+      "text": "14 km · known for yam and tubers"
+    }
+  },
+  "rail": {
+    "labels": [
+      "COMMUTERS",
+      "SHOPPERS",
+      "BARGAIN SEEKERS"
+    ]
+  }
+}
