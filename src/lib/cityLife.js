@@ -584,19 +584,20 @@ export class CityLife {
     }
     // 3 splashes
     if (this.splashes.length) {
-      ctx.strokeStyle = rainCol; ctx.fillStyle = rainCol;
+      const spCol = this.night ? 'rgba(200,214,229,.6)' : 'rgba(255,255,255,.65)';
+      ctx.strokeStyle = spCol; ctx.fillStyle = spCol; ctx.lineWidth = 1.2;
       this.splashes = this.splashes.filter(sp => {
         sp.age += dt;
         const t = sp.age / 0.3;
         if (t >= 1) return false;
         ctx.globalAlpha = 1 - t;
         ctx.beginPath();
-        const rx = lerp(1, 6, t);
+        const rx = lerp(2, 9, t);
         ctx.ellipse(sp.x, gy, rx, rx * 0.3, 0, 0, Math.PI * 2);
         ctx.stroke();
         sp.dr.forEach(q => {
           q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 700 * dt;
-          ctx.fillRect(q.x - 0.6, q.y - 0.6, 1.2, 1.2);
+          ctx.fillRect(q.x - 0.9, q.y - 0.9, 1.8, 1.8);
         });
         return true;
       });
@@ -615,11 +616,21 @@ export class CityLife {
       ctx.stroke();
       ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     }
+    // soften the canvas top edge so dim/flash/rain never show a hard line
+    if (!this.topFade) {
+      this.topFade = ctx.createLinearGradient(0, 0, 0, 140);
+      this.topFade.addColorStop(0, 'rgba(0,0,0,1)');
+      this.topFade.addColorStop(1, 'rgba(0,0,0,0)');
+    }
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = this.topFade;
+    ctx.fillRect(0, 0, W, 140);
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   addSplash(x) {
     const rv = this.rV, n = 2 + Math.floor(rv() * 2), dr = [];
-    for (let k = 0; k < n; k++) dr.push({ x, y: this.gy, vx: -40 + rv() * 80, vy: -110 + rv() * 50 });
+    for (let k = 0; k < n; k++) dr.push({ x, y: this.gy, vx: -45 + rv() * 90, vy: -150 + rv() * 60 });
     this.splashes.push({ x, age: 0, dr });
   }
 
