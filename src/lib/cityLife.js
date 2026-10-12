@@ -27,16 +27,41 @@ const CLOUD_D = 'M0 0H120Q132 0 130 -10Q128 -22 112 -20Q108 -40 86 -38Q76 -56 52
 const S0 = 10, HEADWAY = 0.6, ACC = 60, DECEL = 90, DECEL_MAX = 260;
 
 // roof segments per vehicle shape (vehicle-local coords, x relative to the inner g, y relative to the wrapper)
-const ROOFS = [
-  [[0, 22, -21], [22, 50, -32], [50, 66, -21]],
-  [[0, 64, -38], [64, 72, -28]],
-  [[0, 36, -32], [36, 44, -18]],
-  [[0, 104, -52], [104, 112, -12], [112, 134, -44], [134, 140, -30]],
-  [[0, 12, -24], [12, 58, -36], [58, 66, -22]],
-  [[-2, 12, -14], [12, 24, -38], [24, 40, -12]],
-  [[0, 74, -38], [74, 78, -12], [78, 94, -36], [94, 104, -26]],
-  [[0, 62, -48], [62, 64, -10], [64, 82, -36], [82, 92, -26]],
+// opaque underlay per vehicle shape (vehicle-local): body + wheel band + the gaps between cab and cargo,
+// filled with the skyline colour so nothing behind (rain, buildings) shows through the vehicle
+const UNDER = [
+  'M0 -6V-16Q0 -20 6 -20L16 -21L26 -32H46L56 -21H62Q66 -20 66 -14V-6ZM8 -8H58V1H8Z',
+  'M0 -6V-32Q0 -38 6 -38H58Q66 -38 69 -28L72 -6ZM8 -8H62V1H8Z',
+  'M0 -6V-24Q0 -32 8 -32H28Q36 -32 39 -24L44 -10V-6ZM5 -8H42V0H5Z',
+  'M0 -8V-52H104V-44H112V-44H128Q134 -44 136 -38L140 -22V-8ZM8 -10H134V1H8Z',
+  'M0 -6V-20Q0 -24 4 -24L12 -36H54Q60 -36 62 -30L66 -20V-6ZM7 -8H59V2H7Z',
+  'M-3 2V-12L10 -15L13 -30L14 -38H22V-30H29L27 -15L41 -12V2Z',
+  'M4 -14Q0 -14 0 -26Q0 -38 10 -38H64Q74 -38 74 -26V-36H94L104 -22V-8H0V-14ZM6 -10H98V1H6Z',
+  'M0 -8V-48H62V-36H82L92 -22V-8ZM8 -10H86V1H8Z',
 ];
+
+// exact roof line per vehicle shape (topmost painted y for each local x), computed once per page from the
+// underlay + body paths with Path2D hit-testing (no DOM layout), then cached
+const ROOF_X0 = -6, ROOF_N = 152;
+const ROOF_CACHE = new Map();
+const roofLine = (i, bodyD) => {
+  if (ROOF_CACHE.has(i)) return ROOF_CACHE.get(i);
+  const line = new Float32Array(ROOF_N).fill(NaN);
+  const ctx = typeof document !== 'undefined' && document.createElement('canvas').getContext('2d');
+  if (ctx && typeof Path2D === 'function') {
+    const pu = UNDER[i] ? new Path2D(UNDER[i]) : null, pb = bodyD ? new Path2D(bodyD) : null;
+    ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+    for (let k = 0; k < ROOF_N; k++) {
+      const x = ROOF_X0 + k;
+      for (let y = -64; y <= 3; y += 0.5) {
+        if ((pu && (ctx.isPointInPath(pu, x, y) || ctx.isPointInStroke(pu, x, y)))
+          || (pb && (ctx.isPointInPath(pb, x, y) || ctx.isPointInStroke(pb, x, y)))) { line[k] = y; break; }
+      }
+    }
+  }
+  ROOF_CACHE.set(i, line);
+  return line;
+};
 
 export class CityLife {
   constructor(svgEl, { night = false, W, G = 292, seed = 1, reducedMotion = false } = {}) {
@@ -140,6 +165,21 @@ export class CityLife {
       };
     });
     this.vehicles.forEach(v => { this.pickV0(v); v.lcCool = this.rT() * 2; });
+    this.vehicles.forEach(v => {
+      const d = UNDER[v.i], body = v.g.querySelector('path');
+      if (!d || !body) return;
+      const u = document.createElementNS(SVGNS, 'path');
+      u.setAttribute('d', d);
+      const fl = body.getAttribute('fill') || '#000';
+      u.setAttribute('fill', fl);
+      // stroke too: the body outline is semi-transparent and sits outside the fill
+      u.setAttribute('stroke', fl);
+      u.setAttribute('stroke-width', '1.6');
+      u.setAttribute('stroke-linejoin', 'round');
+      u.setAttribute('data-cl-under', '1');
+      v.roof = roofLine(v.i, body.getAttribute('d'));
+      v.g.insertBefore(u, v.g.firstChild);
+    });
     this.VN = this.vehicles.filter(v => !v.extra).length;
     this.target = this.VN;
     // seeded-shuffled lane order for the round-robin initial assignment
@@ -1407,14 +1447,12 @@ export class CityLife {
 
   // world roof y at world x wx (svg coords), or null if the shape has no roof there
   roofAt(v, wx) {
-    const segs = ROOFS[v.i];
-    if (!segs) return null;
-    const lx = wx - v.x;
-    for (let k = 0; k < segs.length; k++) {
-      const s = segs[k];
-      if (lx >= s[0] && lx <= s[1]) return this.G + v.dy + s[2];
-    }
-    return null;
+    const line = v.roof;
+    if (!line) return null;
+    const k = Math.round(wx - v.x) - ROOF_X0;
+    if (k < 0 || k >= ROOF_N) return null;
+    const y = line[k];
+    return y === y ? this.G + v.dy + y : null; // NaN: no body at this x
   }
 
   addGroundSplash(x, y) {
@@ -1431,14 +1469,47 @@ export class CityLife {
     }
   }
 
+  // a roof splash is hidden once a nearer vehicle (larger dy) covers it with a higher body
+  roofHidden(sp) {
+    const v = sp.veh, wx = v.x + sp.lx, wy = this.G + v.dy + sp.ly, r = sp.rxMax || 6;
+    // test the ripple's centre and both ends: any part under a nearer, higher body hides the splash
+    return this.occludedAt(v, wx - r, wy) || this.occludedAt(v, wx, wy) || this.occludedAt(v, wx + r, wy);
+  }
+
+  // true when a vehicle nearer than v covers point (px, py) with its body
+  occludedAt(v, px, py) {
+    const vs = this.vehicles;
+    for (let m = 0; m < vs.length; m++) {
+      const u = vs[m];
+      if (u === v || !u.active || u.dy <= v.dy) continue;
+      if (px < u.x + u.bx0 - 1 || px > u.x + u.bx0 + u.len + 1) continue;
+      const ry = this.roofAt(u, Math.min(Math.max(px, u.x + u.bx0), u.x + u.bx0 + u.len));
+      if (ry != null && ry < py + 2) return true;
+    }
+    return false;
+  }
+
   addRoofSplash(v, lx, ly) {
     if (this.rSplashCount >= 80) return;
+    // on a sloped roof the ripple must stay within the roof band: cap its radius by the local slope;
+    // at a step (a wall between roof levels) the drop just ends there, without a splash
+    // the ripple may only spread over roof that stays within 1.2 px of the hit point
+    const line = v.roof, k0 = Math.round(lx) - ROOF_X0;
+    const y0 = line && k0 >= 0 && k0 < ROOF_N ? line[k0] : NaN;
+    let r = 0;
+    for (let d = 1; d <= 6 && y0 === y0; d++) {
+      const a = k0 - d >= 0 ? line[k0 - d] : NaN, b = k0 + d < ROOF_N ? line[k0 + d] : NaN;
+      if (!(Math.abs(a - y0) <= 1.2) || !(Math.abs(b - y0) <= 1.2)) break;
+      r = d;
+    }
+    if (r < 1) return;
     const sp = this.rSplashes[this.rSplashCount++];
     const rv = this.rV;
     sp.veh = v; sp.lx = lx; sp.ly = ly; sp.age = 0; sp.n = 2;
+    sp.rxMax = Math.max(0.8, r - 1.2); // keep the stroked ripple inside the flat run
     for (let k = 0; k < 2; k++) {
       const q = sp.dr[k];
-      q.x = 0; q.y = 0;
+      q.x = 0; q.y = 0; q.gone = false;
       q.vx = -30 + rv() * 60;
       q.vy = -90 + rv() * 40;
     }
@@ -1487,17 +1558,17 @@ export class CityLife {
       d.x += sn * dist;
       d.y += cs * dist;
       const hx = d.x, hy = d.y;
-      let hit = null;
+      // the topmost roof covering x wins: that is the surface the drop visibly reaches first
+      let hit = null, ry = null;
       for (let m = 0; m < vehicles.length; m++) {
         const v = vehicles[m];
         if (!v.active) continue;
         if (hx < v.x + v.bx0 || hx > v.x + v.bx0 + v.len) continue;
-        if (!hit || v.dy > hit.dy) hit = v;
+        const y = this.roofAt(v, hx);
+        if (y != null && (ry == null || y < ry)) { ry = y; hit = v; }
       }
-      let ry = null;
-      if (hit) ry = this.roofAt(hit, hx);
       if (ry != null && py < ry && hy >= ry) {
-        this.addRoofSplash(hit, hx - hit.x, ry - (G + hit.dy));
+        this.addRoofSplash(hit, hx - hit.x, ry - (G + hit.dy) - 0.8); // ripple sits just on top of the roof line
         if (!this.emit(d, false)) d.wait = true;
       } else if (hy >= G) {
         this.addGroundSplash(hx, G);
@@ -1529,7 +1600,7 @@ export class CityLife {
     for (let k = this.rSplashCount - 1; k >= 0; k--) {
       const sp = this.rSplashes[k];
       sp.age += dt;
-      if (sp.age >= 0.3 || !sp.veh.active) {
+      if (sp.age >= 0.3 || !sp.veh.active || this.roofHidden(sp)) {
         this.rSplashCount--;
         const last = this.rSplashes[this.rSplashCount];
         this.rSplashes[k] = last;
@@ -1542,6 +1613,23 @@ export class CityLife {
         q.x += q.vx * dt;
         q.y += q.vy * dt;
         q.vy += 600 * dt;
+        // land back on the roof line under the droplet (never in front of the body)
+        const line = sp.veh.roof, kq = Math.round(sp.lx + q.x) - ROOF_X0, kb = Math.round(sp.lx) - ROOF_X0;
+        // highest roof under the droplet's 2 px footprint
+        let yq = NaN;
+        let off = false;
+        for (let f = -1; f <= 2; f++) {
+          const kk = kq + f, yy = line && kk >= 0 && kk < ROOF_N ? line[kk] : NaN;
+          if (yy !== yy) { off = true; break; }
+          if (!(yq <= yy)) yq = yy;
+        }
+        if (off) yq = NaN; // any part of the droplet past the end of the roof: it is gone (below)
+        const yb = line && kb >= 0 && kb < ROOF_N ? line[kb] : NaN;
+        // a droplet never slides into a taller part of the body (a wall): bounce back off it
+        if (yq === yq && yb === yb && yq < yb - 1 && q.y > (yq - yb) - 2.8) { q.x -= q.vx * dt; q.vx = -q.vx; }
+        if (yq !== yq) { q.gone = true; continue; } // off the end of the roof: the droplet is gone
+        const floor = (yb === yb) ? (yq - yb) - 2.8 : -2.8; // 1 px clearance above the roof
+        if (q.y > floor) { q.y = floor; q.vy = 0; q.vx = 0; }
       }
     }
 
@@ -1646,7 +1734,7 @@ export class CityLife {
         if (sp.b !== b) continue;
         const wx = sp.veh.x + sp.lx;
         const wy = G + sp.veh.dy + sp.ly;
-        const rx = lerp(1.5, 6, sp.age / 0.3);
+        const rx = Math.min(sp.rxMax, lerp(1.5, 6, sp.age / 0.3));
         ctx.moveTo(wx + rx, wy - top); // new subpath: no connecting line between ripples
         ctx.ellipse(wx, wy - top, rx, rx * 0.3, 0, 0, 2 * Math.PI);
       }
@@ -1659,6 +1747,7 @@ export class CityLife {
         const wy = G + sp.veh.dy + sp.ly;
         for (let m = 0; m < sp.n; m++) {
           const q = sp.dr[m];
+          if (q.gone || this.occludedAt(sp.veh, wx + q.x, wy + q.y) || this.occludedAt(sp.veh, wx + q.x + 1.8, wy + q.y)) continue;
           ctx.rect(wx + q.x, wy + q.y - top, 1.8, 1.8);
         }
       }
