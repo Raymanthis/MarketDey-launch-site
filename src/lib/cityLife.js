@@ -1590,6 +1590,7 @@ export class CityLife {
         const sp = gS[k];
         if (sp.b !== b) continue;
         const rx = lerp(2, 9, sp.age / 0.3);
+        ctx.moveTo(sp.x + rx, sp.y - top); // new subpath: no connecting line between ripples
         ctx.ellipse(sp.x, sp.y - top, rx, rx * 0.3, 0, 0, 2 * Math.PI);
       }
       ctx.stroke();
@@ -1646,6 +1647,7 @@ export class CityLife {
         const wx = sp.veh.x + sp.lx;
         const wy = G + sp.veh.dy + sp.ly;
         const rx = lerp(1.5, 6, sp.age / 0.3);
+        ctx.moveTo(wx + rx, wy - top); // new subpath: no connecting line between ripples
         ctx.ellipse(wx, wy - top, rx, rx * 0.3, 0, 0, 2 * Math.PI);
       }
       ctx.stroke();
