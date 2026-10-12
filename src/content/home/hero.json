@@ -91,6 +91,7 @@
     "bank": "BANK",
     "clinic": "CLINIC",
     "pos": "POS",
-    "tankerPms": "PMS"
+    "tankerPms": "PMS",
+    "police": "POLICE"
   }
 }

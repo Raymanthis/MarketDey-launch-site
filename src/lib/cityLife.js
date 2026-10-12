@@ -38,6 +38,9 @@ const UNDER = [
   'M-3 2V-12L10 -15L13 -30L14 -38H22V-30H29L27 -15L41 -12V2Z',
   'M4 -14Q0 -14 0 -26Q0 -38 10 -38H64Q74 -38 74 -26V-36H94L104 -22V-8H0V-14ZM6 -10H98V1H6Z',
   'M0 -8V-48H62V-36H82L92 -22V-8ZM8 -10H86V1H8Z',
+  'M-10 -12V-40H0Q0 -50 10 -50H66V-38H84L94 -22V-8H-10ZM8 -10H92V1H8Z',
+  'M0 -6V-22H3V-32H33V-30L40 -38H66L74 -26H86Q90 -26 90 -20V-6ZM10 -10H82V1H10Z',
+  'M0 -8V-50H150V-44H178Q186 -44 188 -38L196 -22V-8ZM8 -10H190V1H8Z',
 ];
 
 // exact roof line per vehicle shape (topmost painted y for each local x), computed once per page from the
@@ -103,6 +106,7 @@ export class CityLife {
     this.bd = null;
     this.hzG = null;
     this.hzDefs = null;
+    this.polDefs = null;
 
     // weather schedule
     this.storms = [];
@@ -180,6 +184,48 @@ export class CityLife {
       v.roof = roofLine(v.i, body.getAttribute('d'));
       v.g.insertBefore(u, v.g.firstChild);
     });
+    // police light bar: two alternating halves on the cab roof of each Hilux (shape 9)
+    this.vehicles.forEach(v => {
+      if (v.i !== 9) return;
+      if (this.night) this.ensurePolDefs();
+      const g = document.createElementNS(SVGNS, 'g');
+      g.setAttribute('data-cl-pol', '1');
+      const red = [], blue = [];
+      const redHalo = document.createElementNS(SVGNS, 'circle');
+      redHalo.setAttribute('cx', '50');
+      redHalo.setAttribute('cy', '-39.5');
+      if (this.night) { redHalo.setAttribute('r', '9'); redHalo.setAttribute('fill', 'url(#cl-pol-r-' + this.seed + ')'); }
+      else { redHalo.setAttribute('r', '4'); redHalo.setAttribute('fill', '#e63946'); redHalo.setAttribute('opacity', '.25'); }
+      red.push(redHalo);
+      const redRect = document.createElementNS(SVGNS, 'rect');
+      redRect.setAttribute('x', '46.5');
+      redRect.setAttribute('y', '-40.5');
+      redRect.setAttribute('width', '7.5');
+      redRect.setAttribute('height', '2');
+      redRect.setAttribute('fill', '#e63946');
+      if (!this.night) redRect.setAttribute('opacity', '.55');
+      red.push(redRect);
+      const blueHalo = document.createElementNS(SVGNS, 'circle');
+      blueHalo.setAttribute('cx', '58');
+      blueHalo.setAttribute('cy', '-39.5');
+      if (this.night) { blueHalo.setAttribute('r', '9'); blueHalo.setAttribute('fill', 'url(#cl-pol-b-' + this.seed + ')'); }
+      else { blueHalo.setAttribute('r', '4'); blueHalo.setAttribute('fill', '#3a86ff'); blueHalo.setAttribute('opacity', '.25'); }
+      blue.push(blueHalo);
+      const blueRect = document.createElementNS(SVGNS, 'rect');
+      blueRect.setAttribute('x', '54');
+      blueRect.setAttribute('y', '-40.5');
+      blueRect.setAttribute('width', '7.5');
+      blueRect.setAttribute('height', '2');
+      blueRect.setAttribute('fill', '#3a86ff');
+      if (!this.night) blueRect.setAttribute('opacity', '.55');
+      blue.push(blueRect);
+      g.appendChild(redHalo);
+      g.appendChild(redRect);
+      g.appendChild(blueHalo);
+      g.appendChild(blueRect);
+      v.g.appendChild(g);
+      v.pol = { red, blue, phase: -1 };
+    });
     this.VN = this.vehicles.filter(v => !v.extra).length;
     this.target = this.VN;
     // seeded-shuffled lane order for the round-robin initial assignment
@@ -211,6 +257,16 @@ export class CityLife {
     });
     base.forEach(v => { v.x = v.fr - v.bx0 - v.len; delete v.fr; this.setActive(v, true); });
     this.orderDirty = true;
+  }
+
+  ensurePolDefs() {
+    if (this.polDefs || !this.svg) return;
+    const defs = document.createElementNS(SVGNS, 'defs');
+    defs.setAttribute('data-cl-pol', '1');
+    defs.innerHTML = '<radialGradient id="cl-pol-r-' + this.seed + '"><stop offset="0" stop-color="#e63946" stop-opacity=".55"/><stop offset="1" stop-color="#e63946" stop-opacity="0"/></radialGradient>'
+      + '<radialGradient id="cl-pol-b-' + this.seed + '"><stop offset="0" stop-color="#3a86ff" stop-opacity=".55"/><stop offset="1" stop-color="#3a86ff" stop-opacity="0"/></radialGradient>';
+    this.svg.insertBefore(defs, this.svg.firstChild);
+    this.polDefs = defs;
   }
 
   // ---------- layer stack ----------
@@ -317,8 +373,8 @@ export class CityLife {
   pickV0(v) {
     const r = this.rT();
     let f;
-    if (v.i === 5 || v.i === 0 || v.i === 4) f = 0.7 + 0.65 * Math.pow(r, 0.55);
-    else if (v.i === 3 || v.i === 6 || v.i === 7) f = 0.7 + 0.65 * Math.pow(r, 1.9);
+    if (v.i === 5 || v.i === 0 || v.i === 4 || v.i === 9) f = 0.7 + 0.65 * Math.pow(r, 0.55);
+    else if (v.i === 3 || v.i === 6 || v.i === 7 || v.i === 8 || v.i === 10) f = 0.7 + 0.65 * Math.pow(r, 1.9);
     else f = 0.7 + 0.65 * r;
     v.v0 = v.vBase * f;
   }
@@ -535,6 +591,7 @@ export class CityLife {
     this.clearLights();
     this.hazardsOff();
     if (this.hzDefs) { this.hzDefs.remove(); this.hzDefs = null; }
+    if (this.polDefs) { this.polDefs.remove(); this.polDefs = null; }
     this.bd = null;
     this.skyEls.forEach(g => { g.style.removeProperty('transition'); g.style.removeProperty('opacity'); });
     this.cloudEls.forEach(g => {
@@ -741,11 +798,11 @@ export class CityLife {
       const bd = this.bd;
       let cand = null;
       act.forEach(v => {
-        if (v.drift || v.lc || (v.i !== 3 && v.i !== 6)) return;
+        if (v.drift || v.lc || (v.i !== 3 && v.i !== 6 && v.i !== 10)) return;
         if (frontOf(v) < W / 2 + v.len / 2 - 60 && (!cand || frontOf(v) > frontOf(cand))) cand = v;
       });
       if (!cand) {
-        const parked = this.vehicles.find(v => !v.active && (v.i === 3 || v.i === 6));
+        const parked = this.vehicles.find(v => !v.active && (v.i === 3 || v.i === 6 || v.i === 10));
         if (parked) {
           const qi = this.queue.indexOf(parked);
           if (qi >= 0) this.queue.splice(qi, 1);
@@ -903,7 +960,8 @@ export class CityLife {
         if (v.lane !== L) return; // obstacle-only here: acceleration comes from its target lane
         const front = frontOf(v), rear = rearOf(v);
         const inZone = front >= Z0 - 30 && rear <= Z1;
-        const s0 = inZone ? 6 : 10, T = inZone ? 0.35 : HEADWAY;
+        const s0 = v.i === 10 ? (inZone ? 10 : 26) : (inZone ? 6 : 10);
+        const T = v.i === 10 ? (inZone ? 0.6 : 1.1) : (inZone ? 0.35 : HEADWAY);
         v.s0 = s0;
         let vd = v.v0;
         // the lane head drives up to its stop line; only the queue behind it creeps
@@ -1042,7 +1100,7 @@ export class CityLife {
     act.forEach(v => {
       if (v.x + v.bx0 > W + 20) {
         if (this.bd && v === this.bd.veh) { this.hazardsOff(); this.bd = null; }
-        if (count > this.target) { this.setActive(v, false); v.queued = false; } else { this.setActive(v, false); v.queued = true; this.queue.push(v); }
+        this.setActive(v, false); v.queued = false;
         count--;
       }
     });
@@ -1052,7 +1110,26 @@ export class CityLife {
     if (this.simTime - this.lastSpawn >= minSpawn) {
       let cand = null;
       if (this.queue.length) cand = this.queue[0];
-      else if (count < this.target) cand = this.vehicles.find(v => !v.active && !v.queued);
+      else if (count < this.target) {
+        // weighted pick among parked vehicles (allocation-light: two passes)
+        const rainy = this.wx.rain > 0;
+        let tot = 0;
+        for (let k = 0; k < this.vehicles.length; k++) {
+          const v = this.vehicles[k];
+          if (!v.active && !v.queued && !(rainy && v.i === 5)) tot += v.i === 9 ? 0.5 : (v.i === 8 || v.i === 10) ? 0.3 : 1;
+        }
+        if (tot > 0) {
+          let pick = this.rT() * tot, last = null;
+          for (let k = 0; k < this.vehicles.length; k++) {
+            const v = this.vehicles[k];
+            if (v.active || v.queued || (rainy && v.i === 5)) continue;
+            last = v;
+            pick -= v.i === 9 ? 0.5 : (v.i === 8 || v.i === 10) ? 0.3 : 1;
+            if (pick <= 0) { cand = v; break; }
+          }
+          if (!cand) cand = last;
+        }
+      }
       if (cand) {
         this.pickV0(cand);
         let bestLane = -1, bestRoom = -Infinity, bestRear = null;
@@ -1175,6 +1252,21 @@ export class CityLife {
         v.tx = tx; v.ty = ty;
         v.wrapper.style.transform = 'translate3d(' + tx + 'px,' + ty + 'px,0)';
       }
+    }
+  }
+
+  // police light bars alternate red/blue at ~2 Hz; nothing is allocated per frame
+  updatePolice() {
+    const vehicles = this.vehicles;
+    const phase = Math.floor(this.simTime * 4) % 2;
+    for (let k = 0; k < vehicles.length; k++) {
+      const v = vehicles[k];
+      if (!v.active || !v.pol || v.pol.phase === phase) continue;
+      v.pol.phase = phase;
+      const rd = phase === 0 ? 'inline' : 'none';
+      const bd = phase === 0 ? 'none' : 'inline';
+      for (let m = 0; m < v.pol.red.length; m++) v.pol.red[m].setAttribute('display', rd);
+      for (let m = 0; m < v.pol.blue.length; m++) v.pol.blue[m].setAttribute('display', bd);
     }
   }
 
@@ -1418,6 +1510,7 @@ export class CityLife {
     this.fireLightning();
     this.updateStormClouds();
     this.applyVehicles();
+    this.updatePolice();
     this.updateLights();
     this.stepRain(dt);
     this.draw();
