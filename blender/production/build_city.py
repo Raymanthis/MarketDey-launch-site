@@ -30,7 +30,7 @@ def main():
     mats = materials.build_all()
     street.FL = 3.0                    # the section's storey height
     street.BASE = 0.0
-    street.CLUTTER.update(ac=(1, 3), dish=0.3, tiles=0.35)
+    street.CLUTTER.update(ac=(1, 3), dish=0.3, tiles=0.35, sides=True)
     street.SIGN_HOOK = city.sign_hook
     root = bpy.data.objects.new("city", None)        # scaled in z during the tilt (city.scale.y)
     bpy.context.scene.collection.objects.link(root)
