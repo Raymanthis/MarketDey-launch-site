@@ -31,7 +31,7 @@ for (const mode of ['day', 'night']) {
     under.innerHTML = '<div style="font-size:32px;opacity:.9">' + C.sub + '</div>'
       + '<div style="margin-top:34px;display:inline-block;background:' + C.bg + ';color:' + C.fg + ';font-weight:900;font-size:30px;padding:14px 34px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.18);transform:rotate(-4deg)">' + C.pill + '</div>'
       + '<div style="margin-top:22px;font-weight:900;font-size:26px;letter-spacing:.5px;opacity:.95">marketdey.com</div>'
-      + '<div style="margin-top:26px;display:flex;gap:14px;justify-content:center;align-items:center"><img src="/images/badges/app-store.svg" style="height:52px"><img src="/images/badges/google-play.svg" style="height:52px"></div>';
+      + '<div style="margin-top:26px;display:flex;gap:40px;justify-content:center;align-items:center"><img src="/images/badges/apple-logo.svg" style="height:50px"><img src="/images/badges/google-play-icon.svg" style="height:47px"></div>';
     document.body.appendChild(under);
   }, { ...info, C });
   await p.evaluate(() => {
@@ -68,7 +68,7 @@ for (const mode of ['day', 'night']) {
   });
   await p.waitForFunction(() => [...document.images].filter(i => i.src.includes('/badges/')).every(i => i.complete && i.naturalWidth));
   await p.waitForTimeout(400);
-  await p.screenshot({ path: `${out}/poster5-${mode}.png` });
+  await p.screenshot({ path: `${out}/poster6-${mode}.png` });
   console.log(mode, JSON.stringify(info));
   await p.close();
 }
