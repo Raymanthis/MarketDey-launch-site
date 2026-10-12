@@ -318,7 +318,8 @@ export class CityLife {
 
   genStorm() {
     const r = this.rS, last = this.storms[this.storms.length - 1];
-    const start = last ? last.start + Math.max(60 + r() * 30, last.end - last.start + 5) : 30 + r() * 20;
+    // 60–90 s of clear sky between storms, so the skyline is clear more often than not.
+    const start = last ? last.end + 60 + r() * 30 : 30 + r() * 20;
     this.storms.push(this.makeStorm(start, 30 + r() * 10));
   }
 
