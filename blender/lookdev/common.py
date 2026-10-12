@@ -56,7 +56,7 @@ SHOTS = {
     # (b) close pass on the right lane beside a shopfront: pedestrian + parked keke in front
     "b": {"pos": (1.0, 36.6, EYE), "target": (5.0, 45.5, 1.35)},
     # (c) looking up at a power pole with a transformer, wires against the sky, almond + palm
-    "c": {"pos": (1.2, 37.5, EYE), "target": (-3.2, 52.0, 6.6)},
+    "c": {"pos": (2.4, 33.0, EYE), "target": (-4.6, 41.5, 7.2)},
 }
 
 
