@@ -44,11 +44,12 @@ const TM_PINS = [{t:'main'},{t:'mkt',ox:118,oy:-150,init:350},{t:'mkt',ox:-96,oy
   {t:'lm',n:1},{t:'lm',n:2},{t:'lm',n:3},{t:'lm',n:4},{t:'arrow'}];
 const TM_P0 = 1.8, TM_HAND = 4.4, TM_END = 5.4, TM_LM = 3.9;
 const SIGN_K = 400, SIGN_C = 2;
+const SIGN_RING_CY = 11, SIGN_HOLE_R = 4.6, SIGN_LOOP_R = 7, SIGN_DRAG_VEL_MAX = 100;
 
 class HomePage extends React.Component {
   static defaultProps = { startMarket: 'ogwashi', launchMode: false };
   state = { gs: -1, sel: null, platform: footerCopy.waitlist.platforms[0], moves: [], submitted: false, forMarket: '', faq: 0, ph: 0, enter: true, mounted: false };
-  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef(); signRef = React.createRef(); signPendRef = React.createRef(); signDropRef = React.createRef(); signNodeRef = React.createRef(); signRopeRef = React.createRef(); signBodyRef = React.createRef(); signFrontRef = React.createRef(); signBackRef = React.createRef();
+  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef(); signRef = React.createRef(); signPendRef = React.createRef(); signDropRef = React.createRef(); signNodeRef = React.createRef(); signRopeRef = React.createRef(); signRopeFrontRef = React.createRef(); signBodyRef = React.createRef(); signFrontRef = React.createRef(); signBackRef = React.createRef();
   buildCity(el0, fl0, sky) {
     const el = el0 || this.cityRef.current; if (!el) return; const hero = !el0, W = Math.max(320, el.clientWidth || window.innerWidth), G = 292, r = mulberry(hero ? 5 : 19), on = hero ? !!this.cityOn : true; let out = [];
     const S = 'rgba(255,255,255,.55)', SF = 'rgba(255,255,255,.28)', SFAR = 'rgba(167,201,87,.4)', SFAR2 = 'rgba(167,201,87,.2)', FL = fl0 || '#386641';
@@ -287,16 +288,18 @@ class HomePage extends React.Component {
   bMove(e) { const p = this.bp; if (!p || !p.drag) return; const nx = Math.max(-160, Math.min(160, e.clientX - p.sx)), ny = Math.max(-50, Math.min(110, e.clientY - p.sy)), now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
     p.vx = p.vx * 0.5 + ((nx - p.x) / dt) * 0.5; p.vy = p.vy * 0.5 + ((ny - p.y) / dt) * 0.5; if (Math.abs(nx) + Math.abs(ny) > 4) p.moved = true; p.x = nx; p.y = ny; p.pt = now; }
   bUp(e) { const p = this.bp; if (!p) return; p.drag = false; if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab'; this.bRun(); }
-  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, drag: false, moved: false, tapDir: 1, vx: 0, sx: 0, cx: 0, px: 0, pt: 0, stx: 0, last: performance.now() }; return this.sp; }
+  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, drag: false, down: false, moved: false, tapDir: 1, vx: 0, sx: 0, sy: 0, cx: 0, px: 0, pt: 0, dt0: 0, lastTapAt: 0, stx: 0, last: performance.now() }; return this.sp; }
   signPlace() {
     const logo = this.heroRef.current && this.heroRef.current.querySelector('[data-h="logo"]');
-    const node = this.signNodeRef.current, rope = this.signRopeRef.current;
+    const node = this.signNodeRef.current, rope = this.signRopeRef.current, ropeF = this.signRopeFrontRef.current;
     if (!logo || !node) return;
     const r = logo.getBoundingClientRect();
     const top = Math.max(40, Math.round(r.bottom + 28));
     this.signTop = top;
     node.style.top = top + 'px';
-    if (rope) { const L = top + 10; rope.style.height = L + 'px'; rope.querySelectorAll('path').forEach(p => p.setAttribute('d', 'M0 0 L0 ' + L)); }
+    const cy = top + SIGN_RING_CY, holeTop = cy - SIGN_HOLE_R, loopBot = cy + SIGN_LOOP_R * 2;
+    if (rope) { const L = loopBot + 2, R = SIGN_LOOP_R, d = 'M0 0 L0 ' + cy + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + loopBot + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + cy; rope.style.height = L + 'px'; rope.querySelectorAll('path').forEach(p => p.setAttribute('d', d)); }
+    if (ropeF) { ropeF.style.height = holeTop + 'px'; ropeF.querySelectorAll('path').forEach(p => p.setAttribute('d', 'M0 0 L0 ' + holeTop)); }
   }
   signShow() {
     const el = this.signRef.current; if (!el) return;
@@ -332,31 +335,39 @@ class HomePage extends React.Component {
   }
   signDown(e) {
     if (this.reducedMotion) { if (e.currentTarget) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {} e.currentTarget.style.cursor = 'grabbing'; } return; }
-    const p = this.signPhys(); p.drag = true; p.moved = false;
+    const p = this.signPhys();
     const rect = e.currentTarget.getBoundingClientRect();
+    const now = performance.now();
+    p.down = true; p.drag = false; p.moved = false;
     p.cx = rect.left + rect.width / 2;
-    p.sx = e.clientX; p.stx = p.theta; p.px = e.clientX; p.pt = performance.now(); p.vx = 0;
+    p.sx = e.clientX; p.sy = e.clientY; p.stx = p.theta; p.px = e.clientX; p.pt = now; p.dt0 = now; p.vx = 0;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
     e.currentTarget.style.cursor = 'grabbing';
-    this.signRun();
   }
   signMove(e) {
-    const p = this.sp; if (!p || !p.drag || this.reducedMotion) return;
-    const dx = e.clientX - p.sx, now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
-    if (Math.abs(dx) > 5) p.moved = true;
+    const p = this.sp; if (!p || !p.down || this.reducedMotion) return;
+    const dx = e.clientX - p.sx;
+    if (!p.moved) { if (Math.abs(dx) <= 6) return; p.moved = true; p.drag = true; p.px = e.clientX; p.pt = performance.now(); }
+    const now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
     p.theta = p.stx + dx * 1.2;
-    p.vx = (e.clientX - p.px) / dt;
+    p.vx = p.vx * 0.7 + ((e.clientX - p.px) / dt) * 0.3;
     p.px = e.clientX; p.pt = now;
     const body = this.signBodyRef.current; if (body) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
   }
   signUp(e) {
     if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab';
     if (this.reducedMotion) { this.signFace = this.signFace ? 0 : 1; this.signCrossfade(); return; }
-    const p = this.sp; if (!p) return;
-    const wasDrag = p.moved, downX = p.sx, cx = p.cx;
-    p.drag = false;
-    if (wasDrag) p.omega = Math.max(-100, Math.min(100, (p.vx || 0) * 1.2));
-    else { let dir = (downX >= cx) ? 1 : -1; if (Math.abs(downX - cx) < 8) { p.tapDir = -p.tapDir; dir = p.tapDir; } p.omega += 220 * dir; }
+    const p = this.sp; if (!p || !p.down) return;
+    const held = performance.now() - p.dt0;
+    p.down = false; p.drag = false;
+    if (p.moved) p.omega = Math.max(-SIGN_DRAG_VEL_MAX, Math.min(SIGN_DRAG_VEL_MAX, (p.vx || 0) * 1.2));
+    else if (held < 350) {
+      const now = performance.now();
+      let dir = (p.sx >= p.cx) ? 1 : -1;
+      if (Math.abs(p.sx - p.cx) < 8) { if (now - p.lastTapAt > 700) p.tapDir = -p.tapDir; dir = p.tapDir; }
+      p.lastTapAt = now;
+      p.omega += 220 * dir;
+    }
     this.signRun();
   }
   signCrossfade() { const f = this.signFrontRef.current, b = this.signBackRef.current; if (!f || !b) return; const front = this.signFace === 0; f.style.opacity = front ? '1' : '0'; b.style.opacity = front ? '0' : '1'; }
@@ -580,12 +591,13 @@ class HomePage extends React.Component {
 
   render() {
     const v = { ...this.props, ...this.renderVals() };
-    const sFace = { backfaceVisibility: "hidden", background: "#a7c957", color: "#252422", fontWeight: "900", fontSize: "clamp(20px, 5.2vw, 30px)", lineHeight: "1", padding: "0.45em 1.1em", borderRadius: "14px", whiteSpace: "nowrap", boxShadow: "0 14px 26px -14px rgba(0,0,0,.45)", letterSpacing: "-.02em" };
+    const sHole = "radial-gradient(circle at 50% " + SIGN_RING_CY + "px, rgba(0,0,0,0) " + SIGN_HOLE_R + "px, #000 " + (SIGN_HOLE_R + 0.1) + "px)";
+    const sFace = { backfaceVisibility: "hidden", background: "#a7c957", color: "#252422", fontWeight: "900", fontSize: "clamp(15px, 3.9vw, 22px)", lineHeight: "1", padding: "20px 1.1em 0.45em", borderRadius: "10.5px", whiteSpace: "nowrap", boxShadow: "0 14px 26px -14px rgba(0,0,0,.45)", letterSpacing: "-.02em", WebkitMaskImage: sHole, maskImage: sHole };
     return (
       <div className={`sc-host ${styles.root}`} data-sc-name="orig">
         <div style={{overflowX:"clip"}}>
           <section ref={v.heroRef} data-screen-label="01 Hero" style={v.launchMode ? {position:"relative",background:"#386641",overflow:"hidden",height:"100vh"} : {position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
-            {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <div data-h="sign" ref={this.signRef} style={{position:"fixed",left:"50%",top:"0",zIndex:"1",transform:"translateX(-50%)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease"}}><div ref={this.signPendRef} className="md-sign-pend" style={{position:"absolute",top:"0",left:"0",transformOrigin:"0px 0px"}}><div ref={this.signDropRef} style={{position:"absolute",top:"0",left:"0"}}><svg data-rope ref={this.signRopeRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"0",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><span style={{position:"absolute",left:"50%",top:"-9.5px",transform:"translateX(-50%)",width:"19px",height:"19px",borderRadius:"50%",boxSizing:"border-box",border:"4px solid #e6e1d5",background:"#2b5233",boxShadow:"inset 0 1px 2px rgba(0,0,0,.45),0 1px 1px rgba(255,255,255,.35)",zIndex:"2"}}></span><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} style={sFace}>{heroCopy.launchingSoon}</div><div ref={this.signBackRef} style={{...sFace,position:"absolute",top:"0",left:"0",right:"0",bottom:"0",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}</div></div></div></div></div></div></div>}{' '}
+            {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <div data-h="sign" ref={this.signRef} style={{position:"fixed",left:"50%",top:"0",zIndex:"1",transform:"translateX(-50%)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease"}}><div ref={this.signPendRef} className="md-sign-pend" style={{position:"absolute",top:"0",left:"0",transformOrigin:"0px 0px"}}><div ref={this.signDropRef} style={{position:"absolute",top:"0",left:"0"}}><svg data-rope="back" ref={this.signRopeRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><span ref={this.signRingRef} data-eyelet="1" style={{position:"absolute",left:"50%",top:"4px",transform:"translateX(-50%)",width:"14px",height:"14px",borderRadius:"50%",boxSizing:"border-box",border:"2.5px solid #d9d9dc",boxShadow:"inset 0 1.5px 2px rgba(0,0,0,.34),inset 0 -1.5px 1.5px rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.3)",zIndex:"4",pointerEvents:"none"}}></span><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} data-face="front" style={sFace}>{heroCopy.launchingSoon}</div><div ref={this.signBackRef} data-face="back" style={{...sFace,background:"#ffffff",color:"#111111",position:"absolute",top:"0",left:"0",right:"0",bottom:"0",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}</div></div></div></div><svg data-rope="front" ref={this.signRopeFrontRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none",zIndex:"5"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div></div></div>}{' '}
             <div ref={v.cityRef} style={{position:"absolute",left:"0",right:"0",bottom:"0",height:"320px",zIndex:"0",pointerEvents:"none",transform:"translateY(100%)",transition:"transform 1.3s cubic-bezier(.2,.8,.2,1)"}}></div>{' '}
             <div style={{position:"relative",zIndex:"1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
               <div style={{position:"relative",zIndex:"3",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"24px",padding:"24px 0",flexWrap:"wrap"}}>
