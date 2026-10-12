@@ -45,7 +45,7 @@ const TM_PINS = [{t:'main'},{t:'mkt',ox:118,oy:-150,init:350},{t:'mkt',ox:-96,oy
 const TM_P0 = 1.8, TM_HAND = 4.4, TM_END = 5.4, TM_LM = 3.9;
 
 class HomePage extends React.Component {
-  static defaultProps = { startMarket: 'ogwashi' };
+  static defaultProps = { startMarket: 'ogwashi', launchMode: false };
   state = { gs: -1, sel: null, platform: footerCopy.waitlist.platforms[0], moves: [], submitted: false, forMarket: '', faq: 0, ph: 0, enter: true, mounted: false };
   faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef();
   buildCity(el0, fl0, sky) {
@@ -208,7 +208,7 @@ class HomePage extends React.Component {
     const show = els => els.forEach(el => { el.style.transition = T; el.style.opacity = '1'; el.style.filter = 'blur(0px)'; el.style.transform = 'none'; });
     const logo = q('logo')[0], hint = q('hint')[0], letters = logo ? Array.from(logo.querySelectorAll('[data-l]')) : [];
     const phones = q('phones')[0], solid = l => { l.style.visibility = 'visible'; };
-    const skip = window.scrollY > 120 || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const skip = !this.props.launchMode && (window.scrollY > 120 || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches));
     const drop = () => { const p = this.bPhys(); p.y = -640; p.vy = 0; p.va = 26; p.amp = 4; this.bRun(); };
     if (skip) { this.introGone = true; if (phones) phones.style.opacity = '1'; if (logo) logo.style.opacity = '1'; letters.forEach(l => { l.style.transition = 'none'; solid(l); }); ['nav', 'pill', 'h1', 'copy', 'form'].forEach(k => q(k).forEach(el => { el.style.opacity = '1'; el.style.filter = 'none'; el.style.transform = 'none'; })); const p = this.bPhys(); p.y = 0; this.bRun(); return; }
     const at = (ms, fn) => this.heroT.push(setTimeout(fn, ms)); this.heroT = [];
@@ -231,7 +231,7 @@ class HomePage extends React.Component {
       at(done + 250, () => { if (hint) { hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } this.introReady = true; }); };
     let started = false; const go1 = () => { if (!started) { started = true; run(); } };
     if (document.fonts && document.fonts.load) document.fonts.load('900 28px Lato').then(go1, go1); else go1(); at(1500, go1);
-    this.introGo = () => { if (!this.introReady || this.introGone) return; this.introGone = true; window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
+    this.introGo = () => { if (this.props.launchMode || !this.introReady || this.introGone) return; this.introGone = true; window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
       if (hint) { hint.style.opacity = '0'; hint.style.transform = 'translate(-50%,12px)'; hint.style.pointerEvents = 'none'; }
       if (logo) { logo.style.transition = 'transform 1.05s cubic-bezier(.7,0,.2,1)'; logo.style.transform = 'none'; }
       this.cityHide();
@@ -397,20 +397,29 @@ class HomePage extends React.Component {
   }
   roadsRef = React.createRef(); glRef = React.createRef();
   componentDidMount() {
+    const lm = this.props.launchMode;
     this.setState({ mounted: true }); // SSR: renderVals uses a fixed date until mounted, then the real clock
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.setState({ gs: 16 });
-    this.glTick = setInterval(() => { const el = this.glRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.75 || r.bottom < vh * 0.15 || this.state.gs >= 16) return; this.setState(s => ({ gs: s.gs + 1 })); }, 340);
-    this.onRoads = () => { const el = this.roadsRef.current; if (!el) return; const r = el.parentElement.getBoundingClientRect(), t = Math.max(0, Math.min(1, -r.top / (window.innerHeight * 0.28))), e = t * t * (3 - 2 * t); el.style.opacity = e.toFixed(3); el.style.transform = 'scale(' + (0.985 + 0.015 * e).toFixed(4) + ')'; };
+    if (!lm) this.glTick = setInterval(() => { const el = this.glRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.75 || r.bottom < vh * 0.15 || this.state.gs >= 16) return; this.setState(s => ({ gs: s.gs + 1 })); }, 340);
+    if (!lm) this.onRoads = () => { const el = this.roadsRef.current; if (!el) return; const r = el.parentElement.getBoundingClientRect(), t = Math.max(0, Math.min(1, -r.top / (window.innerHeight * 0.28))), e = t * t * (3 - 2 * t); el.style.opacity = e.toFixed(3); el.style.transform = 'scale(' + (0.985 + 0.015 * e).toFixed(4) + ')'; };
     this.onHeroScroll = () => { const root = this.heroRef.current, hp = root && root.querySelectorAll('[data-hp]'); if (!hp || hp.length < 2) return; const t = this.heroMax = Math.max(this.heroMax || 0, Math.min(1, window.scrollY / 640)), E = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3), eR = E(t / 0.85), eL = E((t - 0.1) / 0.85); hp[1].style.transform = 'translateY(' + (340 * (1 - eR)).toFixed(1) + 'px) rotate(3deg)'; hp[0].style.transform = 'translateY(' + (380 * (1 - eL)).toFixed(1) + 'px) rotate(-3deg)'; if (!this.cityOn && this.introGone && !this.cityFixedNow() && root.getBoundingClientRect().bottom <= window.innerHeight + 2) this.cityShow(); };
-    this.buildCity(); this.buildCity(this.footCityRef.current, '#252422', this.footSky()); if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!this.dead) this.buildCity(this.footCityRef.current, '#252422', this.footSky()); }); this.onCityResize = () => { const el = this.cityRef.current; if (el && Math.abs(el.clientWidth - (this.cityW || 0)) > 40) this.buildCity(); const fe = this.footCityRef.current; if (fe && Math.abs(fe.clientWidth - (this.footW || 0)) > 40) this.buildCity(fe, '#252422', this.footSky()); }; window.addEventListener('resize', this.onCityResize);
+    this.buildCity();
+    if (!lm) {
+      this.buildCity(this.footCityRef.current, '#252422', this.footSky());
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!this.dead) this.buildCity(this.footCityRef.current, '#252422', this.footSky()); });
+    }
+    this.onCityResize = () => { const el = this.cityRef.current; if (el && Math.abs(el.clientWidth - (this.cityW || 0)) > 40) this.buildCity(); if (!lm) { const fe = this.footCityRef.current; if (fe && Math.abs(fe.clientWidth - (this.footW || 0)) > 40) this.buildCity(fe, '#252422', this.footSky()); } };
+    window.addEventListener('resize', this.onCityResize);
     if (new URLSearchParams(window.location.search).get('citydebug') === '1') { const self = this; window.__city = { get hero() { return self.cityLifeHero; }, get footer() { return self.cityLifeFoot; } }; this.cityDebug = true; }
     window.addEventListener('scroll', this.onHeroScroll, { passive: true }); this.onHeroScroll();
     this.heroIntro();
-    this.onTmResize = () => this.tmResize(); window.addEventListener('resize', this.onTmResize);
-    const tmLoop = t => { if (this.tmDead) return; this.tmRaf = requestAnimationFrame(tmLoop); if (!this.tm && !this.tmSetup()) return; this.tmFrame(t); };
-    this.tmRaf = requestAnimationFrame(tmLoop);
-    window.addEventListener('scroll', this.onRoads, { passive: true }); this.onRoads();
-    this.faqTick = setInterval(() => { const el = this.faqRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.8 || r.bottom < vh * 0.2 || !this.state.enter) return; const ph = this.state.ph + 1; if (ph >= FAQ_STEPS) this.pickFaq((this.state.faq + 1) % FAQS.length); else this.setState({ ph }); }, 1100);
+    if (!lm) {
+      this.onTmResize = () => this.tmResize(); window.addEventListener('resize', this.onTmResize);
+      const tmLoop = t => { if (this.tmDead) return; this.tmRaf = requestAnimationFrame(tmLoop); if (!this.tm && !this.tmSetup()) return; this.tmFrame(t); };
+      this.tmRaf = requestAnimationFrame(tmLoop);
+      window.addEventListener('scroll', this.onRoads, { passive: true }); this.onRoads();
+      this.faqTick = setInterval(() => { const el = this.faqRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.8 || r.bottom < vh * 0.2 || !this.state.enter) return; const ph = this.state.ph + 1; if (ph >= FAQ_STEPS) this.pickFaq((this.state.faq + 1) % FAQS.length); else this.setState({ ph }); }, 1100);
+    }
   }
   componentWillUnmount() { (this.heroT || []).forEach(clearTimeout); window.removeEventListener('scroll', this.onHeroScroll); cancelAnimationFrame(this.swayRaf); window.removeEventListener('scroll', this.onRoads); clearInterval(this.faqTick); clearInterval(this.glTick); this.tmDead = true; if (this.introOff) this.introOff(); document.documentElement.style.overflow = ''; clearTimeout(this.cityT1); clearTimeout(this.cityT2); clearTimeout(this.cityT3); clearTimeout(this.cityT4); window.removeEventListener('resize', this.onCityResize); cancelAnimationFrame(this.tmRaf); window.removeEventListener('resize', this.onTmResize); clearTimeout(this.enterT); if (this.faqIO) this.faqIO.disconnect(); if (this.cityLifeHero) this.cityLifeHero.destroy(); if (this.cityLifeFoot) this.cityLifeFoot.destroy(); this.cityLifeHero = null; this.cityLifeFoot = null; if (this.cityDebug) delete window.__city; }
 
@@ -491,7 +500,7 @@ class HomePage extends React.Component {
       <div className={`sc-host ${styles.root}`} data-sc-name="orig">
         <div style={{overflowX:"clip"}}>
           <section ref={v.heroRef} data-screen-label="01 Hero" style={{position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
-            <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div>{' '}
+            <div data-h="hint" onClick={v.launchMode ? undefined : v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:v.launchMode?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}>{v.launchMode?null:<i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i>}<span>{v.launchMode?heroCopy.launchingSoon:heroCopy.scrollUp}</span></div>{' '}
             <div ref={v.cityRef} style={{position:"absolute",left:"0",right:"0",bottom:"0",height:"320px",zIndex:"0",pointerEvents:"none",transform:"translateY(100%)",transition:"transform 1.3s cubic-bezier(.2,.8,.2,1)"}}></div>{' '}
             <div style={{position:"relative",zIndex:"1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
               <div style={{position:"relative",zIndex:"3",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"24px",padding:"24px 0",flexWrap:"wrap"}}>
@@ -520,6 +529,7 @@ class HomePage extends React.Component {
                 </div>{' '}
               </div>
             </section>
+          {!v.launchMode ? <>
           <section id="who"><AudiencesSection /></section>
           <section id="how" data-screen-label="03 Alerts" style={{padding:"120px 0 0"}}>{' '}
             <div style={{maxWidth:"1200px",margin:"0 auto",padding:"0 32px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,440px),1fr))",gap:"56px",alignItems:"center"}}>
@@ -837,6 +847,7 @@ class HomePage extends React.Component {
                 </div>{' '}
               </div>
             </section>
+          </> : null}
           </div>
       </div>
     );
