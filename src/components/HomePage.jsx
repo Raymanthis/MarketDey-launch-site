@@ -213,10 +213,14 @@ class HomePage extends React.Component {
     if (skip) { this.introGone = true; if (phones) phones.style.opacity = '1'; if (logo) logo.style.opacity = '1'; letters.forEach(l => { l.style.transition = 'none'; solid(l); }); ['nav', 'pill', 'h1', 'copy', 'form'].forEach(k => q(k).forEach(el => { el.style.opacity = '1'; el.style.filter = 'none'; el.style.transform = 'none'; })); const p = this.bPhys(); p.y = 0; this.bRun(); return; }
     const at = (ms, fn) => this.heroT.push(setTimeout(fn, ms)); this.heroT = [];
     document.documentElement.style.overflow = 'hidden';
-    if (logo) { const r = logo.getBoundingClientRect(), dx = window.innerWidth / 2 - (r.left + r.width / 2), dy = window.innerHeight / 2 - 40 - (r.top + r.height / 2);
-      logo.style.transition = 'opacity .4s ease'; logo.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(4)'; logo.style.opacity = '1'; }
+    if (logo) { const r = logo.getBoundingClientRect(), S = Math.min(4, (window.innerWidth * 0.84) / logo.offsetWidth), cy = window.innerWidth < 600 ? window.innerHeight * 0.44 : window.innerHeight / 2 - 40, dx = window.innerWidth / 2 - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2);
+      this.introS = S; this.introCy = cy;
+      logo.style.transition = 'opacity .4s ease'; logo.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + S + ')'; logo.style.opacity = '1';
+      if (hint && window.innerWidth < 600) hint.style.top = 'calc(44% + ' + (logo.offsetHeight * S / 2).toFixed(2) + 'px + 28px)'; }
+    this.introPhoneLayout();
     this.cityFixed(true);
     const run = () => { if (this.dead) return;
+      this.introPhoneLayout();
       const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), cx = document.createElement('canvas').getContext('2d'); cx.font = '900 28px Lato';
       const asc = cx.measureText('M').fontBoundingBoxAscent || 27.6, DL = 220, ST = 300, STEP = 160;
       svg.setAttribute('width', logo.offsetWidth); svg.setAttribute('height', logo.offsetHeight); svg.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none';
@@ -245,6 +249,20 @@ class HomePage extends React.Component {
     window.addEventListener('wheel', this.iWheel, { passive: false }); window.addEventListener('touchstart', this.iTS, { passive: true }); window.addEventListener('touchmove', this.iTM, { passive: false }); window.addEventListener('keydown', this.iKey);
     this.introOff = () => { window.removeEventListener('wheel', this.iWheel); window.removeEventListener('touchstart', this.iTS); window.removeEventListener('touchmove', this.iTM); window.removeEventListener('keydown', this.iKey); };
   }
+  introPhoneLayout() {
+    if (window.innerWidth >= 600) { this.bannerY = 0; return; }
+    const logo = this.heroRef.current && this.heroRef.current.querySelector('[data-h="logo"]');
+    const ban = this.bannerRef.current; if (!logo || !ban) return;
+    ban.style.fontSize = 'clamp(22px, 7.4vw, 48px)';
+    const font = Math.max(22, Math.min(48, window.innerWidth * 0.074)), k = font / 48;
+    ban.style.padding = (14 * k).toFixed(2) + 'px ' + (52 * k).toFixed(2) + 'px ' + (16 * k).toFixed(2) + 'px';
+    ban.style.borderRadius = (30 * k).toFixed(2) + 'px ' + (30 * k).toFixed(2) + 'px ' + (30 * k).toFixed(2) + 'px ' + (8 * k).toFixed(2) + 'px';
+    ban.style.transform = 'none';
+    const layoutTop = ban.getBoundingClientRect().top;
+    const wordTop = this.introCy - (logo.offsetHeight * this.introS) / 2;
+    this.bannerY = (wordTop - 16 - ban.offsetHeight) - layoutTop;
+    ban.style.transform = 'translate(0px,' + this.bannerY.toFixed(2) + 'px) rotate(-2deg)';
+  }
   footSky() { const c = this.footCityRef.current, hd = this.footHeadRef.current, cd = this.footCardRef.current, ru = this.footRuleRef.current; if (!c || !hd || !cd || !ru) return null; const top = c.getBoundingClientRect().top, hb = hd.getBoundingClientRect().bottom, cr = cd.getBoundingClientRect(), rt = ru.getBoundingClientRect().top, gr = cd.parentElement, ft = Math.min(...Array.from(gr.children).map(e => e.getBoundingClientRect().top));
     const g = (hb + ft) / 2 - 4 - top, hy = (cr.bottom + rt) / 2 + 8 - top; return { p1: Math.round(g - 6), p2: Math.round(g + 14), heli: Math.round(hy) }; }
   cityFixedNow() { const el = this.cityRef.current; return !!el && el.style.position === 'fixed'; }
@@ -266,12 +284,12 @@ class HomePage extends React.Component {
       if (!p.drag) { p.vx += (-70 * p.x - 9 * p.vx) * dt; p.vy += (-70 * p.y - 9 * p.vy) * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
       const aT = Math.max(-14, Math.min(14, -p.vx * 0.02)); p.va += ((aT - p.a) * 60 - p.va * 5) * dt; p.a += p.va * dt;
       p.amp = Math.min(10, p.amp * Math.exp(-dt * 1.2) + Math.abs(p.vx) * 0.0015 + Math.abs(p.vy) * 0.001);
-      const el = this.bannerRef.current;
-      if (el) { el.style.transform = 'translate(' + p.x.toFixed(2) + 'px,' + p.y.toFixed(2) + 'px) rotate(' + (-2 + p.a).toFixed(3) + 'deg)';
+      const el = this.bannerRef.current, y0 = this.bannerY || 0;
+      if (el) { el.style.transform = 'translate(' + p.x.toFixed(2) + 'px,' + (p.y + y0).toFixed(2) + 'px) rotate(' + (-2 + p.a).toFixed(3) + 'deg)';
         el.querySelectorAll('svg[data-rope]').forEach((r, i) => { const dd = this.ropePath(p.a, p.x, p.y, t, p.amp, i * 2.1); r.querySelectorAll('path').forEach(q => q.setAttribute('d', dd)); }); }
       const calm = !p.drag && Math.abs(p.x) + Math.abs(p.y) < 0.2 && Math.abs(p.vx) + Math.abs(p.vy) < 0.5 && Math.abs(p.a) < 0.02 && Math.abs(p.va) < 0.05 && p.amp < 0.05;
       if (!calm) this.swayRaf = requestAnimationFrame(step);
-      else { this.swayRaf = null; Object.assign(p, { x: 0, y: 0, vx: 0, vy: 0, a: 0, va: 0, amp: 0 }); if (el) { el.style.transform = 'rotate(-2deg)'; el.querySelectorAll('svg[data-rope] path').forEach(q => q.setAttribute('d', 'M0 0 L0 1400')); } } };
+      else { this.swayRaf = null; Object.assign(p, { x: 0, y: 0, vx: 0, vy: 0, a: 0, va: 0, amp: 0 }); if (el) { el.style.transform = y0 ? 'translate(0px,' + y0.toFixed(2) + 'px) rotate(-2deg)' : 'rotate(-2deg)'; el.querySelectorAll('svg[data-rope] path').forEach(q => q.setAttribute('d', 'M0 0 L0 1400')); } } };
     this.swayRaf = requestAnimationFrame(step); }
   bDown(e) { const p = this.bPhys(); p.drag = true; p.moved = false; p.sx = e.clientX - p.x; p.sy = e.clientY - p.y; p.px = e.clientX; p.pt = performance.now(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {} e.currentTarget.style.cursor = 'grabbing'; this.bRun(); }
   bMove(e) { const p = this.bp; if (!p || !p.drag) return; const nx = Math.max(-160, Math.min(160, e.clientX - p.sx)), ny = Math.max(-50, Math.min(110, e.clientY - p.sy)), now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
