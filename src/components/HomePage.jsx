@@ -393,7 +393,7 @@ class HomePage extends React.Component {
     p.cx = rect.left + rect.width / 2;
     p.sx = e.clientX; p.sy = e.clientY; p.stx = p.theta; p.st0 = p.phi;
     p.px = e.clientX; p.py = e.clientY; p.pt = now; p.dt0 = now; p.vx = 0; p.vy = 0;
-    p.a0 = Math.atan2(e.clientX - p.ax, e.clientY - p.ay);
+    p.a0 = Math.atan2(p.ax - e.clientX, e.clientY - p.ay); // CSS rotate(+phi) swings the card LEFT, so measure the pointer angle with x mirrored
     p.hist = [];
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
     e.currentTarget.style.cursor = 'grabbing';
@@ -405,7 +405,7 @@ class HomePage extends React.Component {
     if (!p.moved) { if (Math.abs(dx) <= 6 && Math.abs(dy) <= 6) return; p.moved = true; p.drag = true; p.px = e.clientX; p.py = e.clientY; p.pt = performance.now(); p.hist = [];
       if (p.idleOn) { p.phi += this.signIdle(p.pt); p.idleOn = false; p.st0 = p.phi; } } // grabbing takes over from the idle sway at its current angle
     const now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
-    let ang = Math.atan2(e.clientX - p.ax, e.clientY - p.ay) - p.a0;
+    let ang = Math.atan2(p.ax - e.clientX, e.clientY - p.ay) - p.a0;
     while (ang > Math.PI) ang -= Math.PI * 2;
     while (ang < -Math.PI) ang += Math.PI * 2;
     const phi = Math.max(-SIGN_PEND_MAX, Math.min(SIGN_PEND_MAX, p.st0 + ang * 180 / Math.PI));
