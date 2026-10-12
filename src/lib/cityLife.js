@@ -614,7 +614,8 @@ export class CityLife {
           cand = parked;
         }
       }
-      if (!cand) { this.hazardsOff(); this.bd = null; }
+      // nothing eligible yet (e.g. every trailer/tanker is past the middle): keep seeking until the segment ends
+      if (!cand) { if (this.viewTime >= bd.seg.t1) { this.hazardsOff(); this.bd = null; } }
       else { bd.veh = cand; bd.stopFront = W / 2 + cand.len / 2; bd.phase = 'approach'; }
     }
 
