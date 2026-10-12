@@ -1,4 +1,3 @@
-/* eslint-disable */
 // Camera and road geometry of the Landmarks Journey ride, moved verbatim out of
 // LandmarksJourneySection.jsx so the section and scripts/ride-stub.mjs (and the Blender frame
 // pipeline's camera export) share one source. Pure math: no DOM, no React. Anything that needs
