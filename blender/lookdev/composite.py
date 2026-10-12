@@ -33,7 +33,7 @@ import common as C  # noqa: E402
 P = dict(
     air_near=45.0, air_far=260.0, air_max=0.82,      # depth fade (m) and max fade to paper
     tone_gamma=1.0,                                  # >1 lightens the shading overall
-    shade_gain=0.9,                                  # scales all shading darkness
+    shade_gain=0.85,                                  # scales all shading darkness
     tooth=0.16,                                      # paper tooth strength on shading
     stroke=0.07,                                     # diagonal stroke texture strength on shading
     ink_gain=0.95, ink_tooth=0.12, ink_soft=0.3,     # ink opacity, tooth break-up, blur (px @900)
