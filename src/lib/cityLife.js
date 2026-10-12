@@ -72,6 +72,7 @@ export class CityLife {
     this.lastSpawn = -1e9;
     this.queue = [];
     this.overtakes = 0;
+    this.stopLines = null;
 
     // weather schedule
     this.storms = [];
@@ -427,10 +428,13 @@ export class CityLife {
       ws += 15 + r() * 10;
     }
     const bEnd = bs + 15, hEnd = bEnd + 25 + r() * 15, eEnd = hEnd + 20;
+    // one stop line per lane, 8-16 px inside the right edge: where the queue head parks
+    const stops = [];
+    for (let L = 0; L < this.lanes; L++) stops.push(this.W - (8 + r() * 8));
     this.tSegs.push(
       { k: 'free', t0: fs, t1: bs, decay: !first, waves },
-      { k: 'build', t0: bs, t1: bEnd },
-      { k: 'hold', t0: bEnd, t1: hEnd },
+      { k: 'build', t0: bs, t1: bEnd, stops },
+      { k: 'hold', t0: bEnd, t1: hEnd, stops },
       { k: 'ease', t0: hEnd, t1: eEnd },
     );
     this.tNextFree = eEnd;
@@ -443,8 +447,8 @@ export class CityLife {
     if (this.tIdx >= this.tSegs.length || t < this.tSegs[this.tIdx].t0) this.tIdx = 0;
     while (this.tSegs[this.tIdx].t1 <= t) this.tIdx++;
     const s = this.tSegs[this.tIdx];
-    if (s.k === 'build') return { C: smooth((t - s.t0) / 15), phase: 'build' };
-    if (s.k === 'hold') return { C: 1, phase: 'hold' };
+    if (s.k === 'build') return { C: smooth((t - s.t0) / 15), phase: 'build', stops: s.stops };
+    if (s.k === 'hold') return { C: 1, phase: 'hold', stops: s.stops };
     if (s.k === 'ease') return { C: lerp(1, 0.3, smooth((t - s.t0) / 20)), phase: 'ease' };
     let wc = 0, inWave = false;
     for (const w of s.waves) {
@@ -459,6 +463,8 @@ export class CityLife {
     const tr = this.trafficAt(this.viewTime);
     this.C = tr.C;
     this.tPhase = tr.phase;
+    // stop lines exist only while the queue builds up and holds; ease lets the heads pull away
+    this.stopLines = (tr.phase === 'build' || tr.phase === 'hold') && !this.reducedMotion ? tr.stops || null : null;
     const jamK = tr.phase === 'build' || tr.phase === 'hold' ? tr.C : tr.phase === 'ease' ? tr.C * 0.5 : 0;
     this.target = Math.min(this.vehicles.length, this.VN + Math.round(this.VN * jamK));
   }
@@ -527,6 +533,7 @@ export class CityLife {
   step(dt) {
     this.deriveTraffic();
     const W = this.W, Z0 = 0.62 * W, Z1 = 0.97 * W;
+    const stops = this.stopLines;
     const frontOf = v => v.x + v.bx0 + v.len;
     const rearOf = v => v.x + v.bx0;
     const act = this.vehicles.filter(v => v.active);
@@ -603,7 +610,19 @@ export class CityLife {
 
     // car-following within each lane only (mid-change vehicles are obstacles in their old lane)
     groups = buildGroups();
+    const heads = [];
     groups.forEach((group, L) => {
+      // lane head: front-most vehicle still short of the stop line (queue members past it keep driving out)
+      const stop = stops ? stops[L] : null;
+      let head = null;
+      if (stop != null) {
+        group.forEach(v => {
+          if (v.lane !== L) return;
+          const f = frontOf(v);
+          if (f <= stop + 2 && (!head || f > frontOf(head))) head = v;
+        });
+      }
+      heads[L] = head;
       group.forEach((v, n) => {
         if (v.lane !== L) return; // obstacle-only here: acceleration comes from its target lane
         const front = frontOf(v), rear = rearOf(v);
@@ -623,6 +642,11 @@ export class CityLife {
           const sStar = Math.max(s0, s0 + v.v * T + v.v * (v.v - ld.v) / (2 * Math.sqrt(ACC * DECEL)));
           term = Math.pow(sStar / Math.max(s, 0.1), 2);
         }
+        // head: a virtual stationary leader parked on the stop line, unless a real leader is closer
+        if (v === head && !(ld && ld.x + ld.bx0 <= stop)) {
+          const sStar = Math.max(0.5, 0.5 + v.v * 0.35 + v.v * v.v / (2 * Math.sqrt(ACC * DECEL)));
+          term = Math.pow(sStar / Math.max(stop - front, 0.1), 2);
+        }
         v._a = Math.max(-DECEL_MAX, Math.min(ACC, ACC * (1 - Math.pow(v.v / vd, 4) - term)));
       });
     });
@@ -637,6 +661,19 @@ export class CityLife {
       v.x += v.v * dt;
       if (v.lcCool > 0) v.lcCool -= dt;
     });
+
+    // no lane head ever pokes past its stop line; drifters ignore the lines but stay behind the furthest
+    if (stops) {
+      for (let L = 0; L < heads.length; L++) {
+        const h = heads[L];
+        if (h && frontOf(h) > stops[L]) { h.x = stops[L] - h.bx0 - h.len; h.v = 0; }
+      }
+      let far = -Infinity;
+      stops.forEach(s => { far = Math.max(far, s); });
+      drifters.forEach(v => {
+        if (frontOf(v) > far + 4) { v.x = far + 4 - v.bx0 - v.len; v.v = 0; }
+      });
+    }
 
     // drifters slide sideways at 3 px/s toward the target lane
     drifters.forEach(v => {
@@ -1192,12 +1229,25 @@ export class CityLife {
       }
     }
     const s = this.wx.storm;
+    const W = this.W;
+    // distance from the right edge back to each lane's front-most vehicle still on stage
+    const laneHeads = [];
+    for (let L = 0; L < this.lanes; L++) {
+      let head = null;
+      act.forEach(v => {
+        if (v.drift || v.lane !== L) return;
+        const front = v.x + v.bx0 + v.len;
+        if (front <= W && (head === null || front > head)) head = front;
+      });
+      laneHeads.push(head === null ? null : W - head);
+    }
     return {
       viewTime: this.viewTime, simTime: this.simTime, running: this.running, C: this.C, trafficPhase: this.tPhase,
       target: this.target, VN: this.VN, active: act.length, total: this.vehicles.length, lanes: this.lanes,
       weather: this.wx.phase, weatherP: this.wx.p, dim: this.wx.dim, rain: this.wx.rain,
       lightningLeft: s && this.wx.phase !== 'clear' ? s.events.filter(e => e.t > this.viewTime).length : 0,
       minGap, minGapDrift, crossLaneOverlaps,
+      stopLines: this.stopLines ? this.stopLines.slice() : null, laneHeads,
       laneChanges: act.filter(v => v.lc).length, overtakes: this.overtakes,
       vehicles: act.map(v => ({ i: v.i, x: v.x, front: v.x + v.bx0 + v.len, rear: v.x + v.bx0, v: v.v, v0: v.v0, len: v.len, lane: v.lane, dy: v.dy, drifting: !!v.drift, lc: !!v.lc }))
         .sort((a, b) => b.front - a.front),
