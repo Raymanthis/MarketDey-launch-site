@@ -50,6 +50,9 @@ def args():
         elif k == "--samples":
             o["samples"] = int(argv[i + 1])
             i += 2
+        elif k == "--worker":           # i/n: render every n-th frame starting at i (parallel workers)
+            o["worker"] = tuple(int(x) for x in argv[i + 1].split("/"))
+            i += 2
         elif k == "--skip-existing":
             o["skip"] = True
             i += 1
@@ -84,11 +87,15 @@ def main():
         sec = json.load(f)
     frames = sec["frames"]
     todo = o["frames"] if o["frames"] is not None else list(range(len(frames)))
+    if o.get("worker"):
+        wi, wn = o["worker"]
+        todo = todo[wi::wn]
     bpy.ops.wm.open_mainfile(filepath=os.path.join(OUT, "city.blend"))
     scene = bpy.context.scene
     R.setup_render(scene, o["samples"])
     R.setup_world(scene)
     R.setup_sun(scene)
+    scene.render.threads_mode = "AUTO"          # all cores (Freestyle itself is single-threaded)
     root = bpy.data.objects["city"]
     times = {}
     for v in o["variants"]:
