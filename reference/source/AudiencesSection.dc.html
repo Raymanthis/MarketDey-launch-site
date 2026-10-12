@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css" rel="stylesheet" />
+<script src="./image-slot.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="02 Who it's for" style="position:relative;height:500vh;background:#faf9f6;font-family:'Lato',ui-sans-serif,system-ui,sans-serif;color:#252422">
+  <div ref="{{ stageRef }}" onPointerMove="{{ onMove }}" style="position:sticky;top:0;height:100vh;overflow:hidden;--mx:0;--my:0">
+    <div data-ch="0" style="position:absolute;inset:0;pointer-events:none">
+      <div data-bg="1" style="position:absolute;inset:0;opacity:0;will-change:opacity,transform">
+        <div style="position:absolute;inset:-6%;transform:translate3d(calc(var(--mx) * -14px),calc(var(--my) * -10px),0);pointer-events:auto"><image-slot id="who-commuters-bg" shape="rect" placeholder="Wide photo: traffic jam on a road beside a busy market (2400×1500)"></image-slot></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(250,249,246,.97) 0%,rgba(250,249,246,.86) 38%,rgba(250,249,246,.15) 72%,rgba(250,249,246,0) 100%),linear-gradient(0deg,rgba(250,249,246,.9) 0%,rgba(250,249,246,0) 36%),linear-gradient(180deg,#faf9f6 0%,rgba(250,249,246,0) 22%)"></div>
+      </div>
+      <div data-det="1" data-sp="1" style="position:absolute;right:clamp(176px,14vw,240px);top:12vh;width:clamp(170px,20vw,300px);aspect-ratio:4/5;will-change:transform">
+        <div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 22px),calc(var(--my) * 16px),0) rotate(3deg);border-radius:22px;overflow:hidden;box-shadow:0 40px 80px -34px rgba(37,36,34,.55);border:6px solid #fff;pointer-events:auto"><image-slot id="who-commuters-detail" shape="rect" placeholder="Portrait: driver or okada rider stuck in traffic (1200×1500)"></image-slot></div>
+      </div>
+      <div data-det="1" data-sp="1.55" style="position:absolute;right:clamp(250px,25vw,420px);top:58vh;width:clamp(140px,15vw,230px);aspect-ratio:4/3;will-change:transform">
+        <div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 34px),calc(var(--my) * 24px),0) rotate(-4deg);border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -28px rgba(37,36,34,.5);border:5px solid #fff;pointer-events:auto"><image-slot id="who-commuters-detail-2" shape="rect" placeholder="Close-up: danfo or keke in traffic (1200×900)"></image-slot></div>
+      </div>
+      <div data-mv="1" data-sp="1.9" style="position:absolute;left:clamp(10px,2vw,28px);top:24vh;width:clamp(84px,9vw,132px);aspect-ratio:3/4;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 12px),calc(var(--my) * 10px),0) rotate(6deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-commuters-m1" shape="rect" placeholder="keke passenger"></image-slot></div></div>
+      <div data-mv="1" data-sp="2.4" style="position:absolute;left:clamp(130px,30vw,440px);top:74vh;width:clamp(76px,7.5vw,112px);aspect-ratio:1/1;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 20px),calc(var(--my) * 16px),0) rotate(-5deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-commuters-m2" shape="rect" placeholder="roadside hawker"></image-slot></div></div>
+      <div data-mv="1" data-sp="2.9" style="position:absolute;left:clamp(60px,14vw,220px);top:-6vh;width:clamp(70px,7vw,104px);aspect-ratio:4/5;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 28px),calc(var(--my) * 22px),0) rotate(4deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-commuters-m3" shape="rect" placeholder="traffic warden"></image-slot></div></div>
+      <div data-tx="1" style="position:absolute;left:0;right:0;top:50%;transform-origin:20% 50%;opacity:0;will-change:transform,opacity,filter">
+        <div style="max-width:1200px;margin:0 auto;padding:0 32px;display:flex;flex-direction:column;gap:20px;transform:translateY(-50%)">
+          <div style="display:flex;align-items:center;gap:14px"><span style="font-size:14px;font-weight:900;letter-spacing:.12em;color:#4f772d">01</span><span style="width:48px;height:2px;background:#4f772d"></span><span style="font-size:14px;font-weight:900;letter-spacing:.12em">COMMUTERS</span></div>
+          <h2 style="margin:0;max-width:min(760px,54vw);font-size:clamp(44px,6.6vw,100px);font-weight:900;letter-spacing:-.045em;line-height:.94;text-wrap:balance">Know before you drive into a market-day jam.</h2>
+          <div style="display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;max-width:min(760px,54vw);"><div style="max-width:440px;font-size:clamp(16px,1.4vw,19px);line-height:1.5;color:#403d39;text-wrap:pretty">On market day, the roads around a market fill with traders, buyers and loading trucks. Marketdey tells you the evening before, so you can leave early or take another road.</div><div style="display:flex;gap:12px;align-items:center;padding:12px 16px 12px 12px;border-radius:18px;background:#fff;border:1px solid rgba(37,36,34,.08);box-shadow:0 24px 48px -24px rgba(37,36,34,.35)"><span style="flex:none;width:38px;height:38px;border-radius:19px;background:rgba(217,150,43,.18);color:#8a5a0b;display:flex;align-items:center;justify-content:center;font-size:18px"><i class="ri-notification-3-line"></i></span><div style="display:flex;flex-direction:column;gap:2px"><div style="font-size:14px;font-weight:900">Tomorrow · Ogwashi-Uku Nkwọ market</div><div style="font-size:13px;color:#403d39">Expect slow traffic on Old Asaba Road.</div></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div data-ch="1" style="position:absolute;inset:0;pointer-events:none">
+      <div data-bg="1" style="position:absolute;inset:0;opacity:0;will-change:opacity,transform">
+        <div style="position:absolute;inset:-6%;transform:translate3d(calc(var(--mx) * -14px),calc(var(--my) * -10px),0);pointer-events:auto"><image-slot id="who-shoppers-bg" shape="rect" placeholder="Wide photo: crowded open market, traders and buyers at stalls (2400×1500)"></image-slot></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(270deg,rgba(250,249,246,.97) 0%,rgba(250,249,246,.86) 38%,rgba(250,249,246,.15) 72%,rgba(250,249,246,0) 100%),linear-gradient(0deg,rgba(250,249,246,.9) 0%,rgba(250,249,246,0) 36%),linear-gradient(180deg,#faf9f6 0%,rgba(250,249,246,0) 22%)"></div>
+      </div>
+      <div data-det="1" data-sp="1" style="position:absolute;left:clamp(176px,14vw,240px);top:12vh;width:clamp(170px,20vw,300px);aspect-ratio:4/5;will-change:transform">
+        <div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 22px),calc(var(--my) * 16px),0) rotate(-3deg);border-radius:22px;overflow:hidden;box-shadow:0 40px 80px -34px rgba(37,36,34,.55);border:6px solid #fff;pointer-events:auto"><image-slot id="who-shoppers-detail" shape="rect" placeholder="Portrait: hands exchanging tomatoes, peppers or naira notes (1200×1500)"></image-slot></div>
+      </div>
+      <div data-det="1" data-sp="1.55" style="position:absolute;left:clamp(24px,4vw,64px);top:52vh;width:clamp(140px,15vw,230px);aspect-ratio:4/3;will-change:transform">
+        <div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 34px),calc(var(--my) * 24px),0) rotate(4deg);border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -28px rgba(37,36,34,.5);border:5px solid #fff;pointer-events:auto"><image-slot id="who-shoppers-detail-2" shape="rect" placeholder="Close-up: basins of produce on a stall (1200×900)"></image-slot></div>
+      </div>
+      <div data-mv="1" data-sp="1.9" style="position:absolute;right:clamp(180px,17vw,260px);top:24vh;width:clamp(84px,9vw,132px);aspect-ratio:3/4;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 12px),calc(var(--my) * 10px),0) rotate(6deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-shoppers-m1" shape="rect" placeholder="trader weighing garri"></image-slot></div></div>
+      <div data-mv="1" data-sp="2.4" style="position:absolute;right:clamp(130px,30vw,440px);top:74vh;width:clamp(76px,7.5vw,112px);aspect-ratio:1/1;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 20px),calc(var(--my) * 16px),0) rotate(-5deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-shoppers-m2" shape="rect" placeholder="pepper and tomatoes"></image-slot></div></div>
+      <div data-mv="1" data-sp="2.9" style="position:absolute;right:clamp(60px,14vw,220px);top:-6vh;width:clamp(70px,7vw,104px);aspect-ratio:4/5;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 28px),calc(var(--my) * 22px),0) rotate(4deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-shoppers-m3" shape="rect" placeholder="buyer with shopping bag"></image-slot></div></div>
+      <div data-tx="1" style="position:absolute;left:0;right:0;top:50%;transform-origin:80% 50%;opacity:0;will-change:transform,opacity,filter">
+        <div style="max-width:1200px;margin:0 auto;padding:0 32px;display:flex;flex-direction:column;gap:20px;align-items:flex-end;text-align:right;transform:translateY(-50%)">
+          <div style="display:flex;align-items:center;gap:14px"><span style="font-size:14px;font-weight:900;letter-spacing:.12em">MARKET-DAY SHOPPERS</span><span style="width:48px;height:2px;background:#4f772d"></span><span style="font-size:14px;font-weight:900;letter-spacing:.12em;color:#4f772d">02</span></div>
+          <h2 style="margin:0;max-width:min(760px,54vw);font-size:clamp(44px,6.6vw,100px);font-weight:900;letter-spacing:-.045em;line-height:.94;text-wrap:balance">Shop on the day the market is full.</h2>
+          <div style="display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;max-width:min(760px,54vw);"><div style="display:flex;gap:12px;align-items:center;padding:10px 16px 10px 10px;border-radius:18px;background:#fff;border:1px solid rgba(37,36,34,.08);text-align:left;box-shadow:0 24px 48px -24px rgba(37,36,34,.35)"><div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:46px;height:50px;border-radius:12px;background:#4f772d;color:#fff"><div style="font-size:10px;font-weight:900;letter-spacing:.06em;color:#d7e5c0">SAT</div><div style="font-size:20px;font-weight:900;line-height:1.1">17</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-size:15px;font-weight:900">Market day</div><div style="font-size:13px;color:#403d39">Afọ market · 2.4 km</div></div></div><div style="max-width:440px;font-size:clamp(16px,1.4vw,19px);line-height:1.5;color:#403d39;text-wrap:pretty">Market day brings traders in from nearby farms and towns, so there's more to choose from and more room to haggle. Follow the markets near you and Marketdey tells you when each one is on.</div></div>
+        </div>
+      </div>
+    </div>
+    <div data-ch="2" style="position:absolute;inset:0;pointer-events:none">
+      <div data-bg="1" style="position:absolute;inset:0;opacity:0;will-change:opacity,transform">
+        <div style="position:absolute;inset:-6%;transform:translate3d(calc(var(--mx) * -14px),calc(var(--my) * -10px),0);pointer-events:auto"><image-slot id="who-seekers-bg" shape="rect" placeholder="Wide photo: person on their phone at a roadside or bus stop (2400×1500)"></image-slot></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(250,249,246,.97) 0%,rgba(250,249,246,.86) 38%,rgba(250,249,246,.15) 72%,rgba(250,249,246,0) 100%),linear-gradient(0deg,rgba(250,249,246,.9) 0%,rgba(250,249,246,0) 36%),linear-gradient(180deg,#faf9f6 0%,rgba(250,249,246,0) 22%)"></div>
+      </div>
+      <div data-det="1" data-sp="1" style="position:absolute;right:clamp(176px,14vw,240px);top:12vh;width:clamp(170px,20vw,300px);aspect-ratio:4/5;will-change:transform">
+        <div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 22px),calc(var(--my) * 16px),0) rotate(3deg);border-radius:22px;overflow:hidden;box-shadow:0 40px 80px -34px rgba(37,36,34,.55);border:6px solid #fff;pointer-events:auto"><image-slot id="who-seekers-detail" shape="rect" placeholder="Portrait: a stack of yams or bolts of fabric at a well-known market (1200×1500)"></image-slot></div>
+      </div>
+      <div data-det="1" data-sp="1.55" style="position:absolute;right:clamp(250px,25vw,420px);top:58vh;width:clamp(140px,15vw,230px);aspect-ratio:4/3;will-change:transform">
+        <div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 34px),calc(var(--my) * 24px),0) rotate(-4deg);border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -28px rgba(37,36,34,.5);border:5px solid #fff;pointer-events:auto"><image-slot id="who-seekers-detail-2" shape="rect" placeholder="Close-up: phone screen showing a market search (1200×900)"></image-slot></div>
+      </div>
+      <div data-mv="1" data-sp="1.9" style="position:absolute;left:clamp(10px,2vw,28px);top:24vh;width:clamp(84px,9vw,132px);aspect-ratio:3/4;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 12px),calc(var(--my) * 10px),0) rotate(6deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-seekers-m1" shape="rect" placeholder="bolts of ankara fabric"></image-slot></div></div>
+      <div data-mv="1" data-sp="2.4" style="position:absolute;left:clamp(130px,30vw,440px);top:74vh;width:clamp(76px,7.5vw,112px);aspect-ratio:1/1;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 20px),calc(var(--my) * 16px),0) rotate(-5deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-seekers-m2" shape="rect" placeholder="person checking a map"></image-slot></div></div>
+      <div data-mv="1" data-sp="2.9" style="position:absolute;left:clamp(60px,14vw,220px);top:-6vh;width:clamp(70px,7vw,104px);aspect-ratio:4/5;will-change:transform"><div style="position:absolute;inset:0;transform:translate3d(calc(var(--mx) * 28px),calc(var(--my) * 22px),0) rotate(4deg);border-radius:14px;overflow:hidden;box-shadow:0 22px 44px -22px rgba(37,36,34,.45);border:4px solid #fff;pointer-events:auto"><image-slot id="who-seekers-m3" shape="rect" placeholder="yam barn"></image-slot></div></div>
+      <div data-tx="1" style="position:absolute;left:0;right:0;top:50%;transform-origin:20% 50%;opacity:0;will-change:transform,opacity,filter">
+        <div style="max-width:1200px;margin:0 auto;padding:0 32px;display:flex;flex-direction:column;gap:20px;transform:translateY(-50%)">
+          <div style="display:flex;align-items:center;gap:14px"><span style="font-size:14px;font-weight:900;letter-spacing:.12em;color:#4f772d">03</span><span style="width:48px;height:2px;background:#4f772d"></span><span style="font-size:14px;font-weight:900;letter-spacing:.12em">BARGAIN SEEKERS</span></div>
+          <h2 style="margin:0;max-width:min(760px,54vw);font-size:clamp(44px,6.6vw,100px);font-weight:900;letter-spacing:-.045em;line-height:.94;text-wrap:balance">Go to the market known for what you need.</h2>
+          <div style="display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;max-width:min(760px,54vw);"><div style="max-width:440px;font-size:clamp(16px,1.4vw,19px);line-height:1.5;color:#403d39;text-wrap:pretty">Some markets are known for one thing, like yams in one town and fabric in the next. Search by what you want to buy, see how far it is, and arrive on the right day.</div><div style="display:flex;gap:12px;align-items:center;padding:10px 16px 10px 10px;border-radius:18px;background:#fff;border:1px solid rgba(37,36,34,.08);box-shadow:0 24px 48px -24px rgba(37,36,34,.35)"><div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:46px;height:50px;border-radius:12px;background:#e4eed4"><div style="font-size:10px;font-weight:900;letter-spacing:.06em;color:#386641">FRI</div><div style="font-size:20px;font-weight:900;line-height:1.1">16</div></div><div style="display:flex;flex-direction:column;gap:2px"><div style="font-size:15px;font-weight:900">Ubulu-Uku central market</div><div style="font-size:13px;color:#403d39">14 km · known for yam and tubers</div></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div ref="{{ railRef }}" style="position:absolute;right:clamp(14px,2.4vw,36px);top:50%;transform:translateY(-50%);z-index:3;transition:opacity .4s;display:flex;flex-direction:column;gap:18px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <button onClick="{{ t.go }}" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:0;border:0;background:none;cursor:pointer;color:{{ t.fg }};font:900 12px Lato,sans-serif;letter-spacing:.1em;transition:color .3s">
+          <span style="opacity:{{ t.lop }};transition:opacity .3s;white-space:nowrap">{{ t.label }}</span>
+          <span style="position:relative;width:3px;height:44px;border-radius:2px;background:rgba(37,36,34,.14);overflow:hidden"><span style="position:absolute;left:0;top:0;width:100%;height:{{ t.pct }};background:#4f772d"></span></span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ease = t => t * t * (3 - 2 * t);
+const LABELS = ['COMMUTERS', 'SHOPPERS', 'BARGAIN SEEKERS'];
+class Component extends DCLogic {
+  state = { si: 0, pp: [0, 0, 0] };
+  rootRef = React.createRef(); stageRef = React.createRef(); railRef = React.createRef();
+  p = 0; cur = 0; mx = 0; my = 0; tmx = 0; tmy = 0;
+  componentDidMount() {
+    this.onScroll = () => this.measure(); window.addEventListener('scroll', this.onScroll, { passive: true }); window.addEventListener('resize', this.onScroll);
+    this.measure(); this.cur = this.p;
+    const loop = () => { if (this.dead) return; this.raf = requestAnimationFrame(loop); this.tick(); }; this.raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { this.dead = true; cancelAnimationFrame(this.raf); window.removeEventListener('scroll', this.onScroll); window.removeEventListener('resize', this.onScroll); }
+  measure() {
+    const el = this.rootRef.current; if (!el) return; const vh = window.innerHeight, r = el.getBoundingClientRect();
+    this.p = clamp(-r.top / Math.max(1, r.height - vh), 0, 1); this.vis = r.top < vh && r.bottom > 0;
+    const si = Math.min(2, Math.floor(this.p * 3)), pp = [0, 1, 2].map(i => Math.round(clamp(this.p * 3 - i, 0, 1) * 40) / 40);
+    const s = this.state; if (s.si !== si || pp.some((v, i) => v !== s.pp[i])) this.setState({ si, pp });
+  }
+  tick() {
+    if (!this.vis) return; const st = this.stageRef.current; if (!st) return;
+    this.cur += (this.p - this.cur) * 0.12; this.mx += (this.tmx - this.mx) * 0.06; this.my += (this.tmy - this.my) * 0.06;
+    st.style.setProperty('--mx', this.mx.toFixed(3)); st.style.setProperty('--my', this.my.toFixed(3));
+    const p = this.cur, vh = window.innerHeight;
+    const ss = (x0, x1, v) => ease(clamp((v - x0) / (x1 - x0), 0, 1));
+    const rl = this.railRef.current; if (rl) rl.style.opacity = (1 - ss(0.94, 0.995, p)).toFixed(3);
+    st.querySelectorAll('[data-ch]').forEach(ch => {
+      const i = +ch.getAttribute('data-ch'), ue = p * 3 - i, u = clamp(ue, 0, 1);
+      const bgIn = i === 0 ? 1 : ss(-0.06, 0.08, ue), bgOut = i === 2 ? 0 : ss(0.9, 1.02, ue), bo = bgIn * (1 - bgOut);
+      const bg = ch.querySelector('[data-bg]'); if (bg) { bg.style.opacity = bo.toFixed(3); const im = bg.firstElementChild; if (im) im.style.translate = '0 ' + ((0.25 - u) * vh * 0.08).toFixed(1) + 'px'; bg.style.visibility = bo < 0.002 ? 'hidden' : 'visible'; }
+      const tIn = i === 0 ? 1 : ss(0, 0.12, ue), tOut = i === 2 ? 0 : ss(0.86, 0.98, ue), op = tIn * (1 - tOut), bl = (1 - tIn) * 22 + tOut * 22, tx = ch.querySelector('[data-tx]');
+      if (tx) { tx.style.transform = 'none'; tx.style.filter = bl > 0.2 ? 'blur(' + bl.toFixed(1) + 'px)' : 'none'; tx.style.opacity = op.toFixed(3); tx.style.visibility = op < 0.002 ? 'hidden' : 'visible'; tx.style.pointerEvents = op > 0.5 ? 'auto' : 'none'; }
+      ch.querySelectorAll('[data-det]').forEach((d, k) => { const sp = k ? 1.5 : 1, y = (0.45 - ue) * vh * 1.25 * sp; d.style.transform = 'translate3d(0,' + y.toFixed(1) + 'px,0)'; d.style.opacity = '1'; d.style.filter = 'none'; d.style.visibility = Math.abs(y) > vh * 1.6 ? 'hidden' : 'visible'; });
+      ch.querySelectorAll('[data-mv]').forEach(d => { const sp = +d.getAttribute('data-sp') / 2.4, c = i === 2 ? 0.55 : 0.96, y = (c - ue) * vh * 3.4 * sp; d.style.transform = 'translate3d(0,' + y.toFixed(1) + 'px,0)'; d.style.visibility = Math.abs(y) > vh * 1.5 ? 'hidden' : 'visible'; });
+    });
+  }
+  goTo(i) { const el = this.rootRef.current; if (!el) return; const top = el.getBoundingClientRect().top + window.scrollY, span = el.offsetHeight - window.innerHeight; window.scrollTo({ top: top + span * [0.4, 1.5, 2.5][i] / 3, behavior: 'smooth' }); }
+  renderVals() {
+    const si = this.state.si;
+    return {
+      rootRef: this.rootRef, stageRef: this.stageRef, railRef: this.railRef,
+      onMove: e => { const r = e.currentTarget.getBoundingClientRect(); this.tmx = (e.clientX - r.left) / r.width - 0.5; this.tmy = (e.clientY - r.top) / r.height - 0.5; },
+      tabs: LABELS.map((label, i) => ({ label, pct: (this.state.pp[i] * 100) + '%', fg: i === si ? '#252422' : 'rgba(37,36,34,.45)', lop: i === si ? 1 : 0, go: () => this.goTo(i) }))
+    };
+  }
+}
+</script>
+</body>
+</html>
