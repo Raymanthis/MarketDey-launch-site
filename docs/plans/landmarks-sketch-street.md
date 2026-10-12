@@ -5,6 +5,15 @@ Landmarks Journey section must reach the line density and craft of the reference
 window grids, varied line weight, overhead wires, trees, cars, people, perspective road lines,
 distance fading to white).
 
+> **Owner decision, 2026-10-12 (after ★0 bake-off): quality first — pre-rendered Blender frames
+> (option 2), not live lines.** The live-line version (D) showed see-through geometry, broken figures,
+> doubled edges and chaotic foliage at full size. Download size is acceptable if compressed as far as
+> quality allows; frames preload on the hero with a percentage under the Marketdey wordmark while the
+> visitor watches the animated skyline. The target is a *proper sketch*: ink lines **plus** tonal
+> pencil shading (glass, shadow, depth) and paper grain, with professional-quality figures, vehicles
+> and trees. A look-development pass on stills must reach that bar before any full render.
+> Sections below that argue against option 2 are kept for the record.
+
 ## What exists today (facts)
 
 - `src/components/sections/LandmarksJourneySection.jsx` builds the street procedurally in
