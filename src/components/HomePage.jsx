@@ -508,7 +508,7 @@ class HomePage extends React.Component {
     return (
       <div className={`sc-host ${styles.root}`} data-sc-name="orig">
         <div style={{overflowX:"clip"}}>
-          <section ref={v.heroRef} data-screen-label="01 Hero" style={{position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
+          <section ref={v.heroRef} data-screen-label="01 Hero" style={v.launchMode ? {position:"relative",background:"#386641",overflow:"hidden",height:"100vh"} : {position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
             <div data-h="hint" onClick={v.launchMode ? undefined : v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:v.launchMode?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}>{v.launchMode?null:<i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i>}<span>{v.launchMode?heroCopy.launchingSoon:heroCopy.scrollUp}</span></div>{' '}
             <div ref={v.cityRef} style={{position:"absolute",left:"0",right:"0",bottom:"0",height:"320px",zIndex:"0",pointerEvents:"none",transform:"translateY(100%)",transition:"transform 1.3s cubic-bezier(.2,.8,.2,1)"}}></div>{' '}
             <div style={{position:"relative",zIndex:"1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
