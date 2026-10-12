@@ -54,9 +54,9 @@ SHOTS = {
     # (a) same framing as the spike's camera frame 10
     "a": _spike_shot(10),
     # (b) close pass on the right lane beside a shopfront: pedestrian + parked keke in front
-    "b": {"pos": (2.35, 37.4, EYE), "target": (4.75, 45.0, 1.55)},
+    "b": {"pos": (1.0, 36.6, EYE), "target": (5.0, 45.5, 1.35)},
     # (c) looking up at a power pole with a transformer, wires against the sky, almond + palm
-    "c": {"pos": (-0.6, 36.2, EYE), "target": (-4.6, 50.0, 6.2)},
+    "c": {"pos": (1.2, 37.5, EYE), "target": (-3.2, 52.0, 6.6)},
 }
 
 
