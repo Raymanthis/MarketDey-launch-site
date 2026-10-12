@@ -43,11 +43,12 @@ const TM_PINS = [{t:'main'},{t:'mkt',ox:118,oy:-150,init:350},{t:'mkt',ox:-96,oy
   {t:'warn',ox:520,oy:10},{t:'warn',ox:-600,oy:250},{t:'warn',ox:815,oy:-420},{t:'warn',ox:-1000,oy:-105},
   {t:'lm',n:1},{t:'lm',n:2},{t:'lm',n:3},{t:'lm',n:4},{t:'arrow'}];
 const TM_P0 = 1.8, TM_HAND = 4.4, TM_END = 5.4, TM_LM = 3.9;
+const SIGN_K = 400, SIGN_C = 2;
 
 class HomePage extends React.Component {
   static defaultProps = { startMarket: 'ogwashi', launchMode: false };
   state = { gs: -1, sel: null, platform: footerCopy.waitlist.platforms[0], moves: [], submitted: false, forMarket: '', faq: 0, ph: 0, enter: true, mounted: false };
-  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef();
+  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef(); signRef = React.createRef(); signPendRef = React.createRef(); signDropRef = React.createRef(); signNodeRef = React.createRef(); signRopeRef = React.createRef(); signBodyRef = React.createRef(); signFrontRef = React.createRef(); signBackRef = React.createRef();
   buildCity(el0, fl0, sky) {
     const el = el0 || this.cityRef.current; if (!el) return; const hero = !el0, W = Math.max(320, el.clientWidth || window.innerWidth), G = 292, r = mulberry(hero ? 5 : 19), on = hero ? !!this.cityOn : true; let out = [];
     const S = 'rgba(255,255,255,.55)', SF = 'rgba(255,255,255,.28)', SFAR = 'rgba(167,201,87,.4)', SFAR2 = 'rgba(167,201,87,.2)', FL = fl0 || '#386641';
@@ -206,7 +207,7 @@ class HomePage extends React.Component {
     const q = s => Array.from(root.querySelectorAll('[data-h="' + s + '"]'));
     const T = 'opacity .9s ease, filter 1s ease, transform 1.1s cubic-bezier(.2,.8,.2,1)';
     const show = els => els.forEach(el => { el.style.transition = T; el.style.opacity = '1'; el.style.filter = 'blur(0px)'; el.style.transform = 'none'; });
-    const logo = q('logo')[0], hint = q('hint')[0], letters = logo ? Array.from(logo.querySelectorAll('[data-l]')) : [];
+    const logo = q('logo')[0], hint = q('hint')[0], sign = q('sign')[0], letters = logo ? Array.from(logo.querySelectorAll('[data-l]')) : [];
     const phones = q('phones')[0], solid = l => { l.style.visibility = 'visible'; };
     const skip = !this.props.launchMode && (window.scrollY > 120 || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches));
     const drop = () => { if (!this.bannerRef.current) return; const p = this.bPhys(); p.y = -640; p.vy = 0; p.va = 26; p.amp = 4; this.bRun(); };
@@ -232,7 +233,7 @@ class HomePage extends React.Component {
       at(ST + 7 * STEP, () => this.cityShow());
       const done = ST + (tx.length + 3) * STEP + 700;
       at(done, () => { letters.forEach(solid); svg.remove(); });
-      at(done + 250, () => { if (hint) { hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } this.introReady = true; }); };
+      at(done + 250, () => { if (hint) { hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } if (sign) this.signShow(); this.introReady = true; }); };
     let started = false; const go1 = () => { if (!started) { started = true; run(); } };
     if (document.fonts && document.fonts.load) document.fonts.load('900 28px Lato').then(go1, go1); else go1(); at(1500, go1);
     this.introGo = () => { if (this.props.launchMode || !this.introReady || this.introGone) return; this.introGone = true; window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
@@ -286,6 +287,79 @@ class HomePage extends React.Component {
   bMove(e) { const p = this.bp; if (!p || !p.drag) return; const nx = Math.max(-160, Math.min(160, e.clientX - p.sx)), ny = Math.max(-50, Math.min(110, e.clientY - p.sy)), now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
     p.vx = p.vx * 0.5 + ((nx - p.x) / dt) * 0.5; p.vy = p.vy * 0.5 + ((ny - p.y) / dt) * 0.5; if (Math.abs(nx) + Math.abs(ny) > 4) p.moved = true; p.x = nx; p.y = ny; p.pt = now; }
   bUp(e) { const p = this.bp; if (!p) return; p.drag = false; if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab'; this.bRun(); }
+  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, drag: false, moved: false, tapDir: 1, vx: 0, sx: 0, cx: 0, px: 0, pt: 0, stx: 0, last: performance.now() }; return this.sp; }
+  signPlace() {
+    const logo = this.heroRef.current && this.heroRef.current.querySelector('[data-h="logo"]');
+    const node = this.signNodeRef.current, rope = this.signRopeRef.current;
+    if (!logo || !node) return;
+    const r = logo.getBoundingClientRect();
+    const top = Math.max(40, Math.round(r.bottom + 28));
+    this.signTop = top;
+    node.style.top = top + 'px';
+    if (rope) { const L = top + 10; rope.style.height = L + 'px'; rope.querySelectorAll('path').forEach(p => p.setAttribute('d', 'M0 0 L0 ' + L)); }
+  }
+  signShow() {
+    const el = this.signRef.current; if (!el) return;
+    this.signPlace();
+    el.style.opacity = '1';
+    el.style.pointerEvents = 'auto';
+    if (this.reducedMotion) {
+      const body = this.signBodyRef.current, f = this.signFrontRef.current, b = this.signBackRef.current;
+      if (body) body.style.transformStyle = 'flat';
+      if (f) { f.style.backfaceVisibility = 'visible'; f.style.transition = 'opacity .3s ease'; f.style.opacity = '1'; }
+      if (b) { b.style.transform = 'none'; b.style.backfaceVisibility = 'visible'; b.style.transition = 'opacity .3s ease'; b.style.opacity = '0'; }
+      this.signFace = 0;
+      return;
+    }
+    const drop = this.signDropRef.current;
+    if (drop) { drop.style.animation = 'none'; void drop.offsetWidth; drop.style.animation = 'mdSignDrop .8s cubic-bezier(.25,.85,.3,1.15) both'; }
+    this.signRun();
+  }
+  signRun() {
+    if (this.signRaf || this.reducedMotion) return;
+    const p = this.signPhys(); p.last = performance.now();
+    const step = () => {
+      const now = performance.now(), dt = Math.min(0.033, Math.max(0.001, (now - p.last) / 1000)); p.last = now;
+      if (!p.drag) { p.omega += (-SIGN_K * Math.sin(p.theta * Math.PI / 90) - SIGN_C * p.omega) * dt; p.theta += p.omega * dt; }
+      const body = this.signBodyRef.current;
+      if (body) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
+      const target = Math.round(p.theta / 180) * 180;
+      const calm = !p.drag && Math.abs(p.theta - target) < 0.05 && Math.abs(p.omega) < 0.5;
+      if (!calm) this.signRaf = requestAnimationFrame(step);
+      else { this.signRaf = null; p.theta = target; p.omega = 0; if (body) body.style.transform = 'rotateY(' + target + 'deg)'; }
+    };
+    this.signRaf = requestAnimationFrame(step);
+  }
+  signDown(e) {
+    if (this.reducedMotion) { if (e.currentTarget) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {} e.currentTarget.style.cursor = 'grabbing'; } return; }
+    const p = this.signPhys(); p.drag = true; p.moved = false;
+    const rect = e.currentTarget.getBoundingClientRect();
+    p.cx = rect.left + rect.width / 2;
+    p.sx = e.clientX; p.stx = p.theta; p.px = e.clientX; p.pt = performance.now(); p.vx = 0;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
+    e.currentTarget.style.cursor = 'grabbing';
+    this.signRun();
+  }
+  signMove(e) {
+    const p = this.sp; if (!p || !p.drag || this.reducedMotion) return;
+    const dx = e.clientX - p.sx, now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
+    if (Math.abs(dx) > 5) p.moved = true;
+    p.theta = p.stx + dx * 1.2;
+    p.vx = (e.clientX - p.px) / dt;
+    p.px = e.clientX; p.pt = now;
+    const body = this.signBodyRef.current; if (body) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
+  }
+  signUp(e) {
+    if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab';
+    if (this.reducedMotion) { this.signFace = this.signFace ? 0 : 1; this.signCrossfade(); return; }
+    const p = this.sp; if (!p) return;
+    const wasDrag = p.moved, downX = p.sx, cx = p.cx;
+    p.drag = false;
+    if (wasDrag) p.omega = Math.max(-100, Math.min(100, (p.vx || 0) * 1.2));
+    else { let dir = (downX >= cx) ? 1 : -1; if (Math.abs(downX - cx) < 8) { p.tapDir = -p.tapDir; dir = p.tapDir; } p.omega += 220 * dir; }
+    this.signRun();
+  }
+  signCrossfade() { const f = this.signFrontRef.current, b = this.signBackRef.current; if (!f || !b) return; const front = this.signFace === 0; f.style.opacity = front ? '1' : '0'; b.style.opacity = front ? '0' : '1'; }
   pickFaq(i) { clearTimeout(this.enterT); this.setState({ faq: i, ph: 0, enter: false }); this.enterT = setTimeout(() => this.setState({ enter: true }), 60); }
   tryRef = React.createRef();
   tmSetup() {
@@ -408,7 +482,8 @@ class HomePage extends React.Component {
   componentDidMount() {
     const lm = this.props.launchMode;
     this.setState({ mounted: true }); // SSR: renderVals uses a fixed date until mounted, then the real clock
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.setState({ gs: 16 });
+    this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (this.reducedMotion) this.setState({ gs: 16 });
     if (!lm) this.glTick = setInterval(() => { const el = this.glRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.75 || r.bottom < vh * 0.15 || this.state.gs >= 16) return; this.setState(s => ({ gs: s.gs + 1 })); }, 340);
     if (!lm) this.onRoads = () => { const el = this.roadsRef.current; if (!el) return; const r = el.parentElement.getBoundingClientRect(), t = Math.max(0, Math.min(1, -r.top / (window.innerHeight * 0.28))), e = t * t * (3 - 2 * t); el.style.opacity = e.toFixed(3); el.style.transform = 'scale(' + (0.985 + 0.015 * e).toFixed(4) + ')'; };
     this.onHeroScroll = () => { const root = this.heroRef.current, hp = root && root.querySelectorAll('[data-hp]'); if (!hp || hp.length < 2) return; const t = this.heroMax = Math.max(this.heroMax || 0, Math.min(1, window.scrollY / 640)), E = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3), eR = E(t / 0.85), eL = E((t - 0.1) / 0.85); hp[1].style.transform = 'translateY(' + (340 * (1 - eR)).toFixed(1) + 'px) rotate(3deg)'; hp[0].style.transform = 'translateY(' + (380 * (1 - eL)).toFixed(1) + 'px) rotate(-3deg)'; if (!this.cityOn && this.introGone && !this.cityFixedNow() && root.getBoundingClientRect().bottom <= window.innerHeight + 2) this.cityShow(); };
@@ -430,7 +505,7 @@ class HomePage extends React.Component {
       this.faqTick = setInterval(() => { const el = this.faqRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.8 || r.bottom < vh * 0.2 || !this.state.enter) return; const ph = this.state.ph + 1; if (ph >= FAQ_STEPS) this.pickFaq((this.state.faq + 1) % FAQS.length); else this.setState({ ph }); }, 1100);
     }
   }
-  componentWillUnmount() { (this.heroT || []).forEach(clearTimeout); window.removeEventListener('scroll', this.onHeroScroll); cancelAnimationFrame(this.swayRaf); window.removeEventListener('scroll', this.onRoads); clearInterval(this.faqTick); clearInterval(this.glTick); this.tmDead = true; if (this.introOff) this.introOff(); document.documentElement.style.overflow = ''; clearTimeout(this.cityT1); clearTimeout(this.cityT2); clearTimeout(this.cityT3); clearTimeout(this.cityT4); window.removeEventListener('resize', this.onCityResize); cancelAnimationFrame(this.tmRaf); window.removeEventListener('resize', this.onTmResize); clearTimeout(this.enterT); if (this.faqIO) this.faqIO.disconnect(); if (this.cityLifeHero) this.cityLifeHero.destroy(); if (this.cityLifeFoot) this.cityLifeFoot.destroy(); this.cityLifeHero = null; this.cityLifeFoot = null; if (this.cityDebug) delete window.__city; }
+  componentWillUnmount() { (this.heroT || []).forEach(clearTimeout); window.removeEventListener('scroll', this.onHeroScroll); cancelAnimationFrame(this.swayRaf); cancelAnimationFrame(this.signRaf); window.removeEventListener('scroll', this.onRoads); clearInterval(this.faqTick); clearInterval(this.glTick); this.tmDead = true; if (this.introOff) this.introOff(); document.documentElement.style.overflow = ''; clearTimeout(this.cityT1); clearTimeout(this.cityT2); clearTimeout(this.cityT3); clearTimeout(this.cityT4); window.removeEventListener('resize', this.onCityResize); cancelAnimationFrame(this.tmRaf); window.removeEventListener('resize', this.onTmResize); clearTimeout(this.enterT); if (this.faqIO) this.faqIO.disconnect(); if (this.cityLifeHero) this.cityLifeHero.destroy(); if (this.cityLifeFoot) this.cityLifeFoot.destroy(); this.cityLifeHero = null; this.cityLifeFoot = null; if (this.cityDebug) delete window.__city; }
 
   faqVals() {
     const i = Math.max(0, this.state.faq), P = this.state.ph, q = P % 4, en = this.state.enter, fpos = Math.min(4, P);
@@ -484,7 +559,7 @@ class HomePage extends React.Component {
     const glLands = mk.map((k, i) => { const a = at(k), on = gs >= k; return { t: a.dow + ' ' + a.date + ' ' + a.mon, arrow: i > 0, op: on ? 1 : 0, ty: on ? '0px' : '8px' }; });
 
     return {
-      heroRef: this.heroRef, cityRef: this.cityRef, footCityRef: this.footCityRef, footHeadRef: this.footHeadRef, footCardRef: this.footCardRef, footRuleRef: this.footRuleRef, introGo: () => this.introGo && this.introGo(), roadsRef: this.roadsRef, bannerRef: this.bannerRef, swayHover: () => this.bKick(0.5), swayClick: () => { if (this.bp && this.bp.moved) { this.bp.moved = false; return; } this.bKick(1); }, bDown: e => this.bDown(e), bMove: e => this.bMove(e), bUp: e => this.bUp(e),
+      heroRef: this.heroRef, cityRef: this.cityRef, footCityRef: this.footCityRef, footHeadRef: this.footHeadRef, footCardRef: this.footCardRef, footRuleRef: this.footRuleRef, introGo: () => this.introGo && this.introGo(), roadsRef: this.roadsRef, bannerRef: this.bannerRef, swayHover: () => this.bKick(0.5), swayClick: () => { if (this.bp && this.bp.moved) { this.bp.moved = false; return; } this.bKick(1); }, bDown: e => this.bDown(e), bMove: e => this.bMove(e), bUp: e => this.bUp(e), signDown: e => this.signDown(e), signMove: e => this.signMove(e), signUp: e => this.signUp(e),
       pidgin: this.props.pidgin ?? true,
       markets: MARKETS.map(x => ({ short: x.short, sel: x.id === m.id, notSel: x.id !== m.id, pick: () => this.setState({ sel: x.id }) })),
       sel: { name: m.name, town: m.town, lga: m.lga, road: m.road, short: m.short },
@@ -505,11 +580,12 @@ class HomePage extends React.Component {
 
   render() {
     const v = { ...this.props, ...this.renderVals() };
+    const sFace = { backfaceVisibility: "hidden", background: "#a7c957", color: "#252422", fontWeight: "900", fontSize: "clamp(20px, 5.2vw, 30px)", lineHeight: "1", padding: "0.45em 1.1em", borderRadius: "14px", whiteSpace: "nowrap", boxShadow: "0 14px 26px -14px rgba(0,0,0,.45)", letterSpacing: "-.02em" };
     return (
       <div className={`sc-host ${styles.root}`} data-sc-name="orig">
         <div style={{overflowX:"clip"}}>
           <section ref={v.heroRef} data-screen-label="01 Hero" style={v.launchMode ? {position:"relative",background:"#386641",overflow:"hidden",height:"100vh"} : {position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
-            <div data-h="hint" onClick={v.launchMode ? undefined : v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:v.launchMode?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}>{v.launchMode?null:<i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i>}<span>{v.launchMode?heroCopy.launchingSoon:heroCopy.scrollUp}</span></div>{' '}
+            {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <div data-h="sign" ref={this.signRef} style={{position:"fixed",left:"50%",top:"0",zIndex:"1",transform:"translateX(-50%)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease"}}><div ref={this.signPendRef} className="md-sign-pend" style={{position:"absolute",top:"0",left:"0",transformOrigin:"0px 0px"}}><div ref={this.signDropRef} style={{position:"absolute",top:"0",left:"0"}}><svg data-rope ref={this.signRopeRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"0",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><span style={{position:"absolute",left:"50%",top:"-9.5px",transform:"translateX(-50%)",width:"19px",height:"19px",borderRadius:"50%",boxSizing:"border-box",border:"4px solid #e6e1d5",background:"#2b5233",boxShadow:"inset 0 1px 2px rgba(0,0,0,.45),0 1px 1px rgba(255,255,255,.35)",zIndex:"2"}}></span><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} style={sFace}>{heroCopy.launchingSoon}</div><div ref={this.signBackRef} style={{...sFace,position:"absolute",top:"0",left:"0",right:"0",bottom:"0",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}</div></div></div></div></div></div></div>}{' '}
             <div ref={v.cityRef} style={{position:"absolute",left:"0",right:"0",bottom:"0",height:"320px",zIndex:"0",pointerEvents:"none",transform:"translateY(100%)",transition:"transform 1.3s cubic-bezier(.2,.8,.2,1)"}}></div>{' '}
             <div style={{position:"relative",zIndex:"1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
               <div style={{position:"relative",zIndex:"3",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"24px",padding:"24px 0",flexWrap:"wrap"}}>
