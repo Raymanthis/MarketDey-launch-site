@@ -59,7 +59,7 @@ def camera_frames(n=N_FRAMES):
         z = -40.0 * i / (n - 1)
         y = 1.75 + 0.03 * math.sin(2.0 * math.pi * i / 10.0)
         frames.append({
-            "pos": [-1.2, round(y, 4), round(z, 4)],
+            "pos": [-1.2, round(y, 4), round(z, 4) + 0.0],
             "target": [-1.2, 1.6, round(z - 60.0, 4)],
         })
     return frames
