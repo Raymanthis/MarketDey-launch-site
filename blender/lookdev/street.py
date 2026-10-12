@@ -531,8 +531,10 @@ def catenary(p0, p1, sag, n, tangle=0.0, seed=0):
     return pts
 
 
-def wire(name, pts, r=0.009):
-    W = get("wires", "nolines")
+def wire(name, pts, r=0.005):
+    """Cables are 10 mm tubes: thin enough that their two silhouettes fall within one pixel
+    beyond ~4 m, so Freestyle inks each as a single hairline."""
+    W = get("wires", "wires", smooth=True)
     W.tube(pts, r, n=6, caps=True, mat="wire")
 
 
@@ -625,6 +627,16 @@ def umbrella_stall(tag, x, y, rng):
     S.box((x + 0.45, y - 0.15, z0 + 0.42), (x + 0.75, y + 0.15, z0 + 0.46), mat="plastic")
     for (lx, ly) in ((0.47, -0.13), (0.71, -0.13), (0.47, 0.11), (0.71, 0.11)):
         S.box((x + lx, y + ly, z0), (x + lx + 0.03, y + ly + 0.03, z0 + 0.43), mat="plastic")
+
+
+def bench(tag, x, y, length=1.8, axis="y"):
+    """Plank bench on block legs (seat 0.45 m), long side along the street."""
+    S = get(tag, "lines", union=True)
+    z0 = BASE + LIFT
+    hl = length / 2
+    S.box((x - 0.18, y - hl, z0 + 0.41), (x + 0.18, y + hl, z0 + 0.46), mat="wood")
+    for yy in (y - hl + 0.15, y + hl - 0.15):
+        S.box((x - 0.15, yy - 0.1, z0), (x + 0.15, yy + 0.1, z0 + 0.415), mat="block")
 
 
 def water_tank(b_info, a, d):
