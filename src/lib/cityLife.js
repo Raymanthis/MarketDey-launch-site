@@ -765,7 +765,8 @@ export class CityLife {
         const s0 = inZone ? 6 : 10, T = inZone ? 0.35 : HEADWAY;
         v.s0 = s0;
         let vd = v.v0;
-        if (inZone) {
+        // the lane head drives up to its stop line; only the queue behind it creeps
+        if (inZone && v !== head) {
           const jam = 8 * Math.pow(0.5 + 0.5 * Math.sin(2 * Math.PI * this.simTime / 7 - front / 45), 2);
           vd = Math.min(v.v0, lerp(v.v0, jam, this.C));
         }
