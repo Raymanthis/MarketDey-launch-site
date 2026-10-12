@@ -44,8 +44,15 @@ const CLOUD_FILL_NIGHT = '#1b2c43';   // normal (and storm) clouds at night: dar
 const SKY_STORM_NIGHT = mixHex(SKY_NIGHT, '#000000', 0.15);   // night blue, ~15% darker in a storm
 const FILL_STORM_NIGHT = mixHex(FILL_NIGHT, '#000000', 0.15);
 const CLOUD_STORM_NIGHT = mixHex(CLOUD_FILL_NIGHT, '#000000', 0.15);
-const DN_DAY = 90, DN_DUSK = 12, DN_NIGHT = 90, DN_DAWN = 12, DN_TOTAL = DN_DAY + DN_DUSK + DN_NIGHT + DN_DAWN;
-const SUN_COL = '#f4d35e', MOON_COL = '#f1ede0', WIN_COL = '#f6c453', STAR_COL = '#eef3ff';
+const DN_DAY = 90, DN_DUSK = 20, DN_NIGHT = 90, DN_DAWN = 20, DN_TOTAL = DN_DAY + DN_DUSK + DN_NIGHT + DN_DAWN;
+// the sun has no fill of its own any more (outline only); the moon's crescent is MOON_COL
+const MOON_COL = '#f1ede0', WIN_COL = '#f6c453', STAR_COL = '#eef3ff';
+// night lines: the skyline's lime strokes mix to white, the twinkling windows' fill to warm yellow, and
+// every white stroke gets a little brighter — all through custom properties on the city container, so a
+// whole night costs one write of three properties per colour tick (see updateCycle / setDnLines).
+const LN_DAY = [167, 201, 87], LN_NIGHT = [255, 255, 255], WIN_NIGHT = [246, 196, 83];
+const DN_RE_LIME = /^rgba\(167,\s*201,\s*87,\s*([\d.]+)\)$/;
+const DN_RE_WHITE = /^rgba\(255,\s*255,\s*255,\s*([\d.]+)\)$/;
 // Splash skyline styles: the dn rules are looked up by selector, so their colours are rewritten from JS
 // (see setDnColors). The sky background itself is *not* driven from here — an !important stylesheet rule
 // loses to the hero section's own inline `background`, so setDnColors writes the section inline instead.
@@ -54,6 +61,11 @@ const DN_SEL_FILL = '[data-cl-sky][data-cl-dn] [fill="#386641"]:not([data-cl-wxc
 const DN_SEL_CLD = '[data-cl-sky][data-cl-dn] [data-cl-cld]';
 const DN_CSS = DN_SEL_FILL + '{fill:#386641!important}'
   + DN_SEL_CLD + '{fill:#386641!important}'
+  // in splash mode the colours are written continuously from JS, so nothing may ease between them:
+  // the CSS transitions (sky background, skyline fills, cloud bodies) are switched off wholesale
+  + '[data-cl-sky][data-cl-dn]{transition:none!important}'
+  + '[data-cl-sky][data-cl-dn] [fill="#386641"]{transition:none!important}'
+  + '[data-cl-sky][data-cl-dn] [data-cl-cld]{transition:none!important}'
   + '[data-cl-sky][data-cl-dnj] [fill="#386641"]:not([data-cl-wxc]){transition:none!important}'
   + '[data-cl-sky][data-cl-dnj] [data-cl-cld]{transition:none!important}'
   + '@keyframes clStar{0%,100%{opacity:.08}50%{opacity:.6}}';
@@ -140,6 +152,14 @@ export class CityLife {
     this.dnLights = false;     // vehicle night lights (on regardless of rain)
     this.dnLightsAt = -1e9;
     this.sunEl = null; this.moonEl = null; this.starsEl = null;
+    this.sunReady = false;     // the sun joins the cycle only when the intro calls sunIn()
+    this.sunInT0 = -1e9;       // view time of the drop-in (see updateCycle)
+    this.dnDarkK = 0;          // storm darkness on the splash: eased 0..1 instead of switching
+    this.dnLastWrite = -1e9;   // view time of the last colour write (the 10 Hz throttle)
+    this.dnCol = null;         // the sky/fill/cloud hexes already written
+    this.dnLines = null;       // lime strokes that turn white at night
+    this.dnWhite = null;       // white strokes that brighten a little at night
+    this.dnWinFills = null;    // twinkling window rects whose fill turns yellow at night
     this.birdGs = null;
 
     this.viewTime = 0;
@@ -825,6 +845,7 @@ export class CityLife {
     if (this.dnTimer) { clearTimeout(this.dnTimer); this.dnTimer = 0; }
     if (this.dnReT) { this.dnReT.forEach(clearTimeout); this.dnReT = []; }
     this.restoreNightWindows(true);
+    this.clearDnLines();
     if (this.sunEl) { this.sunEl.remove(); this.sunEl = null; }
     if (this.moonEl) { this.moonEl.remove(); this.moonEl = null; }
     if (this.starsEl) { this.starsEl.remove(); this.starsEl = null; }
@@ -2540,7 +2561,7 @@ export class CityLife {
   }
 
   // ---------- day/night cycle (loading splash only) ----------
-  // DAY 90s -> DUSK 12s -> NIGHT 90s -> DAWN 12s, looping on viewing time. q is "night-ness": 0 in full
+  // DAY 90s -> DUSK 20s -> NIGHT 90s -> DAWN 20s, looping on viewing time. q is "night-ness": 0 in full
   // day, 1 in full night, interpolated across dusk and dawn. The cycle starts in day.
   dnPhaseAt(t) {
     t = ((t % DN_TOTAL) + DN_TOTAL) % DN_TOTAL;
@@ -2558,11 +2579,24 @@ export class CityLife {
   dnStormFill(q) { return mixHex(DARK_FILL, FILL_STORM_NIGHT, q); }
   dnStormCloud(q) { return mixHex(DARK_FILL, CLOUD_STORM_NIGHT, q); }
   dnDark() { const p = this.wx.phase; return p === 'gathering' || p === 'storm'; }
-  // the colour the hero sky shows right now: the phase colour, or the storm's darkening of it
+  // night-ness as it is actually painted: smoothstepped, so dusk and dawn walk in and out of the colours
+  dnQs() { return smooth(this.dnPhaseAt(this.dnT).q); }
+  // the colour the hero sky shows right now: the phase colour, mixed towards the storm's darkening by
+  // the eased dnDarkK (a storm slides in over 4 s instead of switching)
   skyNow() {
     if (!this.splash || !this.dnRules) return this.dnDark() ? DARK_FILL : SKY_DAY;
-    const q = this.dnPhaseAt(this.dnT).q;
-    return this.dnDark() ? this.dnStormSky(q) : this.dnSky(q);
+    const qs = this.dnQs();
+    return mixHex(this.dnSky(qs), this.dnStormSky(qs), this.dnDarkK);
+  }
+
+  // the sun joins the cycle late: the intro calls this once the wordmark, skyline and sign are all in,
+  // and the sun then drops in from above the top of the sky (see updateCycle). Called while it is not
+  // day (a debug jump), it just becomes ready and follows the cycle.
+  sunIn() {
+    if (this.night || !this.splash || this.sunReady) return this;
+    this.sunReady = true;
+    this.sunInT0 = this.viewTime;
+    return this;
   }
 
   // Splash API. Off by default: HomePage calls this.setSplash(true) for the launching page (for its whole
@@ -2591,8 +2625,15 @@ export class CityLife {
     this.dnLightsAt = -1e9;
     if (this.dnWins) this.dnWins.forEach(w => { w.on = false; w.pend = false; w.anim = ''; });
     this.dnPend = false;
+    this.sunReady = false;        // the sun stays out of the sky until the intro calls sunIn()
+    this.sunInT0 = -1e9;
+    this.dnDarkK = this.dnDark() ? 1 : 0;
+    this.dnLastWrite = -1e9;      // the first frame writes, whatever the clock says
+    this.dnCol = null;
+    this.dnLines = null; this.dnWhite = null; this.dnWinFills = null;
     this.buildSkyVis();
     this.measureDn();
+    this.collectDnLines();
     this.dnJump = true;
     this.updateCycle(0);
     this.dnJump = false;
@@ -2601,6 +2642,7 @@ export class CityLife {
     this.dnReT = [1200, 3200].map(ms => setTimeout(() => {
       if (this.destroyed || !this.splash) return;
       this.measureDn();
+      this.collectDnLines();      // a rebuilt city SVG comes with fresh, unstyled lines
       this.dnJump = true; this.updateCycle(0); this.dnJump = false;
     }, ms));
   }
@@ -2637,6 +2679,7 @@ export class CityLife {
     }
     this.clearScreenBg();   // hand the background back to the stylesheet (storm darkening, page colour)
     this.restoreNightWindows(true);
+    this.clearDnLines();    // the skyline goes back to its own stroke/fill attributes, untouched
     this.visHide();
   }
 
@@ -2645,6 +2688,62 @@ export class CityLife {
     if (this.moonEl) { this.moonEl.style.display = 'none'; this.moonEl.style.opacity = '0'; }
     if (this.starsEl) { this.starsEl.style.display = 'none'; this.starsEl.style.opacity = '0'; }
     this.sunO = this.moonO = this.starsO = null;
+  }
+
+  // The city's own strokes and window fills, taken over for the night. Each one keeps its day alpha (A,
+  // read off its stroke attribute) and reads its colour from three custom properties on the container:
+  //   --cl-ln  lime -> white      --cl-win  window lime -> warm yellow      --cl-wa  white lines, brighter
+  // Nothing is written per frame but those three properties (see setDnLines); the alphas stay put, so a
+  // line never changes weight, only colour. Runs on splashOn and again after a rebuild (a new city SVG
+  // has fresh, unstyled elements, so the old references having gone stale is the trigger to redo it).
+  collectDnLines() {
+    if (this.night || !this.el || !this.el.querySelectorAll) return;
+    if (this.dnLines && this.dnLines.length && this.dnLines[0].isConnected) return;   // same city
+    const lines = [], white = [], wins = [];
+    this.el.querySelectorAll('*').forEach(el => {
+      const s = el.getAttribute('stroke');
+      if (s) {
+        const lime = DN_RE_LIME.exec(s);
+        if (lime) {
+          el.style.stroke = 'rgb(var(--cl-ln) / calc(min(1, ' + lime[1] + ' * var(--cl-wa))))';
+          lines.push(el);
+          return;
+        }
+        const wh = DN_RE_WHITE.exec(s);
+        if (wh) {
+          el.style.stroke = 'rgb(255 255 255 / calc(min(1, ' + wh[1] + ' * var(--cl-wa))))';
+          white.push(el);
+          return;
+        }
+      }
+      if (el.hasAttribute('data-w')) { el.style.fill = 'rgb(var(--cl-win))'; wins.push(el); }
+    });
+    this.dnLines = lines; this.dnWhite = white; this.dnWinFills = wins;
+  }
+
+  // hand every stroke and window fill back to its own attribute (and drop the custom properties, but only
+  // after the windows have let go of them — an rgb() left holding a deleted var paints as nothing at all)
+  clearDnLines() {
+    const drop = (list, prop) => {
+      if (!list) return;
+      for (let k = 0; k < list.length; k++) list[k].style.removeProperty(prop);
+    };
+    drop(this.dnLines, 'stroke');
+    drop(this.dnWhite, 'stroke');
+    drop(this.dnWinFills, 'fill');
+    this.dnLines = null; this.dnWhite = null; this.dnWinFills = null;
+    if (this.el && this.el.style) {
+      ['--cl-ln', '--cl-wa', '--cl-win'].forEach(p => this.el.style.removeProperty(p));
+    }
+  }
+
+  // the three night properties, written together with the sky colours (≤10 Hz, and always on a jump)
+  setDnLines(qs) {
+    const st = this.el && this.el.style;
+    if (!st) return;
+    st.setProperty('--cl-ln', LN_DAY.map((v, k) => Math.round(lerp(v, LN_NIGHT[k], qs))).join(' '));
+    st.setProperty('--cl-wa', (1 + 0.6 * qs).toFixed(3));
+    st.setProperty('--cl-win', LN_DAY.map((v, k) => Math.round(lerp(v, WIN_NIGHT[k], qs))).join(' '));
   }
 
   ensureDnStyle() {
@@ -2665,12 +2764,14 @@ export class CityLife {
     };
   }
 
-  // one write per phase/weather change: the hero section's own inline background (a stylesheet rule cannot
-  // beat the section's inline `background` shorthand), every green skyline fill, and — while the splash is
-  // up — html/body, so the whole screen is sky. Inline transitions do the easing; nothing per frame.
+  // one write of the sky, every green skyline fill and the cloud bodies: the hero section's own inline
+  // background (a stylesheet rule cannot beat the section's inline `background` shorthand) and — while the
+  // splash is up — html/body, so the whole screen is sky. Off the splash the inline transitions do the
+  // easing; on it the cycle writes every tick instead and nothing may ease between the writes.
   setDnColors(sky, fill, cloud, dur) {
     const R = this.dnRules;
     if (!R) return;
+    if (this.splash) dur = 'none';
     const sect = this.skyHost;
     if (sect) {
       sect.style.transition = 'background-color ' + dur;
@@ -2697,27 +2798,16 @@ export class CityLife {
     });
   }
 
-  // a weather change on the splash: the darkening rides on top of the current phase colour
-  applySky(dur) {
-    if (!this.splash || !this.dnRules) return;
-    const q = this.dnPhaseAt(this.dnT).q;
-    const dark = this.dnDark();
-    this.setDnColors(dark ? this.dnStormSky(q) : this.dnSky(q), dark ? this.dnStormFill(q) : this.dnFill(q),
-      dark ? this.dnStormCloud(q) : this.dnCloudFill(q), dur || '4s ease');
+  // a weather change on the splash: the per-frame driver already folds the storm's darkening into the
+  // sky (dnDarkK), so there is nothing to write here — the darkening just eases in over the next frames
+  applySky() {
+    return this;
   }
 
-  // step change of the cycle: the sky eases towards the *next* half-phase colour, so dusk walks
-  // green -> mid-tone -> night blue as two 6 s linear legs (dawn does the mirror)
+  // step change of the cycle: windows, birds and vehicle lights switch state here; the colours are the
+  // per-frame driver's job now (updateCycle), so nothing eases anywhere and nothing ever jumps
   applyCycle(jump) {
     const ph = this.dnPhaseAt(this.dnT);
-    const dark = this.dnDark();
-    const q = jump ? ph.q
-      : ph.name === 'dusk' ? (ph.u < 0.5 ? 0.5 : 1)
-        : ph.name === 'dawn' ? (ph.u < 0.5 ? 0.5 : 0)
-          : ph.q;
-    const dur = jump ? '0s' : (ph.name === 'dusk' || ph.name === 'dawn') ? '6s linear' : '4s ease';
-    this.setDnColors(dark ? this.dnStormSky(q) : this.dnSky(q), dark ? this.dnStormFill(q) : this.dnFill(q),
-      dark ? this.dnStormCloud(q) : this.dnCloudFill(q), dur);
     const mode = jump ? 'jump' : 'normal';
     const nightState = ph.name === 'dusk' || ph.name === 'night';
     if (nightState !== this.dnNight) {
@@ -2751,8 +2841,8 @@ export class CityLife {
       s.style.cssText = 'position:absolute;left:0;bottom:0;overflow:visible;pointer-events:none;will-change:transform,opacity;opacity:0';
       return s;
     };
-    // sun: filled disc, thin white-ish outline, short rays turning slowly.
-    // The rays are their own <g> rotating about the viewBox centre, so nothing is touched per frame.
+    // sun: an outline and its short rays, no disc — the sky shows through it. The rays are their own <g>
+    // rotating about the viewBox centre, so nothing is touched per frame.
     const sun = mk(sz);
     sun.setAttribute('viewBox', '-70 -70 140 140');
     let rays = '';
@@ -2760,7 +2850,7 @@ export class CityLife {
       rays += '<path d="M33 0h11" stroke="rgba(255,255,255,.8)" stroke-width="2.6" stroke-linecap="round" transform="rotate(' + k * 45 + ')"></path>';
     }
     sun.innerHTML = '<g>' + (this.reducedMotion ? '' : '<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="90s" repeatCount="indefinite"></animateTransform>') + rays + '</g>'
-      + '<circle r="26" fill="' + SUN_COL + '" fill-opacity=".9" stroke="rgba(255,255,255,.85)" stroke-width="1.4"></circle>';
+      + '<circle r="26" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2.4"></circle>';
     // moon: crescent with a soft glow, same place in the sky as the sun
     const moon = mk(mz);
     moon.setAttribute('viewBox', '-60 -60 120 120');
@@ -2849,7 +2939,7 @@ export class CityLife {
         w.on = false;
         const d = jump ? '0s' : (fast ? (w.d2 * 0.05).toFixed(2) : w.d2) + 's';
         r.style.transition = jump ? 'none' : 'fill ' + (fast ? '.4s' : '.9s') + ' ease ' + d + ', fill-opacity ' + (fast ? '.4s' : '.9s') + ' ease ' + d;
-        r.style.fill = '#a7c957';
+        r.style.fill = 'rgb(var(--cl-win))';   // the same colour their ordinary twinkle now wears
         r.style.fillOpacity = '0';
         w.pend = true;
         this.dnPend = true;
@@ -2891,6 +2981,9 @@ export class CityLife {
   }
 
   // ---------- per-frame cycle driver ----------
+  // The splash's colours are written here, continuously, and never eased: a storm's darkness walks in over
+  // 4 s (dnDarkK) and dusk/dawn walk the sky from green to night blue. Writes are throttled to 10 Hz and
+  // skipped when the colour has not moved, which is what keeps a whole cycle to a handful of style writes.
   updateCycle(dt) {
     if (this.night || !this.splash || !this.dnRules) return;
     // cheap drift check: only reading style strings, so a re-measure stays rare
@@ -2898,6 +2991,7 @@ export class CityLife {
     if (pos !== this.dnPos || tf !== this.dnTf || cw !== this.dnW || window.innerHeight !== this.dnVh) {
       this.dnPos = pos; this.dnTf = tf; this.dnW = cw; this.dnVh = window.innerHeight;
       this.measureDn();
+      this.collectDnLines();
     }
     if (!this.reducedMotion && dt > 0) this.dnT = (this.dnT + dt) % DN_TOTAL;
     const ph = this.dnPhaseAt(this.dnT);
@@ -2908,18 +3002,50 @@ export class CityLife {
     } else if (ph.name === 'day') {
       this.restoreNightWindows(false);
     }
+    // the storm's darkening eases in and out (4 s for the full swing) instead of switching
+    const dk = this.dnDark() ? 1 : 0, step = (dt > 0 ? dt : 0) / 4;
+    if (this.dnDarkK < dk) this.dnDarkK = Math.min(dk, this.dnDarkK + step);
+    else if (this.dnDarkK > dk) this.dnDarkK = Math.max(dk, this.dnDarkK - step);
+    // sky, skyline fill and cloud fill: one continuous mix from day to night, folded with the storm
+    const qs = smooth(ph.q);
+    const sky = mixHex(this.dnSky(qs), this.dnStormSky(qs), this.dnDarkK);
+    const fill = mixHex(this.dnFill(qs), this.dnStormFill(qs), this.dnDarkK);
+    const cloud = mixHex(this.dnCloudFill(qs), this.dnStormCloud(qs), this.dnDarkK);
+    const C = this.dnCol;
+    if ((!C || C.sky !== sky || C.fill !== fill || C.cloud !== cloud)
+      && (this.dnJump || this.viewTime - this.dnLastWrite >= 0.1)) {
+      this.dnCol = { sky, fill, cloud };
+      this.dnLastWrite = this.viewTime;
+      this.setDnColors(sky, fill, cloud, '0s');
+      this.setDnLines(qs);
+    }
     const g = this.dnGeo;
     if (!g || !this.sunEl) return;
-    // sun and moon trade places: one sinks and fades as the other rises; a storm dims them to ~0.15
-    const occ = 1 - 0.85 * clamp01(this.wx.dim || 0);
-    const sunP = ph.name === 'day' ? 1 : ph.name === 'dusk' ? 1 - ph.u : ph.name === 'night' ? 0 : ph.u;
-    const sunD = (ph.name === 'dusk' ? ph.u : ph.name === 'night' ? 1 : ph.name === 'dawn' ? 1 - ph.u : 0) * 30 * g.sc;
-    const moonD = (ph.name === 'dusk' ? 1 - ph.u : ph.name === 'day' ? 1 : ph.name === 'dawn' ? ph.u : 0) * 30 * g.sc;
-    const so = (sunP * occ).toFixed(3), mo = ((1 - sunP) * occ).toFixed(3), xo = (ph.q * occ).toFixed(3);
+    // sun and moon trade places by travelling: one leaves through the top of the sky in the first half of
+    // dusk and the other drops back in during the second half (dawn is the mirror). off clears the
+    // viewport top by the body's own box, so "above" really means out of sight.
+    const off = g.sunV + 140 * g.sc + 20;
+    const half = u => smooth(clamp01(u / 0.5));
+    let sunY, moonY;
+    if (ph.name === 'dusk') { sunY = -off * half(ph.u); moonY = off * (half(ph.u) - 1); }
+    else if (ph.name === 'dawn') { sunY = off * (half(ph.u) - 1); moonY = -off * half(ph.u); }
+    else if (ph.name === 'night') { sunY = -off; moonY = 0; }
+    else { sunY = 0; moonY = -off; }
+    // the sun is held out of the sky until the intro calls sunIn(); then it drops in from above the top,
+    // easing out with a small overshoot (or, with reduced motion, simply appears where it belongs)
+    let dropY = 0;
+    if (this.sunReady && !this.reducedMotion) {
+      const k = clamp01((this.viewTime - this.sunInT0) / 1.4), c = k - 1;
+      dropY = -(g.sunV + 140 * g.sc) * (1 - (1 + 2.2 * c * c * c + 1.2 * c * c));
+    }
+    // rain hides both bodies completely (and the stars with them) once it is half-way in
+    const occ = 1 - smooth(clamp01((this.wx.dim || 0) / 0.5));
+    const sunOn = this.sunReady && sunY > -off + 1, moonOn = moonY > -off + 1;
+    const so = (sunOn ? occ : 0).toFixed(3), mo = (moonOn ? occ : 0).toFixed(3), xo = (ph.q * occ).toFixed(3);
     if (so !== this.sunO) { this.sunO = so; this.sunEl.style.opacity = so; }
     if (mo !== this.moonO) { this.moonO = mo; this.moonEl.style.opacity = mo; }
     if (xo !== this.starsO) { this.starsO = xo; this.starsEl.style.opacity = xo; }
-    const st = 'translate3d(0,' + sunD.toFixed(1) + 'px,0)', mt = 'translate3d(0,' + moonD.toFixed(1) + 'px,0)';
+    const st = 'translate3d(0,' + (sunY + dropY).toFixed(1) + 'px,0)', mt = 'translate3d(0,' + moonY.toFixed(1) + 'px,0)';
     if (st !== this.sunT) { this.sunT = st; this.sunEl.style.transform = st; }
     if (mt !== this.moonT) { this.moonT = mt; this.moonEl.style.transform = mt; }
   }

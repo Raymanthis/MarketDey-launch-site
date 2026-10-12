@@ -242,7 +242,7 @@ class HomePage extends React.Component {
       at(ST + 7 * STEP, () => this.cityShow());
       const done = ST + (tx.length + 3) * STEP + 700;
       at(done, () => { letters.forEach(solid); svg.remove(); });
-      at(done + 250, () => { if (hint) { hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } if (sign) this.signShow(); this.introReady = true; }); };
+      at(done + 250, () => { if (hint) { hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } if (sign) this.signShow(); this.introReady = true; if (this.cityLifeHero && this.cityLifeHero.sunIn) this.cityLifeHero.sunIn(); }); };
     let started = false; const go1 = () => { if (!started) { started = true; run(); } };
     if (document.fonts && document.fonts.load) document.fonts.load('900 28px Lato').then(go1, go1); else go1(); at(1500, go1);
     this.introGo = () => { if (this.props.launchMode || !this.introReady || this.introGone) return; this.introGone = true; if (this.cityLifeHero && this.cityLifeHero.setSplash) this.cityLifeHero.setSplash(false); window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
