@@ -265,13 +265,13 @@ class HomePage extends React.Component {
   tryRef = React.createRef();
   tmSetup() {
     const sec = this.tryRef.current; if (!sec || !lmMapBuild) return false;
-    const q = s => sec.querySelector('[data-tm="' + s + '"]'), T = { cv: q('cv'), map: q('map'), hole: q('hole'), top: q('top'), ui: q('ui'), card: q('card'), clip: q('clip'), c1: q('c1'), tip: q('tip'), content: q('content'), pins: [] };
-    if (!T.cv || !T.content || !T.tip) return false;
+    const q = s => sec.querySelector('[data-tm="' + s + '"]'), T = { cv: q('cv'), dark: q('dark'), cvd: q('cvd'), map: q('map'), hole: q('hole'), top: q('top'), ui: q('ui'), card: q('card'), clip: q('clip'), c1: q('c1'), tip: q('tip'), content: q('content'), pins: [] };
+    if (!T.cv || !T.dark || !T.cvd || !T.content || !T.tip) return false;
     sec.querySelectorAll('[data-pin]').forEach(el => { const i = +el.getAttribute('data-pin'); T.pins[i] = { el, in: el.firstElementChild, on: null, op: null, seen: false }; });
     if (T.pins.filter(Boolean).length < TM_PINS.length) return false;
     this.tm = T; this.tipOn = false; this.tipAt = null; this.tmBuild(); this.tmResize(); return true;
   }
-  tmResize() { const T = this.tm; if (!T) return; this.dpr = Math.min(1.5, window.devicePixelRatio || 1); const de = document.documentElement; T.cv.width = Math.round(de.clientWidth * this.dpr); T.cv.height = Math.round(window.innerHeight * this.dpr); this.tmKey = null; this.tmN = 0; }
+  tmResize() { const T = this.tm; if (!T) return; this.dpr = Math.min(1.5, window.devicePixelRatio || 1); const de = document.documentElement; T.cv.width = Math.round(de.clientWidth * this.dpr); T.cv.height = Math.round(window.innerHeight * this.dpr); T.cvd.width = T.cv.width; T.cvd.height = T.cv.height; this.tmKey = null; this.tmKeyD = null; this.tmN = 0; }
   tmBuild() {
     const G = lmMapBuild(), { S0, SMAX, FILL, sideQ, patches, fr, W, MK, SIDES } = G, TS0 = S0 + 4;
     const road = []; for (let s = S0; s <= SMAX + 1e-6; s += 1) { const p = fr(s); road.push([p[0], p[1]]); }
@@ -328,7 +328,9 @@ class HomePage extends React.Component {
     const VW = document.documentElement.clientWidth, VH = window.innerHeight, r = sec.getBoundingClientRect();
     if (VW !== this.tmVW) { this.tmVW = VW; this.tmResize(); }
     if (r.bottom < 0 || r.top > VH) return;
-    const stg = sec.firstElementChild; if (stg) { const rv = window.__mdReveal, on = r.top <= 0.5; stg.style.opacity = on ? '1' : '0'; stg.style.visibility = on ? 'visible' : 'hidden'; const full = Math.hypot(VW, VH); stg.style.clipPath = on && rv && rv.r < full ? 'circle(' + rv.r.toFixed(1) + 'px at ' + rv.x.toFixed(1) + 'px ' + rv.y.toFixed(1) + 'px)' : 'none'; }
+    const rv = window.__mdReveal, on = r.top <= 0.5, full = Math.hypot(VW, VH), stg = sec.firstElementChild; if (stg) { stg.style.opacity = on ? '1' : '0'; stg.style.visibility = on ? 'visible' : 'hidden'; stg.style.clipPath = on && rv && rv.r < full ? 'circle(' + rv.r.toFixed(1) + 'px at ' + rv.x.toFixed(1) + 'px ' + rv.y.toFixed(1) + 'px)' : 'none'; }
+    const dA = rv && rv.d != null ? sst(0.35, 0.95, rv.d) : 0, revealed = on && (!rv || rv.r >= full), dk = dA > 0.002 && !revealed;
+    { const dv = dk ? 'visible' : 'hidden', dop = dA.toFixed(3); if (T.dv !== dv) { T.dv = dv; T.dark.style.visibility = dv; } if (T.dop !== dop) { T.dop = dop; T.dark.style.opacity = dop; } }
     const tg = clampN((-r.top - 0.5 * VH) / VH, 0, TM_END); this.tu = this.tu == null ? tg : this.tu + (tg - this.tu) * 0.12; if (Math.abs(tg - this.tu) < 0.0005) this.tu = tg;
     const u = this.tu, narrow = VW < 900; this.tmN = (this.tmN || 0) + 1;
     const Hp0 = narrow ? Math.min(VH * 0.6, 540) : Math.min(VH * 0.72, 620), Wp0 = Hp0 * 402 / 874;
@@ -348,7 +350,7 @@ class HomePage extends React.Component {
       const Ax = lerp(Aov[0], Ah[0], e), Ay = lerp(Aov[1], Ah[1], e); mcx = HD[0] - (Ox - Ax) / ppu; mcz = HD[1] - (Oy - Ay) / ppu; }
     const sT = D.TS0 + (245 - D.TS0) * sst(3.0, 3.55, u), trailA = 1 - sst(3.7, 3.85, u), townA = 1 - sst(4.05, TM_HAND, u), hand = u >= TM_HAND - 0.001;
     const mv = hand ? 'hidden' : 'visible'; if (T.mv !== mv) { T.mv = mv; T.map.style.visibility = mv; }
-    if (!hand) { const key = [ppu.toFixed(5), Ox.toFixed(1), Oy.toFixed(1), mcx.toFixed(3), mcz.toFixed(3), sT.toFixed(1), trailA.toFixed(3), townA.toFixed(3), sL.toFixed(2), VW, VH].join(); if (key !== this.tmKey) { this.tmKey = key; this.tmDraw({ ppu, Ox, Oy, cx: mcx, cz: mcz, sT, trailA, townA, sL }, T.cv.getContext('2d'), TM_LIGHT); } }
+    if (!hand) { const key = [ppu.toFixed(5), Ox.toFixed(1), Oy.toFixed(1), mcx.toFixed(3), mcz.toFixed(3), sT.toFixed(1), trailA.toFixed(3), townA.toFixed(3), sL.toFixed(2), VW, VH].join(); if (key !== this.tmKey) { this.tmKey = key; this.tmDraw({ ppu, Ox, Oy, cx: mcx, cz: mcz, sT, trailA, townA, sL }, T.cv.getContext('2d'), TM_LIGHT); } if (dk && key !== this.tmKeyD) { this.tmKeyD = key; this.tmDraw({ ppu, Ox, Oy, cx: mcx, cz: mcz, sT, trailA, townA, sL }, T.cvd.getContext('2d'), TM_DARK); } }
     const H = T.hole.style, hv = u > 2.85 ? 'hidden' : 'visible'; if (T.hv !== hv) { T.hv = hv; H.visibility = hv; }
     if (hv === 'visible') { const fa = 0.74 * (1 - sst(2.4, 2.75, u)); H.transform = 'translate(' + x + 'px,' + y + 'px)'; H.width = w + 'px'; H.height = h + 'px'; H.borderRadius = 31 * k + 'px';
       H.boxShadow = '0 0 0 ' + 8 * k + 'px #0b0b0b, 0 0 0 ' + 10.5 * k + 'px #8f8c87, 0 0 0 ' + 12 * k + 'px #4a4743, 0 ' + 30 * k + 'px ' + 60 * k + 'px ' + (-10 * k) + 'px rgba(37,36,34,' + (0.3 * (1 - g)).toFixed(3) + '), 0 0 0 4000px rgba(250,249,246,' + fa.toFixed(3) + ')'; }
@@ -688,7 +690,7 @@ class HomePage extends React.Component {
                     </div>{' '}
                   </div>
                 </div>
-              </div></section>
+              </div><div data-tm="dark" style={{position:"fixed",inset:"0",zIndex:"-1",pointerEvents:"none",visibility:"hidden",opacity:"0",background:"#161513"}}><canvas data-tm="cvd" style={{position:"absolute",left:"0",top:"0",width:"100%",height:"100%",display:"block"}}></canvas></div></section>
           <section id="landmarks" style={{position:"relative",zIndex:"1",marginTop:"-250vh"}}><LandmarksJourneySection /></section>
           <section data-screen-label="07 Roads" style={{position:"relative",zIndex:"2",marginTop:"-100vh"}}><div ref={v.roadsRef} style={{position:"sticky",top:"0",boxSizing:"border-box",padding:"96px 0 0",background:"#f3ebdc",opacity:"0",transformOrigin:"50% 30%"}}>{' '}
               <div style={{maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
