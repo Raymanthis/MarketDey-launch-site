@@ -180,7 +180,9 @@ LINESETS = {
                   0.85, (40.0, 160.0), 0.18),
     "wires": (("wires",), ("silhouette", "border", "external_contour"), (), 0.75, (90.0, 320.0), 0.12),
     # foliage: only the outline of each tree's whole leaf mass (contour), never clump-by-clump
-    "foliage": (("foliage",), ("silhouette", "external_contour"), (), 1.1, (60.0, 240.0), 0.0),
+    "foliage": (("foliage",), ("contour", "external_contour"), (), 1.1, (60.0, 240.0), 0.0),
+    # leaf clusters inside the mass: lighter, broken, scalloped strokes on inner contours
+    "foliage_in": (("foliage",), ("silhouette",), ("contour", "external_contour"), 0.6, (40.0, 140.0), 0.0),
 }
 
 
@@ -258,7 +260,7 @@ def style(st, name, thick, fade, wobble):
     al.range_min, al.range_max = f0 * 0.6, f1
     al.mapping = "LINEAR"
     al.invert = True
-    if name == "foliage":
+    if name in ("foliage", "foliage_in"):
         # scalloped leafy edge: small regular bumps plus irregular ones
         sd = st.geometry_modifiers.new("scallop", "SINUS_DISPLACEMENT")
         sd.wavelength = 4.5 * thick / 1.2
@@ -274,7 +276,7 @@ def style(st, name, thick, fade, wobble):
         # broken, pressure-varying strokes
         an = st.alpha_modifiers.new("broken", "NOISE")
         an.blend = "MULTIPLY"
-        an.amplitude = 0.7
+        an.amplitude = 0.4
         an.period = 18.0
         tn = st.thickness_modifiers.new("press", "NOISE")
         tn.blend = "MULTIPLY"
