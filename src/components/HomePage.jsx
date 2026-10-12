@@ -200,6 +200,8 @@ class HomePage extends React.Component {
     const rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     this[k] = new CityLife(svg, { night: !hero, W, G, seed: hero ? 5 : 19, reducedMotion: rm, skyDimOnly: hero && !!this.props.launchMode });
     this[k].start();
+    // day/night cycle runs only on the splash screen: always on the launch page, until the intro ends on the full site
+    if (hero && this[k].setSplash) this[k].setSplash(!!this.props.launchMode || !this.introGone);
   }
   cityLive(el0) { const el = el0 || this.cityRef.current; if (!el) return; this.cityScroll(el); el.querySelectorAll('[data-live]').forEach(g => { g.style.opacity = '1'; }); el.querySelectorAll('rect[data-w]').forEach((w, i) => { w.style.animation = 'mdTwinkle ' + w.getAttribute('data-w') + 's ease-in-out ' + ((i * 0.37) % 4).toFixed(2) + 's infinite'; }); }
   cityScroll(el0) { const el = el0 || this.cityRef.current; if (!el || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
@@ -243,7 +245,7 @@ class HomePage extends React.Component {
       at(done + 250, () => { if (hint) { hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } if (sign) this.signShow(); this.introReady = true; }); };
     let started = false; const go1 = () => { if (!started) { started = true; run(); } };
     if (document.fonts && document.fonts.load) document.fonts.load('900 28px Lato').then(go1, go1); else go1(); at(1500, go1);
-    this.introGo = () => { if (this.props.launchMode || !this.introReady || this.introGone) return; this.introGone = true; window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
+    this.introGo = () => { if (this.props.launchMode || !this.introReady || this.introGone) return; this.introGone = true; if (this.cityLifeHero && this.cityLifeHero.setSplash) this.cityLifeHero.setSplash(false); window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
       if (hint) { hint.style.opacity = '0'; hint.style.transform = 'translate(-50%,12px)'; hint.style.pointerEvents = 'none'; }
       if (logo) { logo.style.transition = 'transform 1.05s cubic-bezier(.7,0,.2,1)'; logo.style.transform = 'none'; }
       this.cityHide();
