@@ -42,22 +42,26 @@ def _blob(b, c, rx, ry, rz, seed, nu=22, nv=12, amp=0.16, mat="foliage"):
 
 
 def leaf_cards(C, c, rx, ry, rz, rng, n, size=0.17):
-    """Small leaf quads scattered over a clump's surface, poking a little outward: in the tonal
-    pass they break the clump's silhouette into leaves and dapple its tone; they are never inked
-    but they do occlude the clump outline, so the contour comes out broken and leafy."""
+    """Small leaf quads scattered over a clump's surface, poking a little outward. Each card lies
+    nearly tangent to the clump (normal close to the clump's own), so it takes the clump's tone
+    instead of flashing light or dark; in the tonal pass the cards break the silhouette into
+    leaves. They are never inked, but they occlude the clump outline, so it comes out broken."""
     c = Vector(c)
     for _ in range(n):
         # biased to the sides and top, where the silhouette is
         u, v = rng.uniform(0, 2 * math.pi), math.acos(rng.uniform(-0.45, 0.9))
         d = Vector((math.sin(v) * math.cos(u), math.sin(v) * math.sin(u), math.cos(v)))
-        p = c + Vector((d.x * rx, d.y * ry, d.z * rz)) * rng.uniform(0.92, 1.12)
-        a = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-0.4, 0.4))).normalized()
-        b = d.cross(a).normalized()
-        if b.length < 1e-6:
-            continue
-        s = size * rng.uniform(0.7, 1.3)
-        q = [p - a * s * 0.5, p + b * s * 0.28, p + a * s * 0.5, p - b * s * 0.28]
-        C.poly(q, "foliage" if d.z > -0.2 else "foliage_dark")
+        p = c + Vector((d.x * rx, d.y * ry, d.z * rz)) * rng.uniform(0.96, 1.08)
+        nrm = Vector((d.x / rx, d.y / ry, d.z / rz)).normalized()
+        nrm = (nrm + Vector((rng.uniform(-0.35, 0.35), rng.uniform(-0.35, 0.35), rng.uniform(-0.2, 0.35)))).normalized()
+        a = nrm.orthogonal().normalized()
+        rot = rng.uniform(0, 2 * math.pi)
+        a = (a * math.cos(rot) + nrm.cross(a) * math.sin(rot)).normalized()
+        b = nrm.cross(a).normalized()
+        s = size * rng.uniform(0.7, 1.25)
+        # a pointed leaf: long axis a, half width 0.3
+        q = [p - a * s * 0.5, p + b * s * 0.16, p + a * s * 0.5, p - b * s * 0.16]
+        C.poly(q, "foliage" if nrm.z > -0.1 else "foliage_dark")
 
 
 def almond(tag, x, y, scale=1.0, seed=1):
@@ -97,16 +101,16 @@ def almond(tag, x, y, scale=1.0, seed=1):
                 rz = r * rng.uniform(0.3, 0.42)
                 _blob(Fo, pc, r * 1.1, r * 0.95, rz, seed * 100 + k * 10 + i * 2 + j, amp=0.25,
                       mat="foliage" if (i + j) % 3 else "foliage_dark")
-                leaf_cards(Lc, pc, r * 1.1, r * 0.95, rz, rng, int(130 * r * r), size=0.26 * scale)
+                leaf_cards(Lc, pc, r * 1.1, r * 0.95, rz, rng, int(260 * r * r), size=0.2 * scale)
             # a drooping clump hanging under the tier edge
             if rng.random() < 0.5:
                 pc = c + d * ln * 0.95 + Vector((0, 0, -0.1 * scale))
                 r = rng.uniform(0.45, 0.65) * scale
                 _blob(Fo, pc, r, r, r * 0.55, seed * 1000 + k * 10 + i, amp=0.25, mat="foliage_dark")
-                leaf_cards(Lc, pc, r, r, r * 0.55, rng, int(110 * r * r), size=0.24 * scale)
+                leaf_cards(Lc, pc, r, r, r * 0.55, rng, int(220 * r * r), size=0.2 * scale)
         rc = reach * 0.42
         _blob(Fo, c + Vector((0, 0, 0.3 * scale)), rc, rc, 0.35 * scale, seed * 100 + k * 10 + 9, amp=0.22)
-        leaf_cards(Lc, c + Vector((0, 0, 0.3 * scale)), rc, rc, 0.35 * scale, rng, int(90 * rc * rc), size=0.26 * scale)
+        leaf_cards(Lc, c + Vector((0, 0, 0.3 * scale)), rc, rc, 0.35 * scale, rng, int(180 * rc * rc), size=0.2 * scale)
 
 
 def rounded_tree(tag, x, y, scale=1.0, seed=5):
@@ -128,7 +132,7 @@ def rounded_tree(tag, x, y, scale=1.0, seed=5):
         T.tube([fork, fork + d * 0.7 * scale + Vector((0, 0, 1.0 * scale)), e], 0.17 * scale, 0.07 * scale, n=10,
                mat="bark")
         ends.append(e)
-    centre = fork + Vector((0, 0, 3.0 * scale))
+    centre = fork + Vector((0, 0, 2.3 * scale))
     for k in range(16):
         u = rng.uniform(0, 2 * math.pi)
         v = rng.uniform(0.0, 1.25)
@@ -136,7 +140,7 @@ def rounded_tree(tag, x, y, scale=1.0, seed=5):
         pc = centre + Vector((d.x * 2.6, d.y * 2.6, d.z * 1.7)) * scale
         r = rng.uniform(1.0, 1.5) * scale
         _blob(Fo, pc, r, r, r * 0.75, seed * 50 + k, amp=0.28, mat="foliage" if d.z > 0.3 else "foliage_dark")
-        leaf_cards(Lc, pc, r, r, r * 0.75, rng, int(110 * r * r), size=0.25 * scale)
+        leaf_cards(Lc, pc, r, r, r * 0.75, rng, int(220 * r * r), size=0.2 * scale)
 
 
 def oil_palm(tag, x, y, h=8.0, seed=2):
@@ -195,9 +199,10 @@ def oil_palm(tag, x, y, h=8.0, seed=2):
 
 
 def build_all():
-    almond("almond0", -5.0, 44.0, 1.0, seed=3)
+    almond("almond0", -4.9, 47.5, 1.0, seed=3)
     rounded_tree("neem0", 5.6, 24.0, 0.85, seed=5)
     almond("almond1", 5.25, 88.0, 0.95, seed=7)
     almond("almond2", -5.2, 103.0, 0.85, seed=11)
     oil_palm("palm0", 5.5, 57.0, 8.4, seed=2)
     oil_palm("palm1", -5.5, 116.0, 9.0, seed=5)
+    oil_palm("palm2", -5.7, 53.0, 9.4, seed=8)
