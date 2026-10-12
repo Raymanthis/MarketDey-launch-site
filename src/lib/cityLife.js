@@ -281,6 +281,7 @@ export class CityLife {
   }
 
   trafficAt(t) {
+    if (this.reducedMotion) return { C: 0, phase: 'free' };
     if (t < 0) t = 0;
     while (!this.tSegs.length || this.tSegs[this.tSegs.length - 1].t1 <= t) this.genTraffic();
     if (this.tIdx >= this.tSegs.length || t < this.tSegs[this.tIdx].t0) this.tIdx = 0;
@@ -322,6 +323,7 @@ export class CityLife {
   }
 
   weatherAt(t) {
+    if (this.reducedMotion) return { phase: 'clear', p: 0, dim: 0, rain: 0, storm: null };
     while (!this.storms.length || this.storms[this.storms.length - 1].end <= t) this.genStorm();
     let s = null;
     for (let k = this.storms.length - 1; k >= 0; k--) {
@@ -343,6 +345,7 @@ export class CityLife {
   deriveWeather() { this.wx = this.weatherAt(this.viewTime); }
 
   forceStorm() {
+    if (this.reducedMotion) return this.state();
     this.deriveWeather();
     if (this.wx.phase !== 'clear') return this.state();
     const t = this.viewTime;
