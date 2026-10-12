@@ -1,0 +1,94 @@
+{
+  "siteQuestionPhone": {
+    "progress": "1 of 2 questions",
+    "location": "Sapele, Delta · you are here",
+    "title": "Is today market day at Central Market, Sapele?",
+    "subtitle": "One tap. It helps everyone on the Warri road tomorrow.",
+    "yes": "Yes",
+    "no": "No",
+    "notSure": "I am not sure",
+    "callout": "You are at the market, so your answer counts 3.",
+    "footnote": "4 people answered this morning. Answers from trusted reporters count for more.",
+    "statusTime": "9:41",
+    "statusNetwork": "4G"
+  },
+  "standingPhone": {
+    "back": "Account",
+    "title": "Your standing",
+    "pointsLabel": "Points earned",
+    "pointsValue": "412",
+    "badge": "Trusted ×1.5",
+    "pendingTitle": "18 points pending",
+    "pendingNote": "Waits until enough people agree, then it lands in one go",
+    "nextTierHeading": "Next tier",
+    "nextTierName": "Town verifier",
+    "nextTierProgress": "412 / 1,000",
+    "nextTierNote": "588 more, then an admin reviews your application.",
+    "unlockHeading": "What tiers unlock",
+    "tierNewReporter": "New reporter · ×1",
+    "tierNewReporterNote": "Everything works. Your first road warnings wait for a second person to agree.",
+    "tierTrustedReporter": "Trusted reporter · ×1.5",
+    "youAreHere": "You are here",
+    "tierTrustedReporterNote": "Your road warnings show immediately, and your answers count for more.",
+    "tierTownVerifier": "Town verifier · ×2",
+    "tierTownVerifierNote": "You can edit markets in your town and your answers count double. Needs admin approval.",
+    "activityTitle": "Activity",
+    "activityNote": "Every round, earned and pending",
+    "howPointsWork": "How points work"
+  },
+  "copy": {
+    "eyebrow": "For contributors",
+    "heading": "One tap keeps the dates right.",
+    "body": "Answer \"Is today market day?\" when you pass. Answers count once enough people agree, and they build your standing. Try it below."
+  },
+  "card": {
+    "question": "Is today market day?",
+    "yes": "Yes, it's on",
+    "no": "No",
+    "notSure": "Not sure",
+    "thanksNote": "It counts once enough people agree.",
+    "standingLabel": "YOUR STANDING",
+    "pointsUnit": "points",
+    "places": [
+      "Sapele main market · you are here",
+      "Abraka Nkwọ market · 1.2 km away",
+      "Ogwashi-Uku Eke market · you are here",
+      "Issele-Uku Orie market · 0.4 km away"
+    ],
+    "countSeparator": " of ",
+    "thanksAnswered": "Thanks, answer saved.",
+    "thanksSkipped": "No problem.",
+    "actions": [
+      "Answer from the alert",
+      "Report a blocked road",
+      "Help verify a market",
+      "A market you added gets verified"
+    ]
+  },
+  "standing": {
+    "tierNames": [
+      "New reporter",
+      "Trusted reporter",
+      "Town verifier"
+    ],
+    "multipliers": [
+      "×1",
+      "×1.5",
+      "×2"
+    ],
+    "titleSeparator": " · answers count ",
+    "nodeLabels": [
+      "New reporter",
+      "Trusted reporter ×1.5",
+      "Town verifier ×2"
+    ],
+    "hintTier0Suffix": " more points and your road warnings show right away.",
+    "hintTier1Prefix": "You're a Trusted reporter. Your answers now count ×1.5. ",
+    "hintTier1Suffix": " more points, then an admin reviews you for Town verifier.",
+    "hintTier2": "Eligible for Town verifier. An admin will review your answers."
+  },
+  "links": {
+    "howItWorks": "How contributing works",
+    "startOver": "Start over"
+  }
+}
