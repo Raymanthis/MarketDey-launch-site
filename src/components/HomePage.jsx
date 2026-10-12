@@ -44,7 +44,9 @@ const TM_PINS = [{t:'main'},{t:'mkt',ox:118,oy:-150,init:350},{t:'mkt',ox:-96,oy
   {t:'lm',n:1},{t:'lm',n:2},{t:'lm',n:3},{t:'lm',n:4},{t:'arrow'}];
 const TM_P0 = 1.8, TM_HAND = 4.4, TM_END = 5.4, TM_LM = 3.9;
 const SIGN_K = 400, SIGN_C = 2;
-const SIGN_RING_CY = 11, SIGN_HOLE_R = 4.6, SIGN_LOOP_R = 7, SIGN_DRAG_VEL_MAX = 100;
+const SIGN_RING_CY = 8.8, SIGN_HOLE_R = 3.68, SIGN_LOOP_R = 5.6, SIGN_RING_D = 11.2;
+const SIGN_PEND_K = 700, SIGN_PEND_C = 3, SIGN_PEND_MAX = 55, SIGN_PEND_VMAX = 260;
+const SIGN_FLICK_WIN = 200, SIGN_FLICK_MIN = 400, SIGN_FLICK_K = 0.3, SIGN_FLICK_MAX = 700;
 
 class HomePage extends React.Component {
   static defaultProps = { startMarket: 'ogwashi', launchMode: false };
@@ -288,18 +290,38 @@ class HomePage extends React.Component {
   bMove(e) { const p = this.bp; if (!p || !p.drag) return; const nx = Math.max(-160, Math.min(160, e.clientX - p.sx)), ny = Math.max(-50, Math.min(110, e.clientY - p.sy)), now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
     p.vx = p.vx * 0.5 + ((nx - p.x) / dt) * 0.5; p.vy = p.vy * 0.5 + ((ny - p.y) / dt) * 0.5; if (Math.abs(nx) + Math.abs(ny) > 4) p.moved = true; p.x = nx; p.y = ny; p.pt = now; }
   bUp(e) { const p = this.bp; if (!p) return; p.drag = false; if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab'; this.bRun(); }
-  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, drag: false, down: false, moved: false, tapDir: 1, vx: 0, sx: 0, sy: 0, cx: 0, px: 0, pt: 0, dt0: 0, lastTapAt: 0, stx: 0, last: performance.now() }; return this.sp; }
+  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, phi: 0, phv: 0, drag: false, down: false, moved: false, tapDir: 1, vx: 0, vy: 0, sx: 0, sy: 0, cx: 0, ax: 0, ay: 0, px: 0, py: 0, pt: 0, dt0: 0, a0: 0, st0: 0, stx: 0, hist: [], lastTapAt: 0, last: performance.now() }; return this.sp; }
   signPlace() {
     const logo = this.heroRef.current && this.heroRef.current.querySelector('[data-h="logo"]');
-    const node = this.signNodeRef.current, rope = this.signRopeRef.current, ropeF = this.signRopeFrontRef.current;
+    const node = this.signNodeRef.current;
     if (!logo || !node) return;
     const r = logo.getBoundingClientRect();
     const top = Math.max(40, Math.round(r.bottom + 28));
     this.signTop = top;
     node.style.top = top + 'px';
-    const cy = top + SIGN_RING_CY, holeTop = cy - SIGN_HOLE_R, loopBot = cy + SIGN_LOOP_R * 2;
-    if (rope) { const L = loopBot + 2, R = SIGN_LOOP_R, d = 'M0 0 L0 ' + cy + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + loopBot + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + cy; rope.style.height = L + 'px'; rope.querySelectorAll('path').forEach(p => p.setAttribute('d', d)); }
-    if (ropeF) { ropeF.style.height = holeTop + 'px'; ropeF.querySelectorAll('path').forEach(p => p.setAttribute('d', 'M0 0 L0 ' + holeTop)); }
+    this.signRope();
+  }
+  // rope is redrawn every frame: straight line from the fixed anchor down to the swung eyelet, loop around it
+  signRope() {
+    const rope = this.signRopeRef.current, ropeF = this.signRopeFrontRef.current;
+    if (!rope || !ropeF || this.signTop == null) return;
+    const p = this.signPhys(), R = SIGN_LOOP_R, cy = this.signTop + SIGN_RING_CY, loopBot = cy + R * 2, holeTop = cy - SIGN_HOLE_R;
+    const rad = p.phi * Math.PI / 180, s = Math.sin(rad), c = Math.cos(rad), at = y => (-y * s).toFixed(2) + ' ' + (y * c).toFixed(2); // CSS rotate(phi) maps (0,y) to (-y sin, y cos)
+    rope.style.height = (loopBot + 2) + 'px';
+    rope.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 0 L' + at(cy) + ' A ' + R + ' ' + R + ' 0 1 1 ' + at(loopBot) + ' A ' + R + ' ' + R + ' 0 1 1 ' + at(cy)));
+    ropeF.style.height = holeTop + 'px';
+    ropeF.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 0 L' + at(holeTop)));
+  }
+  // pendulum angle phi swings the card about the anchor; torsion theta spins it about the rope axis
+  signRender() {
+    const p = this.signPhys(), pend = this.signPendRef.current, body = this.signBodyRef.current;
+    if (pend) {
+      const moving = p.drag || Math.abs(p.phi) > 0.02 || Math.abs(p.phv) > 0.2;
+      if (moving) { if (this.signSway) { pend.classList.remove('md-sign-pend'); this.signSway = false; } pend.style.transform = 'rotate(' + p.phi.toFixed(3) + 'deg)'; }
+      else { if (!this.signSway) { pend.classList.add('md-sign-pend'); this.signSway = true; } pend.style.transform = ''; }
+    }
+    if (body && !this.reducedMotion) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
+    this.signRope();
   }
   signShow() {
     const el = this.signRef.current; if (!el) return;
@@ -316,52 +338,82 @@ class HomePage extends React.Component {
     }
     const drop = this.signDropRef.current;
     if (drop) { drop.style.animation = 'none'; void drop.offsetWidth; drop.style.animation = 'mdSignDrop .8s cubic-bezier(.25,.85,.3,1.15) both'; }
+    this.signSway = true;
     this.signRun();
   }
   signRun() {
-    if (this.signRaf || this.reducedMotion) return;
-    const p = this.signPhys(); p.last = performance.now();
+    if (this.signRaf) return;
+    const p = this.signPhys(), rm = this.reducedMotion; p.last = performance.now();
     const step = () => {
       const now = performance.now(), dt = Math.min(0.033, Math.max(0.001, (now - p.last) / 1000)); p.last = now;
-      if (!p.drag) { p.omega += (-SIGN_K * Math.sin(p.theta * Math.PI / 90) - SIGN_C * p.omega) * dt; p.theta += p.omega * dt; }
-      const body = this.signBodyRef.current;
-      if (body) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
-      const target = Math.round(p.theta / 180) * 180;
-      const calm = !p.drag && Math.abs(p.theta - target) < 0.05 && Math.abs(p.omega) < 0.5;
-      if (!calm) this.signRaf = requestAnimationFrame(step);
-      else { this.signRaf = null; p.theta = target; p.omega = 0; if (body) body.style.transform = 'rotateY(' + target + 'deg)'; }
+      if (!p.drag) {
+        if (rm) { p.phi = Math.abs(p.phi) < 0.15 ? 0 : p.phi * Math.exp(-dt * 10); p.phv = 0; }
+        else {
+          p.phv += (-SIGN_PEND_K * Math.sin(p.phi * Math.PI / 180) - SIGN_PEND_C * p.phv) * dt;
+          p.phi += p.phv * dt;
+          if (p.phi > SIGN_PEND_MAX) { p.phi = SIGN_PEND_MAX; if (p.phv > 0) p.phv = 0; }
+          if (p.phi < -SIGN_PEND_MAX) { p.phi = -SIGN_PEND_MAX; if (p.phv < 0) p.phv = 0; }
+          p.omega += (-SIGN_K * Math.sin(p.theta * Math.PI / 90) - SIGN_C * p.omega) * dt;
+          p.theta += p.omega * dt;
+        }
+      }
+      this.signRender();
+      const face = Math.round(p.theta / 180) * 180;
+      const calmP = !p.drag && Math.abs(p.phi) < 0.15 && Math.abs(p.phv) < 1;
+      const calmT = rm || (!p.drag && Math.abs(p.theta - face) < 0.05 && Math.abs(p.omega) < 0.5);
+      if (!calmP || !calmT) this.signRaf = requestAnimationFrame(step);
+      else { this.signRaf = null; p.phi = 0; p.phv = 0; if (!rm) { p.theta = face; p.omega = 0; } this.signRender(); }
     };
     this.signRaf = requestAnimationFrame(step);
   }
   signDown(e) {
-    if (this.reducedMotion) { if (e.currentTarget) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {} e.currentTarget.style.cursor = 'grabbing'; } return; }
     const p = this.signPhys();
     const rect = e.currentTarget.getBoundingClientRect();
+    const root = this.signRef.current ? this.signRef.current.getBoundingClientRect() : null;
     const now = performance.now();
+    p.ax = root ? root.left + root.width / 2 : window.innerWidth / 2; p.ay = root ? root.top : 0;
     p.down = true; p.drag = false; p.moved = false;
     p.cx = rect.left + rect.width / 2;
-    p.sx = e.clientX; p.sy = e.clientY; p.stx = p.theta; p.px = e.clientX; p.pt = now; p.dt0 = now; p.vx = 0;
+    p.sx = e.clientX; p.sy = e.clientY; p.stx = p.theta; p.st0 = p.phi;
+    p.px = e.clientX; p.py = e.clientY; p.pt = now; p.dt0 = now; p.vx = 0; p.vy = 0;
+    p.a0 = Math.atan2(e.clientX - p.ax, e.clientY - p.ay);
+    p.hist = [];
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
     e.currentTarget.style.cursor = 'grabbing';
+    this.signRun();
   }
   signMove(e) {
-    const p = this.sp; if (!p || !p.down || this.reducedMotion) return;
-    const dx = e.clientX - p.sx;
-    if (!p.moved) { if (Math.abs(dx) <= 6) return; p.moved = true; p.drag = true; p.px = e.clientX; p.pt = performance.now(); }
+    const p = this.sp; if (!p || !p.down) return;
+    const dx = e.clientX - p.sx, dy = e.clientY - p.sy;
+    if (!p.moved) { if (Math.abs(dx) <= 6 && Math.abs(dy) <= 6) return; p.moved = true; p.drag = true; p.px = e.clientX; p.py = e.clientY; p.pt = performance.now(); p.hist = []; }
     const now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
-    p.theta = p.stx + dx * 1.2;
-    p.vx = p.vx * 0.7 + ((e.clientX - p.px) / dt) * 0.3;
-    p.px = e.clientX; p.pt = now;
-    const body = this.signBodyRef.current; if (body) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
+    let ang = Math.atan2(e.clientX - p.ax, e.clientY - p.ay) - p.a0;
+    while (ang > Math.PI) ang -= Math.PI * 2;
+    while (ang < -Math.PI) ang += Math.PI * 2;
+    const phi = Math.max(-SIGN_PEND_MAX, Math.min(SIGN_PEND_MAX, p.st0 + ang * 180 / Math.PI));
+    p.phv = Math.max(-SIGN_PEND_VMAX, Math.min(SIGN_PEND_VMAX, (phi - p.phi) / dt));
+    p.phi = phi;
+    p.hist.push({ x: e.clientX, y: e.clientY, phi, t: now });
+    while (p.hist.length > 2 && now - p.hist[0].t > SIGN_FLICK_WIN) p.hist.shift();
+    this.signRender();
+    p.px = e.clientX; p.py = e.clientY; p.pt = now;
   }
   signUp(e) {
     if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab';
-    if (this.reducedMotion) { this.signFace = this.signFace ? 0 : 1; this.signCrossfade(); return; }
     const p = this.sp; if (!p || !p.down) return;
     const held = performance.now() - p.dt0;
-    p.down = false; p.drag = false;
-    if (p.moved) p.omega = Math.max(-SIGN_DRAG_VEL_MAX, Math.min(SIGN_DRAG_VEL_MAX, (p.vx || 0) * 1.2));
-    else if (held < 350) {
+    p.down = false;
+    if (p.moved) {
+      p.drag = false;
+      const h = p.hist || [], now = performance.now();
+      while (h.length > 2 && now - h[0].t > SIGN_FLICK_WIN) h.shift();
+      let vx = 0, vy = 0, vphi = 0;
+      if (h.length > 1) { const span = (h[h.length - 1].t - h[0].t) / 1000; if (span > 0.02) { vx = (h[h.length - 1].x - h[0].x) / span; vy = (h[h.length - 1].y - h[0].y) / span; vphi = (h[h.length - 1].phi - h[0].phi) / span; } }
+      p.vx = vx; p.vy = vy;
+      p.phv = this.reducedMotion ? 0 : Math.max(-SIGN_PEND_VMAX, Math.min(SIGN_PEND_VMAX, vphi));
+      if (!this.reducedMotion && Math.abs(vx) >= SIGN_FLICK_MIN && Math.abs(vx) >= Math.abs(vy)) p.omega += Math.max(-SIGN_FLICK_MAX, Math.min(SIGN_FLICK_MAX, vx * SIGN_FLICK_K));
+    } else if (held < 350) {
+      if (this.reducedMotion) { this.signFace = this.signFace ? 0 : 1; this.signCrossfade(); return; }
       const now = performance.now();
       let dir = (p.sx >= p.cx) ? 1 : -1;
       if (Math.abs(p.sx - p.cx) < 8) { if (now - p.lastTapAt > 700) p.tapDir = -p.tapDir; dir = p.tapDir; }
@@ -592,12 +644,14 @@ class HomePage extends React.Component {
   render() {
     const v = { ...this.props, ...this.renderVals() };
     const sHole = "radial-gradient(circle at 50% " + SIGN_RING_CY + "px, rgba(0,0,0,0) " + SIGN_HOLE_R + "px, #000 " + (SIGN_HOLE_R + 0.1) + "px)";
-    const sFace = { backfaceVisibility: "hidden", background: "#a7c957", color: "#252422", fontWeight: "900", fontSize: "clamp(15px, 3.9vw, 22px)", lineHeight: "1", padding: "20px 1.1em 0.45em", borderRadius: "10.5px", whiteSpace: "nowrap", boxShadow: "0 14px 26px -14px rgba(0,0,0,.45)", letterSpacing: "-.02em", WebkitMaskImage: sHole, maskImage: sHole };
+    const sFace = { backfaceVisibility: "hidden", background: "#a7c957", color: "#252422", fontWeight: "900", fontSize: "clamp(12px, 3.1vw, 18px)", lineHeight: "1", padding: "16px 0.88em 0.36em", borderRadius: "8.4px", whiteSpace: "nowrap", boxShadow: "0 11px 21px -11px rgba(0,0,0,.45)", letterSpacing: "-.02em", WebkitMaskImage: sHole, maskImage: sHole };
+    // grommet lives on the card itself (inside both faces) so it foreshortens with the flip
+    const sEyelet = { position: "absolute", left: "50%", top: (SIGN_RING_CY - SIGN_RING_D / 2) + "px", transform: "translateX(-50%)", width: SIGN_RING_D + "px", height: SIGN_RING_D + "px", borderRadius: "50%", boxSizing: "border-box", border: "2px solid #d9d9dc", boxShadow: "inset 0 1.2px 1.6px rgba(0,0,0,.34),inset 0 -1.2px 1.2px rgba(255,255,255,.55),0 .8px 1.6px rgba(0,0,0,.3)", zIndex: "4", pointerEvents: "none" };
     return (
       <div className={`sc-host ${styles.root}`} data-sc-name="orig">
         <div style={{overflowX:"clip"}}>
           <section ref={v.heroRef} data-screen-label="01 Hero" style={v.launchMode ? {position:"relative",background:"#386641",overflow:"hidden",height:"100vh"} : {position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
-            {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <div data-h="sign" ref={this.signRef} style={{position:"fixed",left:"50%",top:"0",zIndex:"1",transform:"translateX(-50%)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease"}}><div ref={this.signPendRef} className="md-sign-pend" style={{position:"absolute",top:"0",left:"0",transformOrigin:"0px 0px"}}><div ref={this.signDropRef} style={{position:"absolute",top:"0",left:"0"}}><svg data-rope="back" ref={this.signRopeRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><span ref={this.signRingRef} data-eyelet="1" style={{position:"absolute",left:"50%",top:"4px",transform:"translateX(-50%)",width:"14px",height:"14px",borderRadius:"50%",boxSizing:"border-box",border:"2.5px solid #d9d9dc",boxShadow:"inset 0 1.5px 2px rgba(0,0,0,.34),inset 0 -1.5px 1.5px rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.3)",zIndex:"4",pointerEvents:"none"}}></span><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} data-face="front" style={sFace}>{heroCopy.launchingSoon}</div><div ref={this.signBackRef} data-face="back" style={{...sFace,background:"#ffffff",color:"#111111",position:"absolute",top:"0",left:"0",right:"0",bottom:"0",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}</div></div></div></div><svg data-rope="front" ref={this.signRopeFrontRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none",zIndex:"5"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div></div></div>}{' '}
+            {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <div data-h="sign" ref={this.signRef} className="md-sign-pend" style={{position:"fixed",left:"50%",top:"0",zIndex:"0",transform:"translateX(-50%)",transformOrigin:"0px 0px",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease"}}><div ref={this.signDropRef} style={{position:"absolute",top:"0",left:"0"}}><svg data-rope="back" ref={this.signRopeRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg><div ref={this.signPendRef} className="md-sign-pend" style={{position:"absolute",top:"0",left:"0",transformOrigin:"0px 0px"}}><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} data-face="front" style={sFace}>{heroCopy.launchingSoon}<span data-eyelet="1" style={sEyelet}></span></div><div ref={this.signBackRef} data-face="back" style={{...sFace,background:"#ffffff",color:"#111111",position:"absolute",top:"0",left:"0",right:"0",bottom:"0",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}<span data-eyelet="1" style={sEyelet}></span></div></div></div></div></div><svg data-rope="front" ref={this.signRopeFrontRef} style={{position:"absolute",left:"-1px",top:"0",width:"2px",height:"1px",overflow:"visible",pointerEvents:"none",zIndex:"5"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div></div>}{' '}
             <div ref={v.cityRef} style={{position:"absolute",left:"0",right:"0",bottom:"0",height:"320px",zIndex:"0",pointerEvents:"none",transform:"translateY(100%)",transition:"transform 1.3s cubic-bezier(.2,.8,.2,1)"}}></div>{' '}
             <div style={{position:"relative",zIndex:"1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
               <div style={{position:"relative",zIndex:"3",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"24px",padding:"24px 0",flexWrap:"wrap"}}>
