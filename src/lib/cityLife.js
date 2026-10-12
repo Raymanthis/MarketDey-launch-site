@@ -22,6 +22,13 @@ const mixHex = (a, b, t) => {
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const CLOUD_D = 'M0 0H120Q132 0 130 -10Q128 -22 112 -20Q108 -40 86 -38Q76 -56 52 -50Q32 -46 30 -28Q12 -32 6 -18Q-4 -16 -2 -6Q-1 0 0 0Z';
+// distant-cloud body: same silhouette flattened to half height (low over the far skyline)
+const FAR_CLOUD_D = 'M0 0H120Q132 0 130 -5Q128 -11 112 -10Q108 -20 86 -19Q76 -28 52 -25Q32 -23 30 -14Q12 -16 6 -9Q-4 -8 -2 -3Q-1 0 0 0Z';
+// storm-cloud fill: one step lighter than before; far clouds are hazier (lighter, semi-transparent)
+const STORM_FILL = n => (n ? '#474744' : '#425c4b');
+const FAR_FILL = n => (n ? '#545450' : '#53685a');
+// splash surface indices for the rolling state() counter
+const SP_ROAD = 0, SP_VEH = 1, SP_NEAR = 2, SP_FARB = 3, SP_FARA = 4;
 
 // IDM constants (px, seconds)
 const S0 = 10, HEADWAY = 0.6, ACC = 60, DECEL = 90, DECEL_MAX = 260;
@@ -116,6 +123,7 @@ export class CityLife {
     this.appliedStorm = 0;
     this.tinted = false;
     this.stormClouds = [];
+    this.farClouds = [];
     this.boltEv = null;
     // illustrated bolt lives in the SVG as its first child, so tiles, buildings and clouds draw over it
     this.boltG = document.createElementNS(SVGNS, 'g');
@@ -132,6 +140,8 @@ export class CityLife {
     this.nAct = 0;
     this.drawn = false;
     this.rainDrawn = false;
+    this.midDrawn = false;
+    this.farDrawn = false;
     this.roofDrawn = false;
     this.gSplashes = null;
     this.rSplashes = null;
@@ -139,6 +149,14 @@ export class CityLife {
     this.rSplashCount = 0;
     this.bSplashes = null;
     this.bSplashCount = 0;
+    this.cMid = null;
+    this.cMidCtx = null;
+    this.cFar = null;
+    this.cFarCtx = null;
+    this.splashBuf = null;
+    this.splashTot = null;
+    this.splashCur = null;
+    this.splashIdx = 0;
     this.tiles = null;
     this.tileLayers = null;
     this.roadLayer = null;
@@ -457,7 +475,10 @@ export class CityLife {
     this.H = 320 - this.top;
     this.gy = this.G - this.top;
     this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    // near drops at full alpha; mid (farB) ~55% and far (farA) ~35%
     this.rainCol = this.night ? 'rgba(200,214,229,.30)' : 'rgba(255,255,255,.35)';
+    this.rainColMid = this.night ? 'rgba(200,214,229,.16)' : 'rgba(255,255,255,.19)';
+    this.rainColFar = this.night ? 'rgba(200,214,229,.10)' : 'rgba(255,255,255,.12)';
     this.gCol = this.night ? 'rgba(200,214,229,.6)' : 'rgba(255,255,255,.65)';
     this.bucketA = [0.9, 0.55, 0.25];
 
@@ -470,6 +491,26 @@ export class CityLife {
     this.el.insertBefore(rc, this.roadLayer.nextSibling);
     this.cRain = rc;
     this.cRainCtx = rc.getContext('2d');
+
+    // mid rain canvas: farB drops + farB-roof splashes, in front of farB but behind the near row
+    const mc = document.createElement('canvas');
+    mc.setAttribute('aria-hidden', 'true');
+    mc.style.cssText = 'position:absolute;left:0;bottom:0;width:100%;height:' + this.H + 'px;pointer-events:none;will-change:transform';
+    mc.width = Math.round(this.W * this.dpr);
+    mc.height = Math.round(this.H * this.dpr);
+    this.el.insertBefore(mc, this.tileLayers[2] || this.roadLayer);
+    this.cMid = mc;
+    this.cMidCtx = mc.getContext('2d');
+
+    // far rain canvas: farA drops + farA-roof splashes, in front of farA but behind farB
+    const fc = document.createElement('canvas');
+    fc.setAttribute('aria-hidden', 'true');
+    fc.style.cssText = 'position:absolute;left:0;bottom:0;width:100%;height:' + this.H + 'px;pointer-events:none;will-change:transform';
+    fc.width = Math.round(this.W * this.dpr);
+    fc.height = Math.round(this.H * this.dpr);
+    this.el.insertBefore(fc, this.tileLayers[1] || this.roadLayer);
+    this.cFar = fc;
+    this.cFarCtx = fc.getContext('2d');
 
     // roof canvas: above every vehicle
     const rf = document.createElement('canvas');
@@ -491,15 +532,26 @@ export class CityLife {
     this.canvas = c;
     this.ctx = c.getContext('2d');
 
-    // drop pool (fixed); cache trig per drop so the per-frame path allocates nothing
+    // drop pool (fixed); cache trig per drop so the per-frame path allocates nothing.
+    // Each drop is pinned to a depth layer at spawn: near drops fall from the near storm
+    // clouds, mid/far drops from the distant clouds, and a drop only lands on its own layer.
     const N = Math.max(40, Math.round(220 * this.W / 1440));
     this.N = N;
+    this.nNear = Math.ceil(N * 0.55);
+    this.nMid = Math.ceil(N * 0.3);
+    this.nFar = N - this.nNear - this.nMid;
     const rr = this.rR;
     for (let n = 0; n < N; n++) {
-      const len = 10 + rr() * 12;
+      const layer = n < this.nNear ? 'near' : n < this.nNear + this.nMid ? 'farB' : 'farA';
+      const len = layer === 'near' ? 10 + rr() * 12 : layer === 'farB' ? 7 + rr() * 7 : 5 + rr() * 5;
       const ang = (8 + rr() * 4) * Math.PI / 180;
-      this.drops.push({ x: rr() * (this.W + 60) - 60, y: this.top - len - rr() * 60, len, spd: 650 + rr() * 300, ang, sn: Math.sin(ang), cs: Math.cos(ang) });
+      this.drops.push({ layer, x: rr() * (this.W + 60) - 60, y: this.top - len - rr() * 60, len, spd: 650 + rr() * 300, ang, sn: Math.sin(ang), cs: Math.cos(ang) });
     }
+    // 30-frame rolling window of splashes per surface (road/vehicle/near/farB/farA) for state()
+    this.splashBuf = new Array(30);
+    for (let i = 0; i < 30; i++) this.splashBuf[i] = new Int32Array(5);
+    this.splashTot = new Int32Array(5);
+    this.splashCur = this.splashBuf[0];
 
     // splash pools (fixed): 160 ground + 80 roof, 3-slot droplets each, swap-removed
     this.gSplashes = new Array(160);
@@ -536,10 +588,11 @@ export class CityLife {
 
   // rasterise one untransformed copy of each building tile into a per-column roof line
   // (x 0..T, y measured from the top), so rain can land on buildings without touching the
-  // DOM per frame. farA (k=0) is ignored: rain passes in front of it.
+  // DOM per frame. farA (k=0), farB (k=1) and near (k=2) all get a profile now that far
+  // and mid drops land on their own rows.
   buildProfiles() {
     this.prof = [null, null, null];
-    for (let k = 1; k <= 2; k++) {
+    for (let k = 0; k <= 2; k++) {
       const g = this.tiles[k];
       if (!g) continue;
       const T = +g.getAttribute('data-scroll');
@@ -656,6 +709,8 @@ export class CityLife {
     }
     if (this.canvas) this.canvas.remove();
     if (this.cRain) this.cRain.remove();
+    if (this.cMid) this.cMid.remove();
+    if (this.cFar) this.cFar.remove();
     if (this.cRoof) this.cRoof.remove();
     this.clearStormClouds();
     this.clearLights();
@@ -673,10 +728,13 @@ export class CityLife {
     this.boltEv = null;
     this.canvas = null; this.ctx = null;
     this.cRain = null; this.cRainCtx = null;
+    this.cMid = null; this.cMidCtx = null;
+    this.cFar = null; this.cFarCtx = null;
     this.cRoof = null; this.cRoofCtx = null;
     this.vehicles = []; this.queue = []; this.skyEls = []; this.cloudEls = [];
     this.tileLayers = []; this.tiles = [];
     this.gSplashes = []; this.rSplashes = [];
+    this.splashBuf = null; this.splashTot = null; this.splashCur = null;
     this.wxG = null; this.svg = null; this.el = null; this.drops = [];
   }
 
@@ -1369,6 +1427,8 @@ export class CityLife {
   clearStormClouds() {
     this.stormClouds.forEach(c => c.g.remove());
     this.stormClouds = [];
+    this.farClouds.forEach(c => c.g.remove());
+    this.farClouds = [];
   }
 
   buildStormClouds() {
@@ -1396,19 +1456,19 @@ export class CityLife {
       g.appendChild(glow);
       const p = document.createElementNS(SVGNS, 'path');
       p.setAttribute('d', CLOUD_D);
-      // heavier grey-green (hero) / lighter charcoal (night): darker than normal clouds, never near-black
-      p.setAttribute('fill', this.night ? '#3b3b38' : '#36503f');
+      // one step lighter than the original storm clouds (item 4)
+      p.setAttribute('fill', STORM_FILL(this.night));
       p.setAttribute('stroke', 'rgba(255,255,255,.5)');
       // CSS scale also scales strokes now, so bake the inverse into the width
-      p.setAttribute('stroke-width', (1.3 / S).toFixed(3));
+      p.setAttribute('stroke-width', (0.8 / S).toFixed(3));
       p.setAttribute('stroke-linejoin', 'round');
       g.appendChild(p);
-      // inner detail strokes, same as buildCity's cloud()
+      // inner detail strokes, thinner in proportion to the outline
       const dl = document.createElementNS(SVGNS, 'path');
       dl.setAttribute('d', 'M44 -30Q50 -40 62 -38M90 -24Q98 -28 104 -24');
       dl.setAttribute('fill', 'none');
       dl.setAttribute('stroke', 'rgba(255,255,255,.3)');
-      dl.setAttribute('stroke-width', (1.1 / S).toFixed(3));
+      dl.setAttribute('stroke-width', (0.7 / S).toFixed(3));
       dl.setAttribute('stroke-linecap', 'round');
       g.appendChild(dl);
       // lit lower edge, drawn last
@@ -1416,14 +1476,66 @@ export class CityLife {
       hl.setAttribute('d', 'M8 -3Q40 3 66 0Q96 -3 124 -4');
       hl.setAttribute('fill', 'none');
       hl.setAttribute('stroke', '#f4fbe0');
-      hl.setAttribute('stroke-width', (1.6 / S).toFixed(3));
+      hl.setAttribute('stroke-width', (1 / S).toFixed(3));
       hl.setAttribute('stroke-linecap', 'round');
       hl.setAttribute('opacity', '0');
       g.appendChild(hl);
       this.el.insertBefore(g, this.wxAnchor);
-      this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null });
+      this.stormClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null, ox: 6, oy: 60, cxm: 66, sa: 0.5, da: 0.3 });
     }
+    this.buildFarClouds();
     this.updateStormClouds();
+  }
+
+  // distant storm clouds: fewer, smaller, flatter and hazier, low over the far skyline.
+  // They live in front of the far city (farA/farB tiles) and behind the near row + near
+  // clouds (inserted before the mid rain canvas, which is itself before the near tile).
+  buildFarClouds() {
+    if (!this.cMid) return;
+    const rv = this.rV, W = this.W, n = 4 + Math.floor(rv() * 4), span = (W - 120) + 60;
+    for (let j = 0; j < n; j++) {
+      const S = 0.7 + rv() * 0.5, Y = -170 + rv() * 70;
+      const Xt = -60 + (j + 0.5) * (span / n) + (rv() - 0.5) * (span / n) * 0.6;
+      const from = j % 2 ? W + 60 : -300;
+      const g = document.createElementNS(SVGNS, 'svg');
+      g.setAttribute('width', '120');
+      g.setAttribute('height', '44');
+      g.setAttribute('viewBox', '-6 -32 120 44');
+      g.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;will-change:transform,opacity;transform-origin:0 0';
+      const glow = document.createElementNS(SVGNS, 'ellipse');
+      glow.setAttribute('cx', '60');
+      glow.setAttribute('cy', '-5');
+      glow.setAttribute('rx', '70');
+      glow.setAttribute('ry', '26');
+      glow.setAttribute('fill', 'url(#cl-glow-' + this.seed + ')');
+      glow.setAttribute('opacity', '0');
+      g.appendChild(glow);
+      const p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('d', FAR_CLOUD_D);
+      p.setAttribute('fill', FAR_FILL(this.night));
+      p.setAttribute('fill-opacity', '0.82'); // distance haze
+      p.setAttribute('stroke', 'rgba(255,255,255,.30)');
+      p.setAttribute('stroke-width', (0.6 / S).toFixed(3));
+      p.setAttribute('stroke-linejoin', 'round');
+      g.appendChild(p);
+      const dl = document.createElementNS(SVGNS, 'path');
+      dl.setAttribute('d', 'M44 -15Q50 -20 62 -19M90 -12Q98 -14 104 -12');
+      dl.setAttribute('fill', 'none');
+      dl.setAttribute('stroke', 'rgba(255,255,255,.18)');
+      dl.setAttribute('stroke-width', (0.5 / S).toFixed(3));
+      dl.setAttribute('stroke-linecap', 'round');
+      g.appendChild(dl);
+      const hl = document.createElementNS(SVGNS, 'path');
+      hl.setAttribute('d', 'M8 -2Q40 1 66 0Q96 -2 124 -2');
+      hl.setAttribute('fill', 'none');
+      hl.setAttribute('stroke', '#f4fbe0');
+      hl.setAttribute('stroke-width', (0.9 / S).toFixed(3));
+      hl.setAttribute('stroke-linecap', 'round');
+      hl.setAttribute('opacity', '0');
+      g.appendChild(hl);
+      this.el.insertBefore(g, this.cMid);
+      this.farClouds.push({ g, S, Y, Xt, from, dir: Xt + 60 * S < W / 2 ? -1 : 1, cx: from, glow, body: p, detail: dl, hl, L: -1, tf: null, op: null, ox: 6, oy: 32, cxm: 60, sa: 0.30, da: 0.18 });
+    }
   }
 
   ensureGlowDefs() {
@@ -1439,40 +1551,48 @@ export class CityLife {
 
   updateStormClouds() {
     const w = this.wx, s = w.storm;
-    if (!s || !this.stormClouds.length) return;
+    if (!s) return;
     const t = this.viewTime, W = this.W;
-    const base = this.night ? '#3b3b38' : '#36503f';
+    const base = STORM_FILL(this.night), farBase = FAR_FILL(this.night);
     const lit = s.events.filter(e => e.src != null && this.stormClouds[e.src]);
-    this.stormClouds.forEach(c => {
+    this.updateClouds(this.stormClouds, base, lit, 1, t, W, w, s);
+    this.updateClouds(this.farClouds, farBase, lit, 0.55, t, W, w, s);
+  }
+
+  updateClouds(cs, base, lit, glowScale, t, W, w, s) {
+    if (!cs.length) return;
+    for (let i = 0; i < cs.length; i++) {
+      const c = cs[i];
       let X, op;
       if (w.phase === 'gathering') { const p = clamp01(w.p); X = c.from + (c.Xt - c.from) * (1 - Math.pow(1 - p, 3)); op = 0.95 * p; }
       else if (w.phase === 'storm') { X = c.Xt + 4 * (t - s.gEnd); op = 0.95; }
       else { X = c.Xt + 4 * s.D + c.dir * 90 * (t - s.cEnd); op = 0.95 * (1 - clamp01(w.p)); }
       c.cx = X;
-      const tf = 'translate3d(' + r1(X - 6 * c.S) + 'px,' + r1(c.Y - 60 * c.S) + 'px,0) scale(' + c.S.toFixed(2) + ')';
+      const tf = 'translate3d(' + r1(X - c.ox * c.S) + 'px,' + r1(c.Y - c.oy * c.S) + 'px,0) scale(' + c.S.toFixed(2) + ')';
       if (tf !== c.tf) { c.tf = tf; c.g.style.transform = tf; }
       const opS = op.toFixed(3);
       if (opS !== c.op) { c.op = opS; c.g.style.opacity = opS; }
-      // lightning light: source cloud brightest, neighbours fade with distance
-      const cxc = c.cx + 66 * c.S;
+      // lightning light: source cloud brightest, neighbours fade with distance (far clouds scaled down)
+      const cxc = c.cx + c.cxm * c.S;
       let L = 0;
       lit.forEach(e => {
         const k = this.flashK(e, t);
         if (k <= 0) return;
         const sc = this.stormClouds[e.src];
-        const d = Math.abs(cxc - (sc.cx + 66 * sc.S));
+        const d = Math.abs(cxc - (sc.cx + sc.cxm * sc.S));
         const fall = d === 0 ? 1 : 0.85 * Math.exp(-d / (0.22 * W));
         L = Math.max(L, k * fall);
       });
+      L *= glowScale;
       if (Math.abs(L - c.L) > 0.002) {
         c.L = L;
         c.body.setAttribute('fill', mixHex(base, '#eef8cf', 0.85 * L));
-        c.body.setAttribute('stroke', 'rgba(255,255,255,' + (0.5 + 0.5 * L).toFixed(3) + ')');
-        c.detail.setAttribute('stroke', 'rgba(255,255,255,' + (0.3 + 0.6 * L).toFixed(3) + ')');
+        c.body.setAttribute('stroke', 'rgba(255,255,255,' + (c.sa + (1 - c.sa) * L).toFixed(3) + ')');
+        c.detail.setAttribute('stroke', 'rgba(255,255,255,' + (c.da + (1 - c.da) * L).toFixed(3) + ')');
         c.glow.setAttribute('opacity', L.toFixed(3));
         c.hl.setAttribute('opacity', L.toFixed(3));
       }
-    });
+    }
   }
 
   genBolt(t0, src) {
@@ -1650,11 +1770,18 @@ export class CityLife {
     return y === y ? this.G + v.dy + y : null; // NaN: no body at this x
   }
 
+  // record a splash on `surface` in the current frame's rolling-window slot
+  countSplash(surface) {
+    this.splashCur[surface]++;
+    this.splashTot[surface]++;
+  }
+
   addGroundSplash(x, y) {
     if (this.gSplashCount >= 160) return;
     const sp = this.gSplashes[this.gSplashCount++];
     const rv = this.rV;
     sp.x = x; sp.y = y; sp.age = 0;
+    this.countSplash(SP_ROAD);
     sp.n = 2 + Math.floor(rv() * 2);
     for (let k = 0; k < sp.n; k++) {
       const q = sp.dr[k];
@@ -1701,6 +1828,7 @@ export class CityLife {
     const sp = this.rSplashes[this.rSplashCount++];
     const rv = this.rV;
     sp.veh = v; sp.lx = lx; sp.ly = ly; sp.age = 0; sp.n = 2;
+    this.countSplash(SP_VEH);
     sp.rxMax = Math.max(0.8, r - 1.2); // keep the stroked ripple inside the flat run
     for (let k = 0; k < 2; k++) {
       const q = sp.dr[k];
@@ -1715,7 +1843,7 @@ export class CityLife {
   // on a step or wall there is no splash. u is tile-space, so world x = u + current offset.
   addBuildingSplash(k, x, y, off) {
     if (this.bSplashCount >= 120) return;
-    const s = k === 2 ? 1 : 0.7;
+    const s = k === 2 ? 1 : k === 1 ? 0.55 : 0.35;
     const u = x - off;
     const pr = this.prof[k], T = pr.T, p = pr.p;
     const ui = ((u % T) + T) % T | 0;
@@ -1730,6 +1858,7 @@ export class CityLife {
     const sp = this.bSplashes[this.bSplashCount++];
     const rv = this.rV;
     sp.k = k; sp.u = u; sp.y = y; sp.s = s; sp.age = 0;
+    this.countSplash(k === 2 ? SP_NEAR : k === 1 ? SP_FARB : SP_FARA);
     sp.rx = Math.max(0.8, r - 1.2);
     sp.n = 2 + Math.floor(rv() * 2);
     for (let m = 0; m < sp.n; m++) {
@@ -1744,7 +1873,7 @@ export class CityLife {
   // probability proportional to its scale. Two passes over the (tiny) list, so no allocation.
   // fill: also used when a drop first appears, so the column fills in from cloud base to ground.
   emit(d, fill) {
-    const cs = this.stormClouds, rr = this.rR;
+    const cs = d.layer === 'near' ? this.stormClouds : this.farClouds, rr = this.rR;
     let tot = 0;
     for (let k = 0; k < cs.length; k++) { const c = cs[k]; if (c.op >= 0.35) tot += c.S; }
     if (!(tot > 0)) return false;
@@ -1765,14 +1894,40 @@ export class CityLife {
     return true;
   }
 
+  // mid/far drops land only on their own building row; below the roof line they keep falling
+  // (hidden behind nearer rows) and reset at the ground without a splash.
+  stepFarDrop(d, k, off, py, hy) {
+    const y = this.profY(k, d.x, off);
+    if (y === y) {
+      if (py < y && hy >= y) {
+        this.addBuildingSplash(k, d.x, y, off);
+        if (!this.emit(d, false)) d.wait = true;
+      } else if (hy >= y) {
+        if (!this.emit(d, false)) d.wait = true;
+      } else {
+        const mx = d.x - d.sn * d.len * 0.5, my = hy - d.cs * d.len * 0.5, tx = d.x - d.sn * d.len, ty = hy - d.cs * d.len;
+        if (my >= this.profY(k, mx, off) || ty >= this.profY(k, tx, off)) { if (!this.emit(d, false)) d.wait = true; }
+      }
+    } else if (hy >= this.G) {
+      if (!this.emit(d, false)) d.wait = true;
+    }
+  }
+
   stepRain(dt) {
     const G = this.G;
     const drops = this.drops, vehicles = this.vehicles;
     const na = Math.round(this.N * this.wx.rain);
+    // rotate the 30-frame splash window once per frame (totals track the rolling sum)
+    const slot = this.splashBuf[this.splashIdx];
+    for (let i = 0; i < 5; i++) { this.splashTot[i] -= slot[i]; slot[i] = 0; }
+    this.splashCur = slot;
+    this.naNear = Math.min(na, this.nNear);
+    this.naMid = Math.max(0, Math.min(na, this.nNear + this.nMid) - this.nNear);
+    this.naFar = Math.max(0, na - this.nNear - this.nMid);
     // level up: a newly active drop only appears once a storm cloud can emit it
     for (let k = this.nAct; k < na; k++) { const d = drops[k]; if (!this.emit(d, true)) d.wait = true; }
     this.nAct = na;
-    const offB = this.tileOff(1), offN = this.tileOff(2);
+    const offA = this.tileOff(0), offB = this.tileOff(1), offN = this.tileOff(2);
 
     // move drops, spawn roof/ground splashes on impact
     for (let k = 0; k < na; k++) {
@@ -1784,37 +1939,48 @@ export class CityLife {
       d.x += sn * dist;
       d.y += cs * dist;
       const hx = d.x, hy = d.y;
-      // the topmost roof covering x wins: that is the surface the drop visibly reaches first
-      let hit = null, ry = null;
-      for (let m = 0; m < vehicles.length; m++) {
-        const v = vehicles[m];
-        if (!v.active) continue;
-        if (hx < v.x + v.bx0 || hx > v.x + v.bx0 + v.len) continue;
-        const y = this.roofAt(v, hx);
-        if (y != null && (ry == null || y < ry)) { ry = y; hit = v; }
-      }
-      if (ry != null && py < ry && hy >= ry) {
-        this.addRoofSplash(hit, hx - hit.x, ry - (G + hit.dy) - 0.8); // ripple sits just on top of the roof line
-        if (!this.emit(d, false)) d.wait = true;
-      } else {
-        // no vehicle roof hit: buildings are next (near then farB, topmost wins)
-        const yN = this.profY(2, hx, offN);
-        const yB = this.profY(1, hx, offB);
-        let by = NaN, bk = 0;
-        if (yN === yN) { by = yN; bk = 2; }
-        if (yB === yB && (by !== by || yB < by)) { by = yB; bk = 1; }
-        if (by === by && hy >= by) {
-          if (py < by) this.addBuildingSplash(bk, hx, by, bk === 2 ? offN : offB);
-          if (!this.emit(d, false)) d.wait = true;
-        } else if (hy >= G) {
-          this.addGroundSplash(hx, G);
-          if (!this.emit(d, false)) d.wait = true;
-        } else {
-          // the slanted tail must not cut into a building face either (a roof rising toward the tail)
-          const mx = hx - d.sn * d.len * 0.5, my = hy - d.cs * d.len * 0.5, tx = hx - d.sn * d.len, ty = hy - d.cs * d.len;
-          const mN = this.profY(2, mx, offN), mB = this.profY(1, mx, offB), tN = this.profY(2, tx, offN), tB = this.profY(1, tx, offB);
-          if (my >= mN || my >= mB || ty >= tN || ty >= tB) { if (!this.emit(d, false)) d.wait = true; }
+      if (d.layer === 'near') {
+        // a vehicle covering x wins over the building behind it: nearest lane (largest dy) first
+        let hit = null, ry = null, hitDy = -Infinity;
+        for (let m = 0; m < vehicles.length; m++) {
+          const v = vehicles[m];
+          if (!v.active) continue;
+          if (hx < v.x + v.bx0 || hx > v.x + v.bx0 + v.len) continue;
+          const y = this.roofAt(v, hx);
+          if (y == null) continue;
+          if (v.dy > hitDy || (v.dy === hitDy && y < ry)) { ry = y; hit = v; hitDy = v.dy; }
         }
+        if (ry != null) {
+          if (py < ry && hy >= ry) {
+            this.addRoofSplash(hit, hx - hit.x, ry - (G + hit.dy) - 0.8); // ripple sits just on top of the roof line
+            if (!this.emit(d, false)) d.wait = true;
+          }
+          // above the vehicle roof: keep falling toward it (never caught by the building behind)
+        } else if ((k * 7919) % 100 < 55) {
+          // street plane: falls in front of the roadside facades and lands on the road at a slight depth spread
+          const gy = G + 3 + ((k * 37) % 13);
+          if (hy >= gy) {
+            this.addGroundSplash(hx, gy);
+            if (!this.emit(d, false)) d.wait = true;
+          }
+        } else {
+          const yN = this.profY(2, hx, offN);
+          if (yN === yN && hy >= yN) {
+            if (py < yN) this.addBuildingSplash(2, hx, yN, offN);
+            if (!this.emit(d, false)) d.wait = true;
+          } else if (hy >= G) {
+            this.addGroundSplash(hx, G);
+            if (!this.emit(d, false)) d.wait = true;
+          } else {
+            // the slanted tail must not cut into a near facade (a roof rising toward the tail)
+            const mx = hx - d.sn * d.len * 0.5, my = hy - d.cs * d.len * 0.5, tx = hx - d.sn * d.len, ty = hy - d.cs * d.len;
+            if (my >= this.profY(2, mx, offN) || ty >= this.profY(2, tx, offN)) { if (!this.emit(d, false)) d.wait = true; }
+          }
+        }
+      } else if (d.layer === 'farB') {
+        this.stepFarDrop(d, 1, offB, py, hy);
+      } else {
+        this.stepFarDrop(d, 0, offA, py, hy);
       }
     }
 
@@ -1909,13 +2075,69 @@ export class CityLife {
       }
     }
 
+    this.splashIdx = (this.splashIdx + 1) % 30;
     this.drawRainCanvas();
+    this.drawMidCanvas();
+    this.drawFarCanvas();
     this.drawRoofCanvas();
+  }
+
+  drawDrops(ctx, i0, i1, lineWidth, strokeStyle, top) {
+    if (!(i1 > i0)) return;
+    const drops = this.drops;
+    ctx.beginPath();
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = strokeStyle;
+    for (let k = i0; k < i1; k++) {
+      const d = drops[k];
+      if (d.wait) continue;
+      ctx.moveTo(d.x - d.sn * d.len, d.y - d.cs * d.len - top);
+      ctx.lineTo(d.x, d.y - top);
+    }
+    ctx.stroke();
+  }
+
+  // building-roof splashes for one depth layer; each layer is drawn on its own canvas so
+  // nearer rows occlude it naturally (no per-splash layout checks needed).
+  drawBuildingSplashes(ctx, k, top) {
+    const nB = this.bSplashCount, bS = this.bSplashes;
+    if (!nB) return;
+    const off = this.tileOff(k);
+    for (let b = 0; b < 3; b++) {
+      ctx.globalAlpha = this.bucketA[b];
+      ctx.beginPath();
+      for (let i = 0; i < nB; i++) {
+        const sp = bS[i];
+        if (sp.k !== k || sp.b !== b) continue;
+        const cx = sp.u + off;
+        const cy = sp.y - 0.8 - top;
+        const rr = Math.min(sp.rx, lerp(1.5, 6, sp.age / 0.3) * sp.s);
+        ctx.moveTo(cx + rr, cy); // new subpath: no connecting line between ripples
+        ctx.ellipse(cx, cy, rr, rr * 0.3, 0, 0, 2 * Math.PI);
+      }
+      ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i < nB; i++) {
+        const sp = bS[i];
+        if (sp.k !== k || sp.b !== b) continue;
+        const cx = sp.u + off;
+        const cy = sp.y - 0.8 - top;
+        const sz = 1.6 * sp.s;
+        for (let m = 0; m < sp.n; m++) {
+          const q = sp.dr[m];
+          if (q.gone) continue;
+          ctx.rect(cx + q.x, cy + q.y, sz, sz);
+        }
+      }
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 
   drawRainCanvas() {
     const ctx = this.cRainCtx, W = this.W, H = this.H, top = this.top;
-    const na = this.nAct;
+    const na = this.naNear;
     if (!na && !this.gSplashCount && !this.bSplashCount) {
       if (this.rainDrawn) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1928,20 +2150,7 @@ export class CityLife {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
-    if (na) {
-      const drops = this.drops;
-      ctx.beginPath();
-      ctx.lineWidth = 1;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = this.rainCol;
-      for (let k = 0; k < na; k++) {
-        const d = drops[k];
-        if (d.wait) continue;
-        ctx.moveTo(d.x - d.sn * d.len, d.y - d.cs * d.len - top);
-        ctx.lineTo(d.x, d.y - top);
-      }
-      ctx.stroke();
-    }
+    this.drawDrops(ctx, 0, na, 1, this.rainCol, top);
 
     const nS = this.gSplashCount, gS = this.gSplashes;
     ctx.strokeStyle = this.gCol;
@@ -1971,45 +2180,7 @@ export class CityLife {
     }
     ctx.globalAlpha = 1;
 
-    const nB = this.bSplashCount, bS = this.bSplashes;
-    if (nB) {
-      const offB = this.tileOff(1), offN = this.tileOff(2);
-      for (let b = 0; b < 3; b++) {
-        ctx.globalAlpha = this.bucketA[b];
-        ctx.beginPath();
-        for (let k = 0; k < nB; k++) {
-          const sp = bS[k];
-          if (sp.b !== b) continue;
-          const cx = sp.u + (sp.k === 2 ? offN : offB);
-          const cy = sp.y - 0.8 - top;
-          const rr = Math.min(sp.rx, lerp(1.5, 6, sp.age / 0.3) * sp.s);
-          // a farB splash is hidden where a near building's face stands in front of it
-          if (sp.k === 1 && (this.profY(2, cx - rr - 1, offN) <= sp.y + 2 || this.profY(2, cx + rr + 1, offN) <= sp.y + 2)) continue;
-          ctx.moveTo(cx + rr, cy); // new subpath: no connecting line between ripples
-          ctx.ellipse(cx, cy, rr, rr * 0.3, 0, 0, 2 * Math.PI);
-        }
-        ctx.stroke();
-        ctx.beginPath();
-        for (let k = 0; k < nB; k++) {
-          const sp = bS[k];
-          if (sp.b !== b) continue;
-          const cx = sp.u + (sp.k === 2 ? offN : offB);
-          const cy = sp.y - 0.8 - top;
-          const sz = 1.6 * sp.s;
-          for (let m = 0; m < sp.n; m++) {
-            const q = sp.dr[m];
-            if (q.gone) continue;
-            if (sp.k === 1) {
-              const yy = sp.y + q.y + sz;
-              if (this.profY(2, cx + q.x - 1, offN) <= yy + 1 || this.profY(2, cx + q.x + sz + 1, offN) <= yy + 1) continue;
-            }
-            ctx.rect(cx + q.x, cy + q.y, sz, sz);
-          }
-        }
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
+    this.drawBuildingSplashes(ctx, 2, top);
 
     // drops now start down at the cloud bases, so the fade only has to soften the canvas edge
     if (!this.rainFade) {
@@ -2019,6 +2190,64 @@ export class CityLife {
     }
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = this.rainFade;
+    ctx.fillRect(0, 0, W, 40);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  drawMidCanvas() {
+    const ctx = this.cMidCtx, W = this.W, H = this.H, top = this.top;
+    const na = this.naMid, i0 = this.nNear;
+    if (!na && !this.bSplashCount) {
+      if (this.midDrawn) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.cMid.width, this.cMid.height);
+        this.midDrawn = false;
+      }
+      return;
+    }
+    this.midDrawn = true;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    this.drawDrops(ctx, i0, i0 + na, 0.7, this.rainColMid, top);
+    this.drawBuildingSplashes(ctx, 1, top);
+
+    if (!this.midFade) {
+      this.midFade = ctx.createLinearGradient(0, 0, 0, 40);
+      this.midFade.addColorStop(0, 'rgba(0,0,0,1)');
+      this.midFade.addColorStop(1, 'rgba(0,0,0,0)');
+    }
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = this.midFade;
+    ctx.fillRect(0, 0, W, 40);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  drawFarCanvas() {
+    const ctx = this.cFarCtx, W = this.W, H = this.H, top = this.top;
+    const na = this.naFar, i0 = this.nNear + this.nMid;
+    if (!na && !this.bSplashCount) {
+      if (this.farDrawn) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.cFar.width, this.cFar.height);
+        this.farDrawn = false;
+      }
+      return;
+    }
+    this.farDrawn = true;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    this.drawDrops(ctx, i0, i0 + na, 0.5, this.rainColFar, top);
+    this.drawBuildingSplashes(ctx, 0, top);
+
+    if (!this.farFade) {
+      this.farFade = ctx.createLinearGradient(0, 0, 0, 40);
+      this.farFade.addColorStop(0, 'rgba(0,0,0,1)');
+      this.farFade.addColorStop(1, 'rgba(0,0,0,0)');
+    }
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = this.farFade;
     ctx.fillRect(0, 0, W, 40);
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -2143,6 +2372,10 @@ export class CityLife {
       target: this.target, VN: this.VN, active: act.length, total: this.vehicles.length, lanes: this.lanes,
       weather: this.wx.phase, weatherP: this.wx.p, dim: this.wx.dim, rain: this.wx.rain,
       bSplashes: this.bSplashCount,
+      splashes: this.splashTot ? {
+        road: this.splashTot[SP_ROAD], vehicle: this.splashTot[SP_VEH], nearRoof: this.splashTot[SP_NEAR],
+        farBRoof: this.splashTot[SP_FARB], farARoof: this.splashTot[SP_FARA],
+      } : { road: 0, vehicle: 0, nearRoof: 0, farBRoof: 0, farARoof: 0 },
       lightningLeft: s && this.wx.phase !== 'clear' ? s.events.filter(e => e.t > this.viewTime).length : 0,
       minGap, minGapDrift, crossLaneOverlaps,
       stopLines: this.stopLines ? this.stopLines.slice() : null, laneHeads,
