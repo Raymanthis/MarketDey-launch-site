@@ -175,7 +175,7 @@ def bake():
         json.dump(header, f, indent=2)
         f.write("\n")
     with open(os.path.join(C.MEDIA, "camera.json"), "w") as f:
-        json.dump({"fov": C.FOV, "frames": C.camera_frames()}, f, indent=1)
+        json.dump({"fov": int(C.FOV) if C.FOV == int(C.FOV) else C.FOV, "frames": C.camera_frames()}, f, indent=1)
         f.write("\n")
     print(f"[bake] segments: {n_before} raw -> {len(rec)} after dedupe; by mode {per_mode}")
     for i, c in enumerate(C.CLASSES):
