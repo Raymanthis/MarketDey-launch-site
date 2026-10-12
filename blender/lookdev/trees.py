@@ -144,14 +144,13 @@ def rounded_tree(tag, x, y, scale=1.0, seed=5):
                mat="bark")
         ends.append(e)
     centre = fork + Vector((0, 0, 2.3 * scale))
-    for k in range(16):
+    for k in range(11):
         u = rng.uniform(0, 2 * math.pi)
         v = rng.uniform(0.0, 1.25)
         d = Vector((math.sin(v) * math.cos(u), math.sin(v) * math.sin(u), math.cos(v)))
         pc = centre + Vector((d.x * 2.6, d.y * 2.6, d.z * 1.7)) * scale
         r = rng.uniform(1.0, 1.5) * scale
-        _blob(Fo, pc, r, r, r * 0.75, seed * 50 + k, amp=0.28, mat="foliage" if d.z > 0.3 else "foliage_dark")
-        leaf_cards(Lc, pc, r, r, r * 0.75, rng, int(220 * r * r), size=0.2 * scale)
+        cluster(Fo, Lc, pc, r, r * 0.62, rng, seed * 50 + k, mat="foliage" if d.z > 0.3 else "foliage_dark")
 
 
 def oil_palm(tag, x, y, h=8.0, seed=2):
