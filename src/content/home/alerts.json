@@ -1,0 +1,34 @@
+{
+  "alerts": "Alerts",
+  "theEveningBeforeAnd": "The evening before, and the morning of.",
+  "followTheMarketsYou": "Follow the markets you pass. Marketdey tells you in time to change your route, even when you have no network.",
+  "eveningBefore": "6 pm, the evening before",
+  "centralMarketAtSapele": "\"Central Market at Sapele is tomorrow.\" The road line comes with it.",
+  "morningOf": "6 am, the morning of",
+  "tapMarketDayOr": "Tap \"Market day\" or \"Not market day\" right on the alert. You never have to open the app.",
+  "screens": {
+    "nt02Light": {
+      "thursday10September": "Thursday 10 September",
+      "time": "6:00",
+      "marketdey": "Marketdey",
+      "now": "now",
+      "centralMarketRunsTomorrow": "Central Market runs tomorrow",
+      "sapeleFriday11September": "Sapele · Friday 11 September, from 6:00 am. The Warri road is usually busy from 6 am.",
+      "open": "Open",
+      "snooze": "Snooze"
+    },
+    "nt03Light": {
+      "friday11September": "Friday 11 September",
+      "time": "5:30",
+      "marketdey": "Marketdey",
+      "now": "now",
+      "isTodayMarketDay": "Is today market day at Central Market?",
+      "oneTapItHelps": "One tap. It helps everyone on the Warri road today.",
+      "marketDay": "Market day",
+      "notMarketDay": "Not market day",
+      "answeringAtTheMarket": "Answering at the market counts 3, from here it counts 1"
+    }
+  },
+  "statusTime": "9:41",
+  "statusNetwork": "4G"
+}
