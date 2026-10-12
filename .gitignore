@@ -60,3 +60,6 @@ next-env.d.ts
 /blender/lookdev/out/
 /blender/assets/vendor/makehuman-system-assets-cc0/
 /blender/assets/vendor/mpfb-extension/
+
+# Blender production intermediates (section export, scene, passes, PNG masters)
+/blender/production/out/
