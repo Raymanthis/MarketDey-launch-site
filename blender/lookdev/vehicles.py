@@ -240,16 +240,16 @@ def danfo(tag, pos, heading):
     D = get(tag + "_det", "fine")
     # front: two rectangular lamps, grille slats panel, bumper, spare-wheel-free face
     for sg in (-1, 1):
-        D.box(M @ Vector((sg * 0.5, 4.5, 0.66)), M @ Vector((sg * 0.82, 4.58, 0.8)), mat="lamp")
-        D.box(M @ Vector((sg * (W - 0.02), 3.55, 1.06)), M @ Vector((sg * (W + 0.16), 3.68, 1.22)), mat="paint_dark")
-        D.box(M @ Vector((sg * 0.5, -0.04, 0.82)), M @ Vector((sg * 0.84, 0.02, 1.0)), mat="lamp")
-    D.box(M @ Vector((-0.42, 4.53, 0.62)), M @ Vector((0.42, 4.6, 0.84)), mat="under")
-    D.box(M @ Vector((-0.92, 4.5, 0.36)), M @ Vector((0.92, 4.66, 0.5)), mat="paint_dark")
-    D.box(M @ Vector((-0.92, -0.1, 0.38)), M @ Vector((0.92, 0.06, 0.52)), mat="paint_dark")
-    D.box(M @ Vector((-0.25, 4.62, 0.37)), M @ Vector((0.25, 4.68, 0.49)), mat="plate")
+        D.box((sg * 0.5, 4.5, 0.66), (sg * 0.82, 4.58, 0.8), M, mat="lamp")
+        D.box((sg * (W - 0.02), 3.55, 1.06), (sg * (W + 0.16), 3.68, 1.22), M, mat="paint_dark")
+        D.box((sg * 0.5, -0.04, 0.82), (sg * 0.84, 0.02, 1.0), M, mat="lamp")
+    D.box((-0.42, 4.53, 0.62), (0.42, 4.6, 0.84), M, mat="under")
+    D.box((-0.92, 4.5, 0.36), (0.92, 4.66, 0.5), M, mat="paint_dark")
+    D.box((-0.92, -0.1, 0.38), (0.92, 0.06, 0.52), M, mat="paint_dark")
+    D.box((-0.25, 4.62, 0.37), (0.25, 4.68, 0.49), M, mat="plate")
     # sliding-door track and handle on the kerb side, roof rack rails
-    D.box(M @ Vector((W - 0.01, 1.7, 1.03)), M @ Vector((W + 0.02, 2.85, 1.05)), mat="metal_dark")
-    D.box(M @ Vector((W - 0.01, 1.62, 1.09)), M @ Vector((W + 0.04, 1.72, 1.12)), mat="chrome")
+    D.box((W - 0.01, 1.7, 1.03), (W + 0.02, 2.85, 1.05), M, mat="metal_dark")
+    D.box((W - 0.01, 1.62, 1.09), (W + 0.04, 1.72, 1.12), M, mat="chrome")
     Rk = get(tag + "_rack", "nolines")
     for x in (-0.75, 0.75):
         Rk.seg_box(M @ Vector((x, 0.4, 2.12)), M @ Vector((x, 3.7, 2.12)), 0.03, mat="ink")
@@ -258,7 +258,7 @@ def danfo(tag, pos, heading):
     for y in (0.6, 1.2, 1.8, 2.4, 3.0, 3.6):
         Rk.seg_box(M @ Vector((-0.75, y, 2.12)), M @ Vector((0.75, y, 2.12)), 0.022, mat="ink")
     U = get(tag + "_under", "nolines")
-    U.box(M @ Vector((-W + 0.1, 0.2, 0.18)), M @ Vector((W - 0.1, 4.4, 0.36)), mat="under")
+    U.box((-W + 0.1, 0.2, 0.18), (W - 0.1, 4.4, 0.36), M, mat="under")
     return M
 
 
@@ -320,8 +320,8 @@ def keke(tag, pos, heading, paint="keke", roof="canvas", stripe="paint_mid"):
     for sg in (-1, 1):
         x0, x1 = sg * (W - 0.035), sg * W
         P.prism_lr([V(x0, y, z) for (y, z) in side], [V(x1, y, z) for (y, z) in side], mat=paint)
-    P.box(V(-W, -1.32, 0.42), V(W, -1.285, 1.0), mat=paint)                      # rear panel
-    P.box(V(-0.47, -1.32, 0.29), V(0.47, -0.02, 0.36), mat="under")              # tub floor
+    P.box((-W, -1.32, 0.42), (W, -1.285, 1.0), M, mat=paint)                      # rear panel
+    P.box((-0.47, -1.32, 0.29), (0.47, -0.02, 0.36), M, mat="under")              # tub floor
     # rolled top rail along the panel edges
     rail = [(-1.31, 1.0), (-0.48, 1.0), (-0.3, 0.985), (-0.17, 0.93), (-0.08, 0.82), (-0.03, 0.66), (-0.02, 0.5)]
     for sg in (-1, 1):
@@ -333,7 +333,7 @@ def keke(tag, pos, heading, paint="keke", roof="canvas", stripe="paint_mid"):
         pts = [V(x, -1.3, 0.62), V(x, -0.05, 0.62), V(x, -0.04, 0.7), V(x, -1.3, 0.7)]
         K.poly(pts if sg > 0 else pts[::-1], stripe)
     # --- driver's floor and the nose: lofted rounded sections, narrowing to the front
-    P.box(V(-0.47, -0.05, 0.29), V(0.47, 0.62, 0.36), mat="under")
+    P.box((-0.47, -0.05, 0.29), (0.47, 0.62, 0.36), M, mat="under")
     noses = [(0.5, 0.52, 0.3, 1.0, 0.12), (0.72, 0.5, 0.31, 1.06, 0.13), (0.95, 0.44, 0.36, 1.05, 0.14),
              (1.15, 0.36, 0.44, 1.0, 0.13), (1.27, 0.28, 0.52, 0.94, 0.1), (1.315, 0.2, 0.58, 0.88, 0.07)]
     rings = []
@@ -341,13 +341,13 @@ def keke(tag, pos, heading, paint="keke", roof="canvas", stripe="paint_mid"):
         rings.append([V(u, y, (z0 + z1) / 2 + v) for (u, v) in rrect(hw, (z1 - z0) / 2, r, 4)])
     B.loft(rings, True, paint, smooth=True)
     # dashboard cowl behind the windscreen
-    B.box(V(-0.5, 0.55, 0.98), V(0.5, 0.86, 1.06), mat="paint_dark")
+    B.box((-0.5, 0.55, 0.98), (0.5, 0.86, 1.06), M, mat="paint_dark")
     # headlamp, indicators, front plate
     D.cyl(V(0, 1.27, 0.86), V(0, 1.33, 0.86), 0.085, 0.09, n=20, mat="chrome")
     D.cyl(V(0, 1.33, 0.86), V(0, 1.335, 0.86), 0.072, n=20, mat="lamp")
     for sg in (-1, 1):
         D.ellipsoid(V(sg * 0.3, 1.16, 0.99), 0.035, 0.03, 0.025, 10, 6, mat="lamp")
-    D.box(V(-0.16, 1.27, 0.6), V(0.16, 1.31, 0.7), mat="plate")
+    D.box((-0.16, 1.27, 0.6), (0.16, 1.31, 0.7), M, mat="plate")
     # front fork and mudguard over the single front wheel
     for sg in (-1, 1):
         D.cyl(V(sg * 0.07, yf, wr), V(sg * 0.06, yf - 0.12, 0.62), 0.022, n=8, mat="metal_dark")
@@ -388,12 +388,12 @@ def keke(tag, pos, heading, paint="keke", roof="canvas", stripe="paint_mid"):
         D.cyl(V(sg * 0.5, 0.86, 1.06), V(sg * 0.5, 0.86, 1.72), 0.016, n=8, mat="metal_dark")
         K.seg_box(V(sg * (W - 0.02), -0.4, 1.4), V(sg * (W - 0.02), -0.78, 1.4), 0.02, mat="metal_dark")
     # --- seats: driver's saddle on a pedestal, rear bench with backrest for three
-    D.box(V(-0.2, 0.14, 0.36), V(0.2, 0.46, 0.68), mat="paint_dark")              # seat box
-    D.box(V(-0.24, 0.12, 0.68), V(0.24, 0.5, 0.78), mat="seat")
-    D.box(V(-0.24, 0.06, 0.78), V(0.24, 0.13, 1.0), mat="seat")                   # low backrest
-    B.box(V(-0.6, -1.0, 0.36), V(0.6, -0.5, 0.64), mat="paint_dark")
-    D.box(V(-0.6, -1.02, 0.64), V(0.6, -0.46, 0.76), mat="seat")
-    D.box(V(-0.6, -1.26, 0.76), V(0.6, -1.12, 1.3), mat="seat")
+    D.box((-0.2, 0.14, 0.36), (0.2, 0.46, 0.68), M, mat="paint_dark")              # seat box
+    D.box((-0.24, 0.12, 0.68), (0.24, 0.5, 0.78), M, mat="seat")
+    D.box((-0.24, 0.06, 0.78), (0.24, 0.13, 1.0), M, mat="seat")                   # low backrest
+    B.box((-0.6, -1.0, 0.36), (0.6, -0.5, 0.64), M, mat="paint_dark")
+    D.box((-0.6, -1.02, 0.64), (0.6, -0.46, 0.76), M, mat="seat")
+    D.box((-0.6, -1.26, 0.76), (0.6, -1.12, 1.3), M, mat="seat")
     # handlebar on a steering column
     D.cyl(V(0, 0.92, 0.6), V(0, 0.8, 1.08), 0.03, n=8, mat="metal_dark")
     D.tube([V(-0.36, 0.7, 1.13), V(-0.15, 0.79, 1.1), V(0.15, 0.79, 1.1), V(0.36, 0.7, 1.13)], 0.017, n=8,
@@ -402,11 +402,11 @@ def keke(tag, pos, heading, paint="keke", roof="canvas", stripe="paint_mid"):
         D.cyl(V(sg * 0.36, 0.7, 1.13), V(sg * 0.42, 0.68, 1.14), 0.022, n=8, mat="seat")
     # tail lamps, plate, spare wheel on the back
     for sg in (-1, 1):
-        D.box(V(sg * 0.4, -1.345, 0.74), V(sg * 0.57, -1.315, 0.86), mat="lamp")
-    D.box(V(-0.18, -1.35, 0.44), V(0.18, -1.315, 0.56), mat="plate")
+        D.box((sg * 0.4, -1.345, 0.74), (sg * 0.57, -1.315, 0.86), M, mat="lamp")
+    D.box((-0.18, -1.35, 0.44), (0.18, -1.315, 0.56), M, mat="plate")
     Ms = M @ Matrix.Translation((0, -1.4, 0.78)) @ Matrix.Rotation(math.pi / 2, 4, "Z")
     wheel(tag + "_spare", Ms, (0, 0, 0), 0.2, 0.1, axis=-1, spokes=0)
-    D.box(V(-0.04, -1.36, 0.74), V(0.04, -1.31, 0.82), mat="metal_dark")
+    D.box((-0.04, -1.36, 0.74), (0.04, -1.31, 0.82), M, mat="metal_dark")
     # wheels: front single, rear pair under the tub
     wheel(tag + "_wf", M, (0, yf, wr), wr, 0.11, axis=1, spokes=0)
     for sg in (-1, 1):
@@ -463,7 +463,7 @@ def okada(tag, pos, heading):
               mat="metal")
         F.cyl(V(sg * 0.075, yf + (top[0] - yf) * 0.45, r + (top[1] - r) * 0.45), V(sg * 0.075, *top), 0.019, n=10,
               mat="chrome")
-    S.box(V(-0.11, top[0] - 0.05, top[1] - 0.02), V(0.11, top[0] + 0.05, top[1] + 0.02), mat="metal_dark")
+    S.box((-0.11, top[0] - 0.05, top[1] - 0.02), (0.11, top[0] + 0.05, top[1] + 0.02), M, mat="metal_dark")
     S.cyl(V(0, top[0] + 0.09, top[1] - 0.06), V(0, top[0] + 0.15, top[1] - 0.06), 0.09, 0.095, n=24, mat="paint_dark")
     S.cyl(V(0, top[0] + 0.15, top[1] - 0.06), V(0, top[0] + 0.155, top[1] - 0.06), 0.08, n=24, mat="lamp")
     S.cyl(V(0, top[0] - 0.02, top[1] + 0.03), V(0, top[0] - 0.04, top[1] + 0.09), 0.05, n=16, mat="paint_dark")
@@ -494,11 +494,11 @@ def okada(tag, pos, heading):
              for (y, w, h, zc) in seat]
     S.loft(rings, True, "seat", smooth=True)
     # side covers under the seat, rear fender and tail lamp, carrier rack
-    S.box(V(-0.12, 0.18, 0.56), V(0.12, 0.5, 0.75), mat="paint_mid")
+    S.box((-0.12, 0.18, 0.56), (0.12, 0.5, 0.75), M, mat="paint_mid")
     arc = [(yr + math.cos(math.radians(a)) * (r + 0.05), r + math.sin(math.radians(a)) * (r + 0.05))
            for a in range(60, 185, 15)]
     sweep_yz(S, M, arc, rrect(0.065, 0.005, 0.004, 1), "paint_dark")
-    S.box(V(-0.06, -0.3, 0.68), V(0.06, -0.24, 0.76), mat="lamp")
+    S.box((-0.06, -0.3, 0.68), (0.06, -0.24, 0.76), M, mat="lamp")
     K = get(tag + "_k", "nolines")
     for sg in (-1, 1):
         K.seg_box(V(sg * 0.12, 0.05, 0.84), V(sg * 0.12, -0.32, 0.85), 0.014, mat="metal_dark")
@@ -506,7 +506,7 @@ def okada(tag, pos, heading):
     for y in (-0.1, -0.2, -0.32):
         K.seg_box(V(-0.12, y, 0.85), V(0.12, y, 0.85), 0.012, mat="metal_dark")
     # engine: crankcase, finned cylinder inclined forward, carburettor
-    S.box(V(-0.13, 0.42, 0.22), V(0.13, 0.78, 0.47), mat="metal")
+    S.box((-0.13, 0.42, 0.22), (0.13, 0.78, 0.47), M, mat="metal")
     cyl_a, cyl_b = Vector((0, 0.74, 0.45)), Vector((0, 0.88, 0.66))
     S.cyl(M @ cyl_a, M @ cyl_b, 0.065, n=16, mat="metal")
     for k in range(6):
@@ -521,7 +521,7 @@ def okada(tag, pos, heading):
         F.cyl(V(sg * 0.1, 0.44, 0.34), V(sg * 0.1, yr, r), 0.02, n=8, mat="paint_dark")
         F.cyl(V(sg * 0.11, yr + 0.06, r + 0.04), V(sg * 0.11, 0.03, 0.74), 0.022, n=10, mat="chrome")
         F.cyl(V(sg * 0.06, 0.46, 0.33), V(sg * 0.2, 0.46, 0.33), 0.012, n=6, mat="metal_dark")
-    S.box(V(-0.145, 0.02, 0.27), V(-0.12, 0.5, 0.36), mat="paint_dark")              # chain guard
+    S.box((-0.145, 0.02, 0.27), (-0.12, 0.5, 0.36), M, mat="paint_dark")              # chain guard
     F.cyl(V(-0.1, 0.4, 0.3), V(-0.14, 0.45, 0.02), 0.01, n=6, mat="metal_dark")      # kickstand
     # exhaust down from the cylinder head, under the engine, back to the muffler (right side)
     F.tube([V(0.03, 0.9, 0.6), V(0.08, 0.95, 0.45), V(0.12, 0.85, 0.22), V(0.15, 0.4, 0.22), V(0.17, 0.15, 0.3)], 0.022,
