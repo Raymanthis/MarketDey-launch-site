@@ -63,7 +63,8 @@ SPECS = {
     "road_uv": dict(albedo=0.95, ao=0.6, lines=[("V", 1.75, 0.02, 70.0, 0.22, 0.875)]),
     "tile": dict(albedo=0.92, lines=[("Z", 0.3, 0.008, 25.0, 0.5, 0.0), ("X", 0.3, 0.008, 25.0, 0.45, 0.0),
                                      ("Y", 0.3, 0.008, 25.0, 0.45, 0.0)]),
-    "earth": dict(albedo=0.88, ao=0.4), "canopy_yellow": dict(albedo=0.9), "canopy_band": dict(albedo=0.42),
+    "earth": dict(albedo=0.88, ao=0.4), "canopy_yellow": dict(albedo=1.0, ao=0.15, lift=0.1), "canopy_band": dict(albedo=0.38),
+    "soffit": dict(albedo=0.93, ao=0.3),
     "roof_blue": dict(albedo=0.48, lines=[("OX", 0.42, 0.01, 40.0, 0.4, 0.0)]),
     "gate_green": dict(albedo=0.52), "gate_paint": dict(albedo=0.95), "lettering": dict(albedo=0.16, kind="flat", ao=0.0),
     "fuel_pump": dict(albedo=0.85), "church_wall": dict(albedo=0.98),
@@ -353,6 +354,8 @@ def make(name, spec):
         lg.inputs["AO strength"].default_value = 0.6
         sh = op("ADD", op("MULTIPLY", lg.outputs[0], 0.35), 0.65)
         tone = op("MULTIPLY", tone, sh)
+    if spec.get("lift"):
+        tone = op("ADD", op("MULTIPLY", tone, 1.0 - spec["lift"] * 2.5), spec["lift"] * 2.5)
     gam = op("POWER", op("MAXIMUM", tone, 0.0), 2.2)
     comb = N.new("ShaderNodeCombineXYZ")
     for k in ("X", "Y", "Z"):
