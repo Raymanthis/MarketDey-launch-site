@@ -47,6 +47,7 @@ const SIGN_K = 400, SIGN_C = 2;
 const SIGN_RING_CY = 8.8, SIGN_HOLE_R = 3.68, SIGN_LOOP_R = 5.6, SIGN_RING_D = 11.2;
 const SIGN_PEND_K = 700, SIGN_PEND_C = 3, SIGN_PEND_MAX = 55, SIGN_PEND_VMAX = 260;
 const SIGN_IDLE_AMP = 2.6, SIGN_IDLE_T = 4.2;
+const SIGN_ROPE_LAG = 0.22, SIGN_ROPE_BOUNCE = 0, SIGN_ROPE_K1 = 90, SIGN_ROPE_C1 = 4, SIGN_ROPE_K2 = 300, SIGN_ROPE_C2 = 7;
 const SIGN_FLICK_WIN = 200, SIGN_FLICK_MIN = 400, SIGN_FLICK_K = 0.3, SIGN_FLICK_MAX = 700;
 
 class HomePage extends React.Component {
@@ -291,7 +292,7 @@ class HomePage extends React.Component {
   bMove(e) { const p = this.bp; if (!p || !p.drag) return; const nx = Math.max(-160, Math.min(160, e.clientX - p.sx)), ny = Math.max(-50, Math.min(110, e.clientY - p.sy)), now = performance.now(), dt = Math.max(0.008, (now - p.pt) / 1000);
     p.vx = p.vx * 0.5 + ((nx - p.x) / dt) * 0.5; p.vy = p.vy * 0.5 + ((ny - p.y) / dt) * 0.5; if (Math.abs(nx) + Math.abs(ny) > 4) p.moved = true; p.x = nx; p.y = ny; p.pt = now; }
   bUp(e) { const p = this.bp; if (!p) return; p.drag = false; if (e && e.currentTarget) e.currentTarget.style.cursor = 'grab'; this.bRun(); }
-  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, phi: 0, phv: 0, drag: false, down: false, moved: false, tapDir: 1, vx: 0, vy: 0, sx: 0, sy: 0, cx: 0, ax: 0, ay: 0, px: 0, py: 0, pt: 0, dt0: 0, a0: 0, st0: 0, stx: 0, hist: [], lastTapAt: 0, idleOn: false, idleT0: 0, last: performance.now() }; return this.sp; }
+  signPhys() { if (!this.sp) this.sp = { theta: 0, omega: 0, phi: 0, phv: 0, drag: false, down: false, moved: false, tapDir: 1, vx: 0, vy: 0, sx: 0, sy: 0, cx: 0, ax: 0, ay: 0, px: 0, py: 0, pt: 0, dt0: 0, a0: 0, st0: 0, stx: 0, hist: [], lastTapAt: 0, idleOn: false, idleT0: 0, q1: 0, v1: 0, q2: 0, v2: 0, s: 0, vs: 0, l0: 0, s0: 0, last: performance.now() }; return this.sp; }
   signPlace() {
     const logo = this.heroRef.current && this.heroRef.current.querySelector('[data-h="logo"]');
     const node = this.signNodeRef.current;
@@ -302,16 +303,35 @@ class HomePage extends React.Component {
     node.style.top = top + 'px';
     this.signRope();
   }
-  // The rope layer (under the wordmark) and the card layer (over it) are two fixed elements that get the SAME
-  // transform every frame (signRender), so in local coordinates the rope is a straight vertical line from the
-  // anchor to the eyelet at (0, signTop + SIGN_RING_CY) and can never drift off the hole.
-  signRope() {
+  // The rope layer (under the wordmark) and the card layer (over it) get the same swing transform every frame
+  // (signRender). In that shared local frame the eyelet is at (0, signTop + SIGN_RING_CY + p.s), so the rope is
+  // drawn from the anchor (0,0) to exactly that point; only its middle bends (modes vanish at both ends).
+  signRopeX(u, E, now) {
+    const p = this.signPhys(), st = p.s || 0, taut = 1 / (1 + Math.max(0, st) / 50);
+    const slack = st < 0 ? 0.5 * (2 / Math.PI) * Math.sqrt(-st * E) : 0; // a rope cannot push: on the up-bounce it bows out
+    const idle = this.reducedMotion ? 0 : 1.1 * Math.sin(Math.PI * 3 * u - now / 1000 * 2.4); // faint travelling wobble
+    return ((p.q1 * taut + slack + idle) * Math.sin(Math.PI * u)) + p.q2 * taut * Math.sin(Math.PI * 2 * u);
+  }
+  signRope(now) {
     const rope = this.signRopeRef.current, ropeF = this.signRopeFrontRef.current;
     if (!rope || !ropeF || this.signTop == null) return;
-    const R = SIGN_LOOP_R, top = this.signTop, cy = top + SIGN_RING_CY, loopBot = cy + R * 2, holeTop = cy - SIGN_HOLE_R;
-    rope.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 -600 L0 ' + cy + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + loopBot + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + cy));
-    // front piece: only over the card, from its top edge down into the hole
-    ropeF.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M0 ' + top + ' L0 ' + holeTop.toFixed(2)));
+    now = now || performance.now();
+    const p = this.signPhys(), R = SIGN_LOOP_R, top = this.signTop, cy = top + SIGN_RING_CY, E = cy + (p.s || 0), holeTop = cy - SIGN_HOLE_R, N = 36;
+    let d = 'M0 -600 L0 0';
+    for (let k = 1; k < N; k++) { const u = k / N; d += ' L' + this.signRopeX(u, E, now).toFixed(2) + ' ' + (u * E).toFixed(2); }
+    d += ' L0 ' + E.toFixed(2) + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + (E + R * 2).toFixed(2) + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + E.toFixed(2);
+    rope.querySelectorAll('path').forEach(q => q.setAttribute('d', d));
+    // front piece (card layer, card-local coords): over the card from its top edge into the hole, on the rope's end slope
+    const slope = -this.signRopeX(1 - 1 / N, E, now) / (E / N);
+    ropeF.querySelectorAll('path').forEach(q => q.setAttribute('d', 'M' + (slope * (top - cy)).toFixed(2) + ' ' + top + ' L' + (slope * (holeTop - cy)).toFixed(2) + ' ' + holeTop.toFixed(2)));
+  }
+  // rope bending modes: q1 (one bow) lags the swing, q2 (S-shape, faster) gives the whip; both ring down
+  signRopeStep(dt, now) {
+    const p = this.signPhys(); if (this.reducedMotion) { p.q1 = p.q2 = p.v1 = p.v2 = 0; return; }
+    const idleV = p.idleOn && now > p.idleT0 ? SIGN_IDLE_AMP * Math.PI * 2 / SIGN_IDLE_T * Math.cos((now - p.idleT0) / 1000 * Math.PI * 2 / SIGN_IDLE_T) : 0;
+    const w = p.phv + idleV, t1 = SIGN_ROPE_LAG * w + 0.004 * p.omega, t2 = -0.4 * SIGN_ROPE_LAG * w + SIGN_ROPE_BOUNCE * (p.vs || 0);
+    p.v1 += (SIGN_ROPE_K1 * (t1 - p.q1) - SIGN_ROPE_C1 * p.v1) * dt; p.q1 += p.v1 * dt;
+    p.v2 += (SIGN_ROPE_K2 * (t2 - p.q2) - SIGN_ROPE_C2 * p.v2) * dt; p.q2 += p.v2 * dt;
   }
   // idle sway (degrees) added on top of the pendulum angle while the sign hangs untouched
   signIdle(now) {
@@ -333,6 +353,7 @@ class HomePage extends React.Component {
     if (this.signRef.current) this.signRef.current.style.transform = xf;
     if (this.signRopeLayerRef.current) this.signRopeLayerRef.current.style.transform = xf;
     if (body && !this.reducedMotion) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
+    this.signRope(now);
   }
   signShow() {
     const el = this.signRef.current; if (!el) return;
@@ -370,6 +391,7 @@ class HomePage extends React.Component {
           p.theta += p.omega * dt;
         }
       }
+      this.signRopeStep(dt, now);
       const face = Math.round(p.theta / 180) * 180;
       const calmP = !p.drag && Math.abs(p.phi) < 0.15 && Math.abs(p.phv) < 1;
       const calmT = rm || (!p.drag && Math.abs(p.theta - face) < 0.05 && Math.abs(p.omega) < 0.5);
