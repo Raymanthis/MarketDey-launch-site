@@ -3,7 +3,10 @@ import "remixicon/fonts/remixicon.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  // absolute og:image / twitter:image URLs; every public domain serves the same files
+  metadataBase: new URL("https://www.marketdey.com"),
   title: "Marketdey",
+  twitter: { card: "summary_large_image" },
   description:
     "Know which markets are on today across Delta State — market days, alerts and landmarks that work offline.",
 };
