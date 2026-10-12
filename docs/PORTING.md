@@ -48,6 +48,8 @@ The site was exported from Claude Design as one self-unpacking HTML file
 4. **Bindings.** `{{ path }}` → `v.path`. The runtime expression language only has paths,
    `=== !== == !=`, leading `!`, parentheses and literals — translate literally. An attribute
    mixing text and bindings becomes a template literal. `undefined`/`null` in text renders empty.
+   **Every text interpolation is wrapped in `<span className="sc-interp">…</span>`** — the runtime
+   did this (`Within <span class="sc-interp">2 km</span>`) and flex/inline layout depends on it.
 5. **style.** The runtime turned style strings into objects with **string values**. Do the same:
    `style="opacity:0;left:{{ x }}px"` → `style={{ opacity: '0', left: `${v.x}px` }}` (camelCase
    keys, custom properties keep `'--name'`, every value a string so React never appends `px`).
@@ -61,7 +63,8 @@ The site was exported from Claude Design as one self-unpacking HTML file
    (index keys, as the runtime used).
 9. **Pseudo-class attrs.** `style-hover="css"` / `style-active="css"` → a class in a co-located
    CSS module (`<Name>.module.css`) whose rule is `.cls:hover{…}` / `.cls:active{…}` with
-   **`!important` on every declaration** (the runtime did this).
+   **`!important` on every declaration** (the runtime did this). A plain global stylesheet with
+   `scp`-prefixed class names (`.scpcyes:hover{…}`) is equally acceptable and keeps domdiff quiet.
 10. **Imports.** `<dc-import name="X" a="{{ b }}">` → `<X a={v.b} />` (the child renders its own
     sc-host wrapper). `<x-import component-from-global-scope="IOSDevice" …>` → wrap exactly as the
     golden DOM shows (`<div class="sc-host-x" style="display:contents">` around `<IOSDevice …>`),
@@ -106,5 +109,7 @@ Golden captures of the original are in `tools/fidelity/golden/` (gitignored; reg
 - **Structure:** `node tools/fidelity/domdiff.mjs <url> '<selector>'` diffs a rendered subtree
   against the golden DOM (desktop, scroll 0, fixed clock). Use
   `[data-sc-name="<Name>"]` for sections, `section[data-screen-label="…"]` for page blocks.
+  Styles are compared as the browser serialises them, so keep authored style literals verbatim —
+  never rewrite `#386641` as `rgb(56, 102, 65)` to please the tool.
 - **Pixels:** `node tools/fidelity/capture.mjs <url> tools/fidelity/candidate` then
   `node tools/fidelity/diff.mjs tools/fidelity/golden tools/fidelity/candidate tools/fidelity/diff`.
