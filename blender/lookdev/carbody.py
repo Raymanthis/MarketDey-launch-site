@@ -294,7 +294,7 @@ def build_car(tag, M, kind="sedan", paint="paint_light"):
     for sg in (-1, 1):
         for yh in ((2.3, 3.25) if kind == "sedan" else (1.4, 2.5)):
             x = body.side_x(yh, belt - 0.08) + 0.012
-            D.box(M @ Vector((sg * (x - 0.01), yh, belt - 0.1)), M @ Vector((sg * (x + 0.015), yh + 0.17, belt - 0.065)),
+            D.box((sg * (x - 0.01), yh, belt - 0.1), (sg * (x + 0.015), yh + 0.17, belt - 0.065), M,
                   mat="chrome")
         ym = 3.4 if kind == "sedan" else 3.3
         x = body.side_x(ym, belt + 0.05)
