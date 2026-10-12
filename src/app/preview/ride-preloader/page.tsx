@@ -19,7 +19,7 @@ export default function Page() {
   }, []);
   const log = () => window.__preloader as Log;
   return (
-    <div style={{ minHeight: '100vh', background: '#386641', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+    <div style={{ minHeight: '100vh', fontFamily: 'Lato, sans-serif', background: '#386641', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
       <div style={{ fontSize: '28px', fontWeight: '900', letterSpacing: '-.035em', color: '#fff' }}>{heroCopy.logo}</div>
       <div style={{ minHeight: '16px' }}>
         {src !== undefined ? (
