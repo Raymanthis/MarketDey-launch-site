@@ -38,7 +38,9 @@ P = dict(
     stroke=0.07,                                     # diagonal stroke texture strength on shading
     ink_gain=0.95, ink_tooth=0.12, ink_soft=0.3,     # ink opacity, tooth break-up, blur (px @900)
     mottle=0.012,                                    # paper colour variation
+    white=False,                                     # production: gray on white (paper tint in CSS)
 )
+_FIELDS = {}
 
 
 def read_layers(path):
@@ -131,7 +133,9 @@ def composite(path, out_dir):
     t[depth > 5e3] = 1.0
     tone = tone + (1 - tone) * t
     # 3: graphite shading
-    tooth, stroke, mottle = paper_fields(h, w)
+    if (h, w) not in _FIELDS:
+        _FIELDS[(h, w)] = paper_fields(h, w)
+    tooth, stroke, mottle = _FIELDS[(h, w)]
     d = (1 - tone) * P["shade_gain"]
     grain = 1 + P["tooth"] * tooth * np.clip(d * 4, 0, 1) + P["stroke"] * stroke * np.clip(d * 3, 0, 1)
     d = np.clip(d * np.clip(grain, 0.2, 2.0), 0, 1)
@@ -144,16 +148,23 @@ def composite(path, out_dir):
     ink = np.clip(a * ink_dark, 0, 1)
     dark = 1 - (1 - d) * (1 - ink)
     # 5: paper and graphite colours
-    paper = np.array(C.PAPER, np.float32) / 255.0
-    graph = np.array(C.GRAPHITE, np.float32) / 255.0
-    pap = paper[None, None, :] * (1 + P["mottle"] * mottle[..., None])
-    out = pap * (1 - dark[..., None]) + graph[None, None, :] * dark[..., None]
-    out8 = np.clip(out * 255 + 0.5, 0, 255).astype(np.uint8)
     name = os.path.splitext(os.path.basename(path))[0]
     os.makedirs(out_dir, exist_ok=True)
     dst = os.path.join(out_dir, name + ".png")
     o = oiio.ImageOutput.create(dst)
-    o.open(dst, oiio.ImageSpec(w, h, 3, oiio.UINT8))
+    if P["white"]:
+        # one channel: 1 = paper. Multiplied over the page's paper colour this gives the drawing
+        g = float(np.mean(np.array(C.GRAPHITE, np.float32) / np.array(C.PAPER, np.float32)))
+        out = (1 + P["mottle"] * mottle) * (1 - dark) + g * dark
+        out8 = np.ascontiguousarray(np.clip(out * 255 + 0.5, 0, 255).astype(np.uint8)[..., None])
+        o.open(dst, oiio.ImageSpec(w, h, 1, oiio.UINT8))
+    else:
+        paper = np.array(C.PAPER, np.float32) / 255.0
+        graph = np.array(C.GRAPHITE, np.float32) / 255.0
+        pap = paper[None, None, :] * (1 + P["mottle"] * mottle[..., None])
+        out = pap * (1 - dark[..., None]) + graph[None, None, :] * dark[..., None]
+        out8 = np.clip(out * 255 + 0.5, 0, 255).astype(np.uint8)
+        o.open(dst, oiio.ImageSpec(w, h, 3, oiio.UINT8))
     o.write_image(out8)
     o.close()
     print(f"[composite] {dst}")
