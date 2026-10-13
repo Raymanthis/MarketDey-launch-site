@@ -8,15 +8,16 @@
 //
 // Props
 //   manifest    manifest URL (default: the real frames; pass null to skip -> ready at once), or
-//               RIDE_MODEL ('model'): the live street model's glb download (RideModel.js)
+//               RIDE_MODEL ('model'): the live street model's glb download, or RIDE_HYBRID
+//               ('hybrid'): the vehicles + people glb (RideModel.js)
 //   onProgress  (fraction 0..1) => void, on every loaded frame
 //   onReady     () => void, once: at 100%, or after 20 s if the first 64 entries of
 //               manifest.order are loaded, or immediately if the manifest fails (the section then
 //               uses the live street)
 import React from 'react';
 import copy from '@/content/preloader.json';
-import { RIDE_MANIFEST, RIDE_MODEL, rideStore } from '@/components/sections/RideFrames';
-import { modelStore } from '@/components/sections/RideModel';
+import { RIDE_MANIFEST, RIDE_MODEL, RIDE_HYBRID, rideStore } from '@/components/sections/RideFrames';
+import { modelStore, figuresStore } from '@/components/sections/RideModel';
 
 const LABEL = { font: '700 13px Lato, sans-serif', color: 'rgba(255,255,255,.85)', letterSpacing: '.04em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
@@ -33,7 +34,9 @@ export default function RidePreloader({ manifest = RIDE_MANIFEST, onProgress, on
       if (s.ready && !fired) { fired = true; if (cb.current.onReady) cb.current.onReady(); }
     };
     if (!manifest) { handle({ fraction: 0, ready: true }); return undefined; }
-    return manifest === RIDE_MODEL ? modelStore().subscribe(handle) : rideStore(manifest).subscribe(handle);
+    if (manifest === RIDE_MODEL) return modelStore().subscribe(handle);
+    if (manifest === RIDE_HYBRID) return figuresStore().subscribe(handle);
+    return rideStore(manifest).subscribe(handle);
   }, [manifest]);
   return (
     <div role="status" aria-live="polite" style={style ? { ...LABEL, ...style } : LABEL}>
