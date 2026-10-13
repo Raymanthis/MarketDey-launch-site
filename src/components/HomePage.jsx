@@ -577,7 +577,8 @@ class HomePage extends React.Component {
     const u = this.tu, narrow = VW < 900; this.tmN = (this.tmN || 0) + 1;
     const Hp0 = narrow ? Math.min(VH * 0.6, 540) : Math.min(VH * 0.72, 620), Wp0 = Hp0 * 402 / 874;
     const Lm = Math.max(narrow ? 20 : 32, (VW - 1200) / 2 + 32), cx0 = narrow ? VW + Wp0 * 0.75 : VW - Lm - Wp0 / 2 - 40, cy0 = VH / 2 + (narrow ? 0 : 10);
-    const colW = narrow ? VW - 2 * Lm : clampN(cx0 - Wp0 / 2 - 72 - Lm, 300, 560);
+    let colW = narrow ? clampN((VW - 2 * Lm) / (this.tmSc || 1), VW - 2 * Lm, 620) : clampN(cx0 - Wp0 / 2 - 72 - Lm, 300, 560); // phones: widen the column by 1/scale so the scaled-down card still spans the screen
+    if (narrow && T.colW && Math.abs(T.colW - colW) < 14) colW = T.colW;
     if (T.colW !== colW) { T.colW = colW; T.content.style.width = colW + 'px'; this.tmN = 1; }
     if (this.tmN % 45 === 1) { T.hC = T.content.offsetHeight; T.h1 = T.c1.offsetHeight; }
     const b = sst(0.55, 1.5, u), cx = lerp(cx0, VW / 2, b), cy = lerp(cy0, VH / 2, b), s1 = lerp(1, 1.22, b);
@@ -615,7 +616,7 @@ class HomePage extends React.Component {
     let to = u >= 2.75 && u < 5.25 ? 1 - ez((u - 2.75) / 0.35) : null;
     const tv = to === null ? 'hidden' : 'visible'; if (T.tv !== tv) { T.tv = tv; T.tip.style.visibility = tv; }
     if (to !== null) T.tip.style.transform = 'translate(0px,' + (VH * 0.7 * to).toFixed(1) + 'px) rotate(' + (-3 * to).toFixed(2) + 'deg)';
-    const hC = T.hC || 700, sc = Math.min(1, (VH - 96) / hC), c = sst(1.05, 1.45, u), cyC = narrow ? Math.max(24, (VH - hC * sc) / 2) : (VH - hC * sc) / 2;
+    const hC = T.hC || 700, sc = Math.min(1, (VH - (narrow ? 56 : 96)) / hC); this.tmSc = narrow ? sc : 1; const  c = sst(1.05, 1.45, u), cyC = narrow ? Math.max(24, (VH - hC * sc) / 2) : (VH - hC * sc) / 2;
     T.content.style.transform = 'translate(' + (Lm + (VW / 2 - cx0) * b) + 'px,' + cyC + 'px) scale(' + sc + ')'; T.content.style.opacity = (1 - c).toFixed(3); T.content.style.pointerEvents = c > 0.5 ? 'none' : 'auto';
   }
   roadsRef = React.createRef(); glRef = React.createRef();
@@ -868,7 +869,7 @@ class HomePage extends React.Component {
               </div>
             </section>
           <section id="search" style={{position:"relative"}}><MarketSearchSection /></section>
-          <section ref={v.tryRef} data-screen-label="06 Find a market" style={{position:"relative",zIndex:"2",height:"690vh",marginTop:"-160vh"}}>{' '}
+          <section ref={v.tryRef} data-m="try" data-screen-label="06 Find a market" style={{position:"relative",zIndex:"2",height:"690vh",marginTop:"-160vh"}}>{' '}
             <div style={{position:"sticky",top:"0",height:"100vh",overflow:"hidden",opacity:"0"}}>{' '}
               <div data-tm="map" style={{position:"absolute",inset:"0",background:"#ebe8e1"}}>{' '}
                 <canvas data-tm="cv" style={{position:"absolute",left:"0",top:"0",width:"100%",height:"100%",display:"block"}}></canvas>{' '}

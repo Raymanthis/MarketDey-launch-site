@@ -52,6 +52,18 @@
 @media (max-width: 399px) {
   [data-m="hero-nav"] > a:last-child { font-size: 14px; gap: 6px !important; padding-left: 12px !important; padding-right: 13px !important; }
   [data-m="hero-phones"] { zoom: .5; }
+
+  /* ---------- 06 Find a market ("Try it" card, then the phone) ---------- */
+  [data-tm="content"] { gap: 18px !important; }
+  [data-tm="content"] h2 { font-size: clamp(30px, 8.6vw, 44px) !important; }
+  [data-tm="content"] > div:first-child { gap: 10px !important; }
+  [data-tm="content"] > div:first-child > div:last-child { font-size: 16px !important; }
+  [data-tm="content"] button { height: 48px !important; }
+  [data-tm="content"] > div:nth-child(2) > div:first-child { padding: 16px 18px 14px !important; gap: 10px !important; }
+  [data-tm="content"] > div:nth-child(2) > div:nth-child(2) { padding: 14px 18px 12px !important; }
+  [data-tm="content"] > div:nth-child(2) > div:last-child { padding: 14px 18px !important; margin-top: 4px !important; }
+  [data-tm="content"] a[href="#download"] { height: 48px !important; }
+  [data-tm="tip"] { padding: 20px !important; gap: 10px !important; }
 }
 @media (min-width: 600px) and (max-width: 899px) {
   [data-screen-label="03 Alerts"] > div > div:last-child, [data-screen-label="05 Offline and privacy"] > div > div:last-child { margin: 0 auto; }
