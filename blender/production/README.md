@@ -28,3 +28,14 @@ unique and drawn triangles, bytes.
 The site loads the file in `src/components/sections/RideModel.js` and draws the ink lines in
 real time with `src/lib/inkPass.js`. Node `city` grows during the map tilt; node `ground` does not.
 Set `EXPORT_DEBUG=1` to print the heaviest remaining objects.
+
+## Figures only (`?ride=hybrid`)
+
+```
+blender -b --factory-startup blender/production/out/city.blend -P blender/production/export_figures.py
+```
+
+Exports just the vehicles (veh*, parked xp*, okadas ok*) and the people to
+`public/media/street/figures.glb` (desktop, ~1 MB, 4.2k-triangle people) and `figures-lite.glb`
+(phones, ~0.5 MB). Hybrid mode draws everything else as the procedural line art and outlines the
+figures with the ink pass.
