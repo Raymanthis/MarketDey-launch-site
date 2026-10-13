@@ -63,3 +63,22 @@ but several sections clip their own content at the right/left edge instead.
 - Hover-only interactions: only style-hover colour changes (no functional hover found).
 - Tap targets under 44 px: nav links, footer links, Replay, goods chips, distance pills.
 - No console errors during the crawl.
+
+## Status after the fixes (phones and tablets)
+
+All sections above were reworked behind `@media (max-width: 899px)` (or `innerWidth` branches); desktop at
+1440x900 compared pixel for pixel before/after: identical except live-animated content (Explore particles,
+the pulsing landmark pin, footer skyline traffic; at most 1.1 % of a frame).
+
+- Hero: nav reflows (logo + download button, links on their own row), headline `clamp()`, banner and phones scaled; banner drag uses `touch-action: pan-y` so it no longer traps scrolling.
+- Audiences: text sits in a bottom card, vertical scrim, progress rail is bars only with a larger tap area.
+- Alerts / Roads / Contributors / Offline: phone pairs scaled by breakpoint and overlapped; text first.
+- How it counts: the strip follows the day being counted (auto-scroll), edge snap.
+- Explore: compact panel, five distance steps in one row, names wrap, faded goods strip, one result row on short phones.
+- Find a market: card widened by 1/scale so it fills the screen, 48 px controls, larger usable stage.
+- Landmarks: bottom sheet with the full "Check I'm here" content (also 900-1099 px), signboards stand nearer the road in portrait.
+- FAQ: the answer opens under the tapped question on phones; footer links >= 44 px.
+- `svh` stages for Audiences, Explore, Find a market, Landmarks.
+- No horizontal scroll at 320, 360, 390, 430, 768 (scrollWidth == innerWidth at every sampled step).
+
+Known limits: footer clouds (cityLife) still pass behind link columns; the Landmarks sheet buttons are display-only like the desktop mock-up.
