@@ -23,7 +23,7 @@ const FRAG = `
 uniform sampler2D tN;
 uniform sampler2D tD;
 uniform vec2 texel;
-uniform float cn, cf, fogN, fogF, strength, offD, offN, figOnly, nLo, nW, dLo, dW;
+uniform float cn, cf, fogN, fogF, strength, offD, offN, figOnly, nLo;
 uniform vec3 ink;
 varying vec2 vUv;
 float iz(vec2 uv) { return 1.0 / cn - texture2D(tD, uv).x * (1.0 / cn - 1.0 / cf); }
@@ -42,11 +42,11 @@ void main() {
   float lx = 2.0 * c - iz(vUv - dx) - iz(vUv + dx);
   float ly = 2.0 * c - iz(vUv - dy) - iz(vUv + dy);
   float de = max(max(lx, ly), 0.0) / c;
-  float eD = smoothstep(dLo, dLo + dW, de);
+  float eD = smoothstep(0.006, 0.02, de);
   vec3 n = nrm(vUv);
   vec2 nx = vec2(texel.x * offN, 0.0), ny = vec2(0.0, texel.y * offN);
   float ne = max(max(nEdge(n, vUv - nx), nEdge(n, vUv + nx)), max(nEdge(n, vUv - ny), nEdge(n, vUv + ny)));
-  float eN = smoothstep(nLo, nLo + nW, ne);
+  float eN = smoothstep(nLo, nLo + 0.23, ne);
   float z = 1.0 / c;
   float fog = clamp((z - fogN) / (fogF - fogN), 0.0, 1.0);
   float a = max(eD, eN) * strength * (1.0 - fog);
@@ -64,7 +64,7 @@ export function makeInkPass(THREE, renderer, inkHex) {
   const uniforms = {
     tN: { value: rt.texture }, tD: { value: depthTexture }, texel: { value: new THREE.Vector2(1, 1) },
     cn: { value: 0.1 }, cf: { value: 700 }, fogN: { value: 60 }, fogF: { value: 290 }, strength: { value: 1 },
-    offD: { value: 2 }, offN: { value: 1 }, figOnly: { value: 0 }, nLo: { value: 0.22 }, nW: { value: 0.23 }, dLo: { value: 0.006 }, dW: { value: 0.014 }, ink: { value: new THREE.Vector3(inkV[0], inkV[1], inkV[2]) }
+    offD: { value: 2 }, offN: { value: 1 }, figOnly: { value: 0 }, nLo: { value: 0.22 }, ink: { value: new THREE.Vector3(inkV[0], inkV[1], inkV[2]) }
   };
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthTest: false, depthWrite: false });
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); quad.frustumCulled = false;
@@ -88,9 +88,7 @@ export function makeInkPass(THREE, renderer, inkHex) {
       renderer.setRenderTarget(null); renderer.setClearColor(prevClear, ca);
       scene.background = bg; scene.overrideMaterial = ov; camera.layers.mask = mask;
       uniforms.cn.value = camera.near; uniforms.cf.value = camera.far; uniforms.fogN.value = o.fogNear; uniforms.fogF.value = o.fogFar;
-      uniforms.strength.value = o.strength; uniforms.offD.value = o.offD; uniforms.offN.value = o.offN; uniforms.figOnly.value = fig ? 1 : 0; // figure-only mode: narrow thresholds, so an edge is either inked or not (no faint grey ghost
-      // strokes from facets or near-coplanar overlaps); model mode keeps its original soft ones
-      uniforms.nLo.value = fig ? 0.45 : 0.22; uniforms.nW.value = fig ? 0.08 : 0.23; uniforms.dLo.value = fig ? 0.012 : 0.006; uniforms.dW.value = fig ? 0.006 : 0.014;
+      uniforms.strength.value = o.strength; uniforms.offD.value = o.offD; uniforms.offN.value = o.offN; uniforms.figOnly.value = fig ? 1 : 0; uniforms.nLo.value = fig ? 0.32 : 0.22; // figures: rounder shapes, fewer facet lines
       renderer.autoClear = false; renderer.render(quadScene, quadCam); renderer.autoClear = ac;
     },
     dispose() { rt.dispose(); depthTexture.dispose(); normalMat.dispose(); occMat.dispose(); mat.dispose(); quad.geometry.dispose(); }
