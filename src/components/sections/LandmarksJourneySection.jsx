@@ -2,6 +2,7 @@
 /* eslint-disable */
 import React from 'react';
 import LandmarkPhone from '@/components/sections/LandmarkPhone';
+import LandmarkSheet from '@/components/sections/LandmarkSheet';
 import content from '@/content/landmarks-journey.json';
 import { RideFramesPlayer, openRide, rideSource, rideFrameStats } from '@/components/sections/RideFrames';
 import { MAP_END, RIDE_START, RIDE_END, REVEAL, clamp, sstep, S0, PX, PZ, SMAX, fr, W, LS, LSD, SB, MK, TS0, TS1, headS, makeRideCamera } from '@/lib/rideCamera';
@@ -23,7 +24,7 @@ const stepFor = p => { if (p >= 0.95) return 6; let s = 0; STOPS.forEach(t => { 
 
 class LandmarksJourneySection extends React.Component {
   rootRef = React.createRef(); arrowRef = React.createRef(); arrowIcon = React.createRef(); whiteRef = React.createRef();
-  glRef = React.createRef(); cardRef = React.createRef(); phoneRef = React.createRef();
+  glRef = React.createRef(); cardRef = React.createRef(); phoneRef = React.createRef(); sheetRef = React.createRef();
   state = { tip: 0, step: 0, wide: true, zoom: 0.6, glFail: false };
   p = 0; cur = 0; vis = false;
 
@@ -75,6 +76,7 @@ class LandmarksJourneySection extends React.Component {
       c.el.style.transform = 'translate(' + (c.dx * VW * 0.55 * off).toFixed(1) + 'px,' + (c.dy * VH * 0.7 * off).toFixed(1) + 'px) rotate(' + ((c.dx - c.dy) * 3 * off).toFixed(2) + 'deg)';
     });
     if (ph) { const sIn = can && e >= 1 ? sstep(0.03, 0.1, q) : 0, sOut = sstep(0.86, 0.93, q); ph.style.visibility = sIn > 0.001 && sOut < 0.999 ? 'visible' : 'hidden'; ph.style.transform = 'translateY(-50%) translateX(' + ((1 - sIn) * 130 + sOut * 130).toFixed(1) + '%)'; }
+    const sh = this.sheetRef.current; if (sh) { const sIn = can && e >= 1 ? sstep(0.03, 0.1, q) : 0, sOut = sstep(0.86, 0.93, q); sh.style.visibility = sIn > 0.001 && sOut < 0.999 ? 'visible' : 'hidden'; sh.style.transform = 'translateY(' + ((1 - sIn) * 118 + sOut * 118).toFixed(1) + '%)'; }
     if (!can) return;
     const pr = this.three.render({ k, e, q, f, p }, t);
     if (ar && pr) { const o = 1 - sstep(0.05, 0.4, e); ar.style.visibility = o > 0.001 ? 'visible' : 'hidden'; ar.style.left = (pr[0] * 100).toFixed(2) + '%'; ar.style.top = (pr[1] * 100).toFixed(2) + '%'; ar.style.transform = 'translate(-50%,-50%) scale(' + (1 + 0.5 * sstep(0, 0.4, e)).toFixed(3) + ')'; ar.style.opacity = o.toFixed(3); if (ai) ai.style.transform = 'rotate(' + (180 * (1 - pr[2])).toFixed(1) + 'deg)'; }
@@ -399,12 +401,12 @@ class LandmarksJourneySection extends React.Component {
       const face = new THREE.MeshBasicMaterial({ map: tx }), edge = new THREE.MeshBasicMaterial({ color: '#a7c957' });
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 40), [edge, face, face]); m.rotation.x = Math.PI / 2;
       const g = new THREE.Group(); g.add(m); g.userData.coin = true; return g; };
-    const boards = [], pins = [];
+    const boards = [], pins = []; let boardPort = false; const BOARD_LAT = 5.9, BOARD_LAT_PORTRAIT = 4.4, BOARD_SCALE_PORTRAIT = 0.8;
     const postG = new THREE.BoxGeometry(0.16, 2.9, 0.16), postE = new THREE.EdgesGeometry(postG);
     LM.forEach((l, i) => { const sd = LSD[i], grp = new THREE.Group();
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 3.0), new THREE.MeshBasicMaterial({ map: boardTex(i + 1, l), transparent: true })); pl.position.y = 4.1; grp.add(pl);
       [-1.7, 1.7].forEach(x => { const m = new THREE.Mesh(postG, fillMat); m.position.set(x, 1.45, -0.06); grp.add(m); const e = new THREE.LineSegments(postE, lineMat(INK)); e.position.copy(m.position); grp.add(e); });
-      const [bx, bz] = W(SB[i], sd * 5.9); grp.position.set(bx, -8, bz); grp.rotation.y = -fr(SB[i])[2] + (sd > 0 ? -0.5 : 0.5); scene.add(grp); boards.push({ grp, s: SB[i] });
+      const [bx, bz] = W(SB[i], sd * 5.9); grp.position.set(bx, -8, bz); grp.rotation.y = -fr(SB[i])[2] + (sd > 0 ? -0.5 : 0.5); scene.add(grp); boards.push({ grp, s: SB[i], i, sd });
       const [px, pz] = W(MK[i][2], MK[i][0]); const sp = i === 4 ? (() => { const g = coinPin(), [cx, cz] = W(245, -5.2); g.userData.at = [cx, cz]; return g; })() : new THREE.Sprite(new THREE.SpriteMaterial({ map: pinTex(i + 1), transparent: true })); sp.position.set(px, MK[i][1], pz); sp.scale.set(2.2, 2.2, 1); scene.add(sp); pins.push(sp); });
     const self = this;
     this.three = {
@@ -412,6 +414,8 @@ class LandmarksJourneySection extends React.Component {
       dispose() { if (player) player.destroy(); renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); },
       render(st, t) {
         const { k, e, q } = st, e1 = sstep(0, 1, e);
+        // portrait screens see a narrow slice of the street, so the signboards stand nearer the road there
+        { const portrait = host.clientWidth < host.clientHeight * 0.9; if (portrait !== boardPort) { boardPort = portrait; boards.forEach(b => { const [bx, bz] = W(SB[b.i], b.sd * (portrait ? BOARD_LAT_PORTRAIT : BOARD_LAT)); b.grp.position.x = bx; b.grp.position.z = bz; b.grp.scale.setScalar(portrait ? BOARD_SCALE_PORTRAIT : 1); }); } }
         const sHead = headS(k, e), th = fr(sHead)[2];
         if (hdS === undefined) hdS = th; hdS += (th - hdS) * 0.12;
         let fi = null, key = [k, e, q, hdS, st.f].map(v => v.toFixed(4)).join();
@@ -453,7 +457,7 @@ class LandmarksJourneySection extends React.Component {
     const tip = TIPS[this.state.tip], n = this.state.tip;
     const dots = n >= 1 && n <= 5 ? [1, 2, 3, 4, 5].map(i => ({ bg: i <= n ? '#4f772d' : 'rgba(37,36,34,.12)' })) : null;
     return {
-      rootRef: this.rootRef, arrowRef: this.arrowRef, arrowIcon: this.arrowIcon, whiteRef: this.whiteRef, glRef: this.glRef, phoneRef: this.phoneRef,
+      rootRef: this.rootRef, sheetRef: this.sheetRef, arrowRef: this.arrowRef, arrowIcon: this.arrowIcon, whiteRef: this.whiteRef, glRef: this.glRef, phoneRef: this.phoneRef,
       tip: { ...tip, cta: tip.cta || null, dots }, step: this.state.step, wide: this.state.wide, zoom: this.state.zoom
     };
   }
@@ -462,8 +466,8 @@ class LandmarksJourneySection extends React.Component {
     const v = { ...this.props, ...this.renderVals() };
     return (
       <div className="sc-host" data-sc-name="Landmarks Journey Section">
-      <div ref={v.rootRef} data-screen-label="04 Landmarks" style={{ position: 'relative', height: '1800vh' }}>
-        <div style={{ position: 'sticky', top: '0', height: '100vh', overflow: 'hidden', background: '#ebe8e1' }}>
+      <div ref={v.rootRef} data-m="lm-root" data-screen-label="04 Landmarks" style={{ position: 'relative', height: '1800vh' }}>
+        <div data-m="lm-stage" style={{ position: 'sticky', top: '0', height: '100vh', overflow: 'hidden', background: '#ebe8e1' }}>
           <div ref={v.glRef} style={{ position: 'absolute', inset: '0', opacity: '0', transition: 'opacity .6s' }}></div>
           <div ref={v.arrowRef} style={{ position: 'absolute', left: '50%', top: '58%', width: '52px', height: '52px', transform: 'translate(-50%,-50%)', borderRadius: '26px', background: '#252422', border: '4px solid #fff', boxSizing: 'border-box', boxShadow: '0 10px 24px rgba(37,36,34,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a7c957', fontSize: '24px', zIndex: '2', opacity: '0', pointerEvents: 'none' }}><i ref={v.arrowIcon} className="ri-arrow-up-line" style={{ display: 'block', transform: 'rotate(180deg)' }}></i></div>
           <div data-tip="0" data-dx="0" data-dy="1" style={{ position: 'absolute', left: 'clamp(16px,4vw,56px)', bottom: 'clamp(16px,7vh,64px)', width: '420px', maxWidth: 'calc(100% - 32px)', padding: '26px', borderRadius: '28px', background: 'rgba(250,249,246,.97)', boxShadow: '0 24px 60px -30px rgba(37,36,34,.5)', boxSizing: 'border-box', zIndex: '3', display: 'flex', flexDirection: 'column', gap: '12px', visibility: 'hidden', willChange: 'transform' }}>
@@ -506,6 +510,7 @@ class LandmarksJourneySection extends React.Component {
           <div ref={v.phoneRef} style={{ position: 'absolute', right: '56px', top: '50%', transform: 'translateY(-50%) translateX(130%)', zIndex: '3', visibility: 'hidden', pointerEvents: 'none', willChange: 'transform' }}>
             {v.wide ? <><div style={{ zoom: `${v.zoom}` }}><LandmarkPhone step={v.step} /></div></>  : null}
           </div>
+          {!v.wide ? <><div data-m="lm-sheet" style={{ position: 'absolute', left: '0', right: '0', bottom: '0', zIndex: '3', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}><div ref={v.sheetRef} style={{ width: '100%', display: 'flex', justifyContent: 'center', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', visibility: 'hidden', transform: 'translateY(118%)', willChange: 'transform' }}><LandmarkSheet step={v.step} /></div></div></> : null}
           <div ref={v.whiteRef} style={{ position: 'absolute', inset: '0', background: '#faf9f6', opacity: '0', zIndex: '5', pointerEvents: 'none' }}></div>
         </div>
       </div>
