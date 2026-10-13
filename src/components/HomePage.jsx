@@ -256,7 +256,7 @@ class HomePage extends React.Component {
     if (document.fonts && document.fonts.load) document.fonts.load('900 28px Lato').then(go1, go1); else go1(); at(1500, go1);
     // the ride frames preload under the wordmark ("Loading 47%"); the scroll-up hint replaces it once they
     // are ready (or after 30 s, so a slow connection never traps the visitor on the splash)
-    this.hintShow = () => { if (this.introGone) return; this.rideLoadShow(false); if (hint) { if (this.rideLoadRef.current) hint.style.top = this.rideLoadRef.current.style.top || hint.style.top; hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } };
+    this.hintShow = () => { if (this.introGone) return; this.rideLoadShow(false); if (window.scrollY >= window.innerHeight) return; if (hint) { if (this.rideLoadRef.current) hint.style.top = this.rideLoadRef.current.style.top || hint.style.top; hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } };
     this.rideLoadShow = on => { const rl = this.rideLoadRef.current; if (!rl) return; if (on && hint) rl.style.top = hint.style.top || ''; rl.style.opacity = on ? '1' : '0'; };
     this.introGo = () => { if (this.props.launchMode || !this.introReady || !this.rideReady || this.introGone) return; this.introGone = true; if (this.cityLifeHero && this.cityLifeHero.setSplash) this.cityLifeHero.setSplash(false); window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
       if (hint) { hint.style.opacity = '0'; hint.style.transform = 'translate(-50%,12px)'; hint.style.pointerEvents = 'none'; }
@@ -637,6 +637,12 @@ class HomePage extends React.Component {
     window.addEventListener('resize', this.onCityResize);
     if (new URLSearchParams(window.location.search).get('citydebug') === '1') { const self = this; window.__city = { get hero() { return self.cityLifeHero; }, get footer() { return self.cityLifeFoot; } }; this.cityDebug = true; }
     window.addEventListener('scroll', this.onHeroScroll, { passive: true }); this.onHeroScroll();
+    // The splash hint ("Scroll up") and the loading label are position:fixed and are hidden by introGo.
+    // If the page moves a screen down without the intro gesture (keyboard focus or find-in-page
+    // scrolling the locked page), hide them so they never float over the sections below.
+    this.onHintGuard = () => { if (this.introGone || window.scrollY < window.innerHeight) return; const root = this.heroRef.current, h = root && root.querySelector('[data-h="hint"]');
+      if (h && h.style.opacity !== '0') { h.style.opacity = '0'; h.style.pointerEvents = 'none'; } if (this.rideLoadShow) this.rideLoadShow(false); };
+    window.addEventListener('scroll', this.onHintGuard, { passive: true });
     this.heroIntro();
     if (!lm) {
       this.onTmResize = () => this.tmResize(); window.addEventListener('resize', this.onTmResize);
@@ -646,7 +652,7 @@ class HomePage extends React.Component {
       this.faqTick = setInterval(() => { const el = this.faqRef.current, r = el && el.getBoundingClientRect(), vh = window.innerHeight; if (!r || r.top > vh * 0.8 || r.bottom < vh * 0.2 || !this.state.enter) return; const ph = this.state.ph + 1; if (ph >= FAQ_STEPS) this.pickFaq((this.state.faq + 1) % FAQS.length); else this.setState({ ph }); }, 1100);
     }
   }
-  componentWillUnmount() { (this.heroT || []).forEach(clearTimeout); window.removeEventListener('scroll', this.onHeroScroll); cancelAnimationFrame(this.swayRaf); cancelAnimationFrame(this.signRaf); window.removeEventListener('scroll', this.onRoads); clearInterval(this.faqTick); clearInterval(this.glTick); this.tmDead = true; if (this.introOff) this.introOff(); document.documentElement.style.overflow = ''; clearTimeout(this.cityT1); clearTimeout(this.cityT2); clearTimeout(this.cityT3); clearTimeout(this.cityT4); window.removeEventListener('resize', this.onCityResize); cancelAnimationFrame(this.tmRaf); window.removeEventListener('resize', this.onTmResize); clearTimeout(this.enterT); if (this.faqIO) this.faqIO.disconnect(); if (this.cityLifeHero) this.cityLifeHero.destroy(); if (this.cityLifeFoot) this.cityLifeFoot.destroy(); this.cityLifeHero = null; this.cityLifeFoot = null; if (this.cityDebug) delete window.__city; }
+  componentWillUnmount() { (this.heroT || []).forEach(clearTimeout); window.removeEventListener('scroll', this.onHeroScroll); window.removeEventListener('scroll', this.onHintGuard); cancelAnimationFrame(this.swayRaf); cancelAnimationFrame(this.signRaf); window.removeEventListener('scroll', this.onRoads); clearInterval(this.faqTick); clearInterval(this.glTick); this.tmDead = true; if (this.introOff) this.introOff(); document.documentElement.style.overflow = ''; clearTimeout(this.cityT1); clearTimeout(this.cityT2); clearTimeout(this.cityT3); clearTimeout(this.cityT4); window.removeEventListener('resize', this.onCityResize); cancelAnimationFrame(this.tmRaf); window.removeEventListener('resize', this.onTmResize); clearTimeout(this.enterT); if (this.faqIO) this.faqIO.disconnect(); if (this.cityLifeHero) this.cityLifeHero.destroy(); if (this.cityLifeFoot) this.cityLifeFoot.destroy(); this.cityLifeHero = null; this.cityLifeFoot = null; if (this.cityDebug) delete window.__city; }
 
   faqVals() {
     const i = Math.max(0, this.state.faq), P = this.state.ph, q = P % 4, en = this.state.enter, fpos = Math.min(4, P);
