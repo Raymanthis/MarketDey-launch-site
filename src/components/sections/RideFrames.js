@@ -10,10 +10,13 @@
 
 export const RIDE_MANIFEST = '/media/ride/manifest.json';
 export const RIDE_STUB_MANIFEST = '/media/ride-stub/manifest.json';
-// ?ride=live -> null (procedural street), ?ride=stub -> stub frames, otherwise the real frames.
+// Sentinel for ?ride=model: the live Blender street model (RideModel.js), no frames.
+export const RIDE_MODEL = 'model';
+// ?ride=live -> null (procedural street), ?ride=stub -> stub frames, ?ride=model -> RIDE_MODEL,
+// otherwise the real frames.
 export const rideSource = search => {
   const v = new URLSearchParams(search || '').get('ride');
-  return v === 'live' ? null : v === 'stub' ? RIDE_STUB_MANIFEST : RIDE_MANIFEST;
+  return v === 'live' ? null : v === 'stub' ? RIDE_STUB_MANIFEST : v === 'model' ? RIDE_MODEL : RIDE_MANIFEST;
 };
 
 const PAPER = '#f7f5ef';
@@ -138,9 +141,10 @@ const snap = pre => ({ fraction: pre.fraction, ready: pre.ready, failed: pre.fai
 const stores = new Map();
 export function rideStore(url) { let s = stores.get(url); if (!s) { s = new RideStore(url); stores.set(url, s); } return s; }
 
-// Manifest + format for the section, or null (-> live street) if it fails or takes too long.
+// Manifest + format for the section, or null (-> live street, or the model in model mode) if it
+// fails or takes too long.
 export async function openRide(url, timeoutMs = 6000) {
-  if (!url) return null;
+  if (!url || url === RIDE_MODEL) return null;
   const store = rideStore(url);
   try {
     const m = await Promise.race([store.manifest(), new Promise((_, rej) => setTimeout(() => rej(new Error('ride manifest: timeout')), timeoutMs))]);
