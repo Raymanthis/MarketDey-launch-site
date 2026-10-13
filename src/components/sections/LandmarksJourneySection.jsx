@@ -4,7 +4,9 @@ import React from 'react';
 import LandmarkPhone from '@/components/sections/LandmarkPhone';
 import LandmarkSheet from '@/components/sections/LandmarkSheet';
 import content from '@/content/landmarks-journey.json';
-import { RideFramesPlayer, openRide, rideSource, rideFrameStats } from '@/components/sections/RideFrames';
+import { RideFramesPlayer, openRide, rideSource, rideFrameStats, RIDE_MODEL } from '@/components/sections/RideFrames';
+import { modelStore, modelLite } from '@/components/sections/RideModel';
+import { makeInkPass } from '@/lib/inkPass';
 import { MAP_END, RIDE_START, RIDE_END, REVEAL, clamp, sstep, S0, PX, PZ, SMAX, fr, W, LS, LSD, SB, MK, TS0, TS1, headS, makeRideCamera } from '@/lib/rideCamera';
 import './LandmarksJourneySection.global.css';
 
@@ -29,7 +31,7 @@ class LandmarksJourneySection extends React.Component {
   p = 0; cur = 0; vis = false;
 
   componentDidMount() {
-    // Street source: pre-rendered frames (default, ?ride=stub) or the procedural street (?ride=live, or if the manifest fails).
+    // Street source: pre-rendered frames (default, ?ride=stub), the live Blender model (?ride=model) or the procedural street (?ride=live, or if the manifest fails).
     this.rideSrc = rideSource(window.location.search); this.rideDebug = new URLSearchParams(window.location.search).get('ridedebug') === '1';
     this.onScroll = () => this.measure();
     this.onResize = () => { this.measure(); this.layout(); if (this.three) this.three.resize(); };
@@ -86,6 +88,9 @@ class LandmarksJourneySection extends React.Component {
   async init3D() {
     const host = this.glRef.current; if (!host) return;
     let THREE;
+    // ?ride=model: start the glb download now (shared with the hero preloader, so never twice)
+    const modelMode = this.rideSrc === RIDE_MODEL, lite = modelMode && modelLite(), modelP = modelMode ? modelStore().load() : null;
+    if (modelP) modelP.catch(() => {});
     const rideP = openRide(this.rideSrc);
     try { THREE = await import('three'); } catch (e) { this.setState({ glFail: true }); return; }
     try { await Promise.all([document.fonts.load('900 34px Lato'), document.fonts.load('400 24px Lato')]); } catch (e) {}
@@ -93,7 +98,8 @@ class LandmarksJourneySection extends React.Component {
     let renderer;
     const ride = await rideP; if (this.dead || !this.glRef.current) return;
     try { renderer = new THREE.WebGLRenderer(ride ? { antialias: true, alpha: true } : { antialias: true }); } catch (e) { this.setState({ glFail: true }); return; }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    const basePR = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 1.5);
+    renderer.setPixelRatio(modelMode ? basePR : Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%';
     host.appendChild(renderer.domElement);
@@ -408,17 +414,55 @@ class LandmarksJourneySection extends React.Component {
       [-1.7, 1.7].forEach(x => { const m = new THREE.Mesh(postG, fillMat); m.position.set(x, 1.45, -0.06); grp.add(m); const e = new THREE.LineSegments(postE, lineMat(INK)); e.position.copy(m.position); grp.add(e); });
       const [bx, bz] = W(SB[i], sd * 5.9); grp.position.set(bx, -8, bz); grp.rotation.y = -fr(SB[i])[2] + (sd > 0 ? -0.5 : 0.5); scene.add(grp); boards.push({ grp, s: SB[i], i, sd });
       const [px, pz] = W(MK[i][2], MK[i][0]); const sp = i === 4 ? (() => { const g = coinPin(), [cx, cz] = W(245, -5.2); g.userData.at = [cx, cz]; return g; })() : new THREE.Sprite(new THREE.SpriteMaterial({ map: pinTex(i + 1), transparent: true })); sp.position.set(px, MK[i][1], pz); sp.scale.set(2.2, 2.2, 1); scene.add(sp); pins.push(sp); });
+    // ?ride=model: the Blender street replaces the procedural one inside `city` once the glb is in
+    // (until then the procedural street stands in). Layers: 0 = the model (fills + ink edges),
+    // 2 = wires (fills only), 1 = overlays drawn after the ink pass, depth-tested against the model:
+    // the map ribbons, trail, pins and signboards (so buildings hide them and no line crosses them).
+    let M = null;
+    if (modelMode) {
+      mapGrp.traverse(o => o.layers.set(1)); pins.forEach(p => p.traverse(o => o.layers.set(1)));
+      boards.forEach(b => { b.mats = []; b.a = -1; b.grp.traverse(o => { o.layers.set(1); if (!o.material) return; if (o.material === fillMat || o.material === LMAT[INK]) o.material = o.material.clone(); if (o.material.color && o.material !== b.grp.children[0].material && o.material.isMeshBasicMaterial) o.material.color.set(PAPER); o.material.transparent = true; b.mats.push(o.material); }); });
+      M = { ready: false, root: null, mats: [], ink: makeInkPass(THREE, renderer, INK), scale: 1, minDt: 1000, acc: 0, n: 0, t0: 0, lastT: 0, good: 0, avg: 0, size: new THREE.Vector2(), opts: { strength: 0, fogNear: 60, fogFar: 290, offD: 2, offN: 1 }, k: new Float64Array(5) };
+      const mkFill = mapHex => { const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }), u = { uMapCol: { value: new THREE.Color(mapHex) }, uMapK: { value: 1 } };
+        m.onBeforeCompile = sh => { Object.assign(sh.uniforms, u); sh.fragmentShader = 'uniform vec3 uMapCol;\nuniform float uMapK;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n\tdiffuseColor.rgb = mix(diffuseColor.rgb, uMapCol, uMapK);'); };
+        M.mats.push(m); return { m, u }; };
+      const lines = () => { const dpr = basePR * M.scale; M.opts.offD = Math.max(1, Math.round(1.4 * dpr)); M.opts.offN = Math.max(1, Math.round(0.7 * dpr)); };
+      M.resize = () => { renderer.getDrawingBufferSize(M.size); M.ink.setSize(M.size.x, M.size.y); lines(); };
+      M.setScale = sc => { M.scale = sc; renderer.setPixelRatio(basePR * sc); renderer.setSize(host.clientWidth, host.clientHeight); M.resize(); keyS = null; }; // resizing clears the canvas: draw again next frame
+      modelP.then(gltf => {
+        const root = gltf.scene, gCity = root.getObjectByName('city'), gGround = root.getObjectByName('ground');
+        if (this.dead || !gCity) { root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); return; }
+        const cf = mkFill('#ddd6c9'), gf = mkFill('#ebe8e1'); M.cityU = cf.u; M.groundU = gf.u;
+        const old = new Set();
+        root.traverse(o => { if (!o.isMesh) return; if (o.material) old.add(o.material); let q = o, inG = false; while (q) { if (q === gGround) inG = true; q = q.parent; } o.material = inG ? gf.m : cf.m; });
+        old.forEach(m => m.dispose());
+        root.children.slice().forEach(o => { if (o !== gCity && o !== gGround) gCity.add(o); }); // gltfpack lifts the instanced people to the root: they grow with the city
+        const w = gCity.getObjectByName('wires'); if (w) w.traverse(o => o.layers.set(2));
+        city.children.forEach(o => { o.visible = false; });
+        city.add(gCity); if (gGround) scene.add(gGround); ground.visible = false;
+        M.root = root; M.gCity = gCity; M.gGround = gGround; M.ready = true; keyS = null;
+      }, () => {});
+    }
     const self = this;
     this.three = {
-      resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); },
-      dispose() { if (player) player.destroy(); renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); },
+      resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); if (M) M.resize(); },
+      dispose() { if (player) player.destroy();
+        if (M) { M.ink.dispose(); M.mats.forEach(m => m.dispose()); if (M.root) M.root.traverse(o => { if (o.geometry) o.geometry.dispose(); }); boards.forEach(b => b.mats.forEach(m => m.dispose())); }
+        renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); },
       render(st, t) {
         const { k, e, q } = st, e1 = sstep(0, 1, e);
         // portrait screens see a narrow slice of the street, so the signboards stand nearer the road there
         { const portrait = host.clientWidth < host.clientHeight * 0.9; if (portrait !== boardPort) { boardPort = portrait; boards.forEach(b => { const [bx, bz] = W(SB[b.i], b.sd * (portrait ? BOARD_LAT_PORTRAIT : BOARD_LAT)); b.grp.position.x = bx; b.grp.position.z = bz; b.grp.scale.setScalar(portrait ? BOARD_SCALE_PORTRAIT : 1); }); } }
         const sHead = headS(k, e), th = fr(sHead)[2];
         if (hdS === undefined) hdS = th; hdS += (th - hdS) * 0.12;
-        let fi = null, key = [k, e, q, hdS, st.f].map(v => v.toFixed(4)).join();
+        const modelOn = !!(M && M.ready);
+        if (M) { // same skip-if-unchanged rule as below, without building a key string per frame
+          const mk = M.k, sk = st.f; let same = keyS === M && Math.abs(mk[0] - k) < 5e-5 && Math.abs(mk[1] - e) < 5e-5 && Math.abs(mk[2] - q) < 5e-5 && Math.abs(mk[3] - hdS) < 5e-5 && Math.abs(mk[4] - sk) < 5e-5;
+          if (same && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS;
+          mk[0] = k; mk[1] = e; mk[2] = q; mk[3] = hdS; mk[4] = sk; keyS = M; ltS = t;
+          if (modelOn) { if (M.lastT && t - M.lastT < 100) { M.acc += t - M.lastT; M.n++; if (t - M.lastT < M.minDt) M.minDt = t - M.lastT; } M.lastT = t; }
+        }
+        let fi = null, key = M ? null : [k, e, q, hdS, st.f].map(v => v.toFixed(4)).join();
         if (player) { const W = host.clientWidth, H = host.clientHeight, p = st.p;
           if (p >= MAP_END) fi = player.update(p, W, H); else { player.setVisible(false); if (p > MAP_END - 0.07) player.warm(MAP_END, W, H); }
           // map -> frame crossfade over p in [MAP_END, MAP_END + XF]; with no decoded frame the live street stays up
@@ -426,10 +470,11 @@ class LandmarksJourneySection extends React.Component {
           if (op !== liveA) { liveA = op; renderer.domElement.style.opacity = op < 1 ? op.toFixed(3) : ''; }
           overlay = !!fi && a <= 0; shownFrame = fi;
           if (fi) key += '|' + fi.key + '|' + W + 'x' + H + (overlay ? 'o' : ''); }
-        if (key === keyS && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS; keyS = key; ltS = t;
+        if (!M) { if (key === keyS && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS; keyS = key; ltS = t; }
         const lineK = sstep(0.15, 0.7, e), roadK = 1 - sstep(0.35, 0.9, e), trailK = 1 - sstep(0.05, 0.4, e), up = sstep(0.25, 0.95, e);
         mats.ink.opacity = 0.92 * lineK; mats.green.opacity = 0.92 * lineK; mats.fine.opacity = 0.85 * lineK; [mats.ink, mats.green, mats.fine].forEach(m => { m.visible = lineK > 0.002; });
         city.scale.y = 0.02 + 0.98 * up;
+        if (modelOn) { M.cityU.uMapK.value = 1 - sstep(0.3, 1, e); M.groundU.uMapK.value = 1 - sstep(0.2, 0.9, e); }
         fillMat.color.copy(C_BLOCK).lerp(C_PAPER, sstep(0.3, 1, e)); groundMat.color.copy(C_BG).lerp(C_PAPER, sstep(0.2, 0.9, e)); sceneBg.copy(groundMat.color);
         [casingMat, roadMat, patchMat].forEach(m => { m.opacity = roadK; m.visible = roadK > 0.002; }); trailMat.opacity = trailK; trailMat.visible = trailK > 0.002;
         scene.fog.near = 60 + (1 - e1) * 3000; scene.fog.far = 290 + (1 - e1) * 6000;
@@ -441,16 +486,34 @@ class LandmarksJourneySection extends React.Component {
             camera.position.fromArray(c.pos); camera.quaternion.fromArray(c.quat); camera.fov = shownFrame.fov; camera.aspect = shownFrame.w / shownFrame.h;
             camera.setViewOffset(shownFrame.drawW, shownFrame.drawH, shownFrame.offX, shownFrame.offY, W, H); viewSet = true; }
           else if (viewSet) { camera.fov = 58; camera.aspect = host.clientWidth / host.clientHeight; camera.clearViewOffset(); viewSet = false; } }
-        boards.forEach(b => { const d = b.s - sc, rise = sstep(70, 34, d); b.grp.position.y = -8 * (1 - rise); b.grp.visible = e >= 1; });
+        if (modelOn) for (let i = 0; i < boards.length; i++) { // standing boards fade in within ~45 m ahead
+          const b = boards[i], a = e >= 1 ? sstep(45, 35, b.s - sc) : 0; b.grp.position.y = 0; b.grp.visible = a > 0.003;
+          if (a !== b.a) { b.a = a; for (let j = 0; j < b.mats.length; j++) b.mats[j].opacity = a; } }
+        else boards.forEach(b => { const d = b.s - sc, rise = sstep(70, 34, d); b.grp.position.y = -8 * (1 - rise); b.grp.visible = e >= 1; });
         const step = stepFor(q);
         pins.forEach((sp, i) => { sp.visible = e >= 1; if (sp.userData.coin) { const at = sp.userData.at; sp.position.set(at[0], 1.25 + Math.sin(t / 520) * 0.18, at[1]); sp.rotation.y = t / 650; sp.scale.set(1.6, 1.6, 1.6); return; } const cur = step === i + 1; const s2 = cur ? 3 + Math.sin(t / 280) * 0.15 : 2.1; sp.scale.set(s2, s2, 1); });
-        renderer.render(scene, camera);
+        if (modelOn) {
+          // depth precision for the high map view: push the near plane out while the camera is high
+          const near = e < 1 ? clamp((camera.position.y - 35) * 0.5, 0.1, 30) : 0.1;
+          if (near !== camera.near) { camera.near = near; camera.updateProjectionMatrix(); }
+          camera.layers.mask = 5; renderer.render(scene, camera);
+          const o = M.opts; o.strength = lineK; o.fogNear = scene.fog.near; o.fogFar = scene.fog.far; M.ink.render(scene, camera, 1, o);
+          const bg = scene.background; scene.background = null; camera.layers.mask = 2; renderer.autoClear = false;
+          renderer.render(scene, camera); renderer.autoClear = true; scene.background = bg; camera.layers.mask = 1;
+          // adaptive resolution: 1 s average frame interval while rendering continuously
+          if (!M.t0) M.t0 = t;
+          if (t - M.t0 >= 1000) { if (M.n >= 10) { const avg = M.avg = M.acc / M.n, upAt = Math.max(12, M.minDt * 1.12);
+              if (avg > 20) { M.good = 0; if (M.scale > 0.6 + 1e-6) M.setScale(Math.round((M.scale - 0.1) * 10) / 10); }
+              else if (avg < upAt) { if (++M.good >= 2 && M.scale < 1 - 1e-6) { M.good = 0; M.setScale(Math.round((M.scale + 0.1) * 10) / 10); } }
+              else M.good = 0; }
+            M.t0 = t; M.acc = 0; M.n = 0; }
+        } else { if (M) camera.layers.mask = 0xffffffff; renderer.render(scene, camera); }
         prj.set(hx, 0.3, hz).project(camera); projS = [(prj.x + 1) / 2, (1 - prj.y) / 2, roll]; prj.set(gX, 3.0, gZ).project(camera); projS.push((prj.x + 1) / 2, (1 - prj.y) / 2, prj.z < 1 ? 1 : 0);
         return projS;
       }
     };
     this.three.resize();
-    if (this.rideDebug) window.__ride = { mode: player ? 'frames' : 'live', src: this.rideSrc, manifest: ride ? ride.manifest : null, stats: rideFrameStats, get cur() { return self.cur; }, get p() { return self.p; }, get frame() { return overlay && shownFrame ? { i: shownFrame.i, v: shownFrame.v, p: self.cur } : null; }, camera, pins, boards: boards.map(b => b.grp) };
+    if (this.rideDebug) window.__ride = { mode: modelMode ? 'model' : player ? 'frames' : 'live', get model() { return M ? { loaded: M.ready, lite, scale: M.scale, avgMs: M.avg, basePR, offD: M.opts.offD, offN: M.opts.offN, url: modelStore().url, near: camera.near } : null; }, src: this.rideSrc, manifest: ride ? ride.manifest : null, stats: rideFrameStats, get cur() { return self.cur; }, get p() { return self.p; }, get frame() { return overlay && shownFrame ? { i: shownFrame.i, v: shownFrame.v, p: self.cur } : null; }, camera, scene, pins, boards: boards.map(b => b.grp) };
   }
 
   renderVals() {
