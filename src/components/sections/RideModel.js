@@ -1,4 +1,5 @@
-// The live Blender street model for LandmarksJourneySection's ?ride=model mode.
+// The live Blender street model for LandmarksJourneySection's ?ride=model mode, and the Blender
+// vehicles + people for ?ride=hybrid (figuresStore).
 //
 // Plain module, no React. One download per page: the hero preloader (RidePreloader) and the
 // section share the same store, so whichever asks first starts the fetch and the other reuses it.
@@ -7,8 +8,10 @@
 
 export const MODEL_URL = '/media/street/city.glb';
 export const MODEL_LITE_URL = '/media/street/city-lite.glb';
+export const FIGURES_URL = '/media/street/figures.glb';
+export const FIGURES_LITE_URL = '/media/street/figures-lite.glb';
 // Fallback sizes for the progress bar when a server sends no Content-Length.
-const APPROX_BYTES = { [MODEL_URL]: 3.2e6, [MODEL_LITE_URL]: 1.27e6 };
+const APPROX_BYTES = { [MODEL_URL]: 3.2e6, [MODEL_LITE_URL]: 1.27e6, [FIGURES_URL]: 1.05e6, [FIGURES_LITE_URL]: 0.5e6 };
 
 // Phones (small screens or a coarse pointer) get the lite model.
 export function modelLite() {
@@ -68,8 +71,13 @@ class ModelStore {
   }
 }
 
-let store = null;
+let store = null, figStore = null;
 export function modelStore() {
   if (!store) store = new ModelStore(modelLite() ? MODEL_LITE_URL : MODEL_URL);
   return store;
+}
+// Vehicles + people only (blender/production/export_figures.py), for ?ride=hybrid.
+export function figuresStore() {
+  if (!figStore) figStore = new ModelStore(modelLite() ? FIGURES_LITE_URL : FIGURES_URL);
+  return figStore;
 }
