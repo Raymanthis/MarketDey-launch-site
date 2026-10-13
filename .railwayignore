@@ -9,3 +9,6 @@ Screenshot*
 public/media/spike/
 public/media/spike-synth/
 public/media/ride-stub/
+
+# ride frames (~200 MB) exceed the CLI upload limit; they are served from separate media hosting
+public/media/ride/
