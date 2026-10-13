@@ -66,8 +66,8 @@ const SKY_STORM_NIGHT = mixHex(SKY_NIGHT, '#000000', STORM_K);
 const FILL_STORM_NIGHT = mixHex(FILL_NIGHT, '#000000', STORM_K);
 const CLOUD_STORM_NIGHT = mixHex(CLOUD_FILL_NIGHT, '#000000', STORM_K);
 const SKY_STORM_DAY = mixHex(SKY_DAY, '#000000', STORM_K);
-// short on purpose: visitors don't stay long, so the whole loop (day, dusk, night, dawn) runs in under a minute
-const DN_DAY = 20, DN_DUSK = 8, DN_NIGHT = 20, DN_DAWN = 8, DN_TOTAL = DN_DAY + DN_DUSK + DN_NIGHT + DN_DAWN;
+// short on purpose: visitors don't stay long, so the whole loop (day, dusk, night, dawn) runs in about 35 s
+const DN_DAY = 13, DN_DUSK = 5, DN_NIGHT = 12, DN_DAWN = 5, DN_TOTAL = DN_DAY + DN_DUSK + DN_NIGHT + DN_DAWN;
 // the sun has no fill of its own any more (outline only); the moon's crescent is MOON_COL
 const MOON_COL = '#f1ede0', WIN_COL = '#f6c453', STAR_COL = '#eef3ff';
 // night lines: the skyline's lime strokes mix to white, the twinkling windows' fill to warm yellow, and
@@ -99,7 +99,7 @@ const DN_CSS = DN_SEL_FILL + '{fill:#386641!important}'
 const SP_ROAD = 0, SP_VEH = 1, SP_NEAR = 2, SP_FARB = 3, SP_FARA = 4;
 
 // storm transitions (seconds): clouds gathering before the rain, clearing after it
-const WX_GATHER = 6, WX_CLEAR = 6;
+const WX_GATHER = 4, WX_CLEAR = 4;
 
 // IDM constants (px, seconds)
 const S0 = 10, HEADWAY = 0.6, ACC = 60, DECEL = 90, DECEL_MAX = 260;
@@ -314,7 +314,7 @@ export class CityLife {
           this.dnWins.push({
             r, on: false, pend: false, anim: '',
             d1: (rw() * 1.4).toFixed(2),      // stagger: fading up as dusk falls
-            d2: (rw() * 3).toFixed(2),        // stagger: fading back out as dawn breaks
+            d2: (rw() * 2).toFixed(2),        // stagger: fading back out as dawn breaks
             tw: 'mdTwinkle ' + dur + 's ease-in-out ' + ((k * 0.37) % 4).toFixed(2) + 's infinite',
           });
         });
@@ -1002,7 +1002,7 @@ export class CityLife {
   // ---------- weather schedule ----------
   makeStorm(start, D) {
     const id = ++this.stormId, gEnd = start + WX_GATHER, cEnd = gEnd + D, rv = this.rV;
-    const n = 2 + Math.floor(rv() * 3), events = [];
+    const n = 2 + Math.floor(rv() * 2), events = [];
     for (let k = 0; k < n; k++) events.push({ t: gEnd + 2 + rv() * (D - 4), double: rv() < 0.35, bolt: rv() < 0.5, fired: false });
     events.sort((a, b) => a.t - b.t);
     return { id, start, D, gEnd, cEnd, end: cEnd + WX_CLEAR, events };
@@ -1010,9 +1010,9 @@ export class CityLife {
 
   genStorm() {
     const r = this.rS, last = this.storms[this.storms.length - 1];
-    // 15–25 s of clear sky between storms and 12–16 s of rain, so a short visit still sees a storm.
-    const start = last ? last.end + 15 + r() * 10 : 8 + r() * 4;
-    this.storms.push(this.makeStorm(start, 12 + r() * 4));
+    // 10–15 s of clear sky between storms and 8–10 s of rain, so a short visit still sees a storm.
+    const start = last ? last.end + 10 + r() * 5 : 5 + r() * 3;
+    this.storms.push(this.makeStorm(start, 8 + r() * 2));
   }
 
   weatherAt(t) {
@@ -1086,8 +1086,8 @@ export class CityLife {
     this.applyVehicles();
   }
 
-  // debug: land on an exact moment of the day/night cycle (0 = day, 24 = dusk midpoint, 38 = night,
-  // 52 = dawn midpoint). Applied without easing so a screenshot shows exactly that moment.
+  // debug: land on an exact moment of the day/night cycle (0 = day, 15.5 = dusk midpoint, 24 = night,
+  // 32.5 = dawn midpoint). Applied without easing so a screenshot shows exactly that moment.
   setPhaseTime(sec) {
     this.dnT = ((+sec || 0) % DN_TOTAL + DN_TOTAL) % DN_TOTAL;
     if (this.night || !this.splash || !this.dnRules) return this.state();
@@ -2590,7 +2590,7 @@ export class CityLife {
   }
 
   // ---------- day/night cycle (loading splash only) ----------
-  // DAY 20s -> DUSK 8s -> NIGHT 20s -> DAWN 8s, looping on viewing time. q is "night-ness": 0 in full
+  // DAY 13s -> DUSK 5s -> NIGHT 12s -> DAWN 5s, looping on viewing time. q is "night-ness": 0 in full
   // day, 1 in full night, interpolated across dusk and dawn. The cycle starts in day.
   dnPhaseAt(t) {
     t = ((t % DN_TOTAL) + DN_TOTAL) % DN_TOTAL;
