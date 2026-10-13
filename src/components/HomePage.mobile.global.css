@@ -118,3 +118,7 @@
   [data-m="roads-phones"] > div > div { zoom: .4 !important; }
   [data-m="roads-phones"] > div + div { margin-left: -20px; }
 }
+@media (max-width: 339px) {
+  [data-m="hero-nav"] > a:not(:last-child) { font-size: 14px !important; }
+  [data-m="hero-bar"] { gap: 0 6px !important; }
+}
