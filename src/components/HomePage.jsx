@@ -214,6 +214,12 @@ class HomePage extends React.Component {
   cityShow() { const el = this.cityRef.current; if (!el || this.cityOn) return; this.cityOn = true; clearTimeout(this.cityT3); clearTimeout(this.cityT4); el.style.transform = 'translateY(0)';
     this.cityT1 = setTimeout(() => el.querySelectorAll('path[data-c]').forEach(p => { const d = p.getAttribute('data-dl'); p.style.transition = 'stroke-dashoffset 1.5s ease ' + d + 's,fill-opacity .9s ease ' + d + 's'; p.style.strokeDashoffset = '0'; p.style.fillOpacity = '1'; }), 350);
     this.cityT2 = setTimeout(() => this.cityLive(), 2600); }
+  componentDidUpdate(ps) { if (ps.gs !== this.state.gs && window.innerWidth < 900) this.glFollow(); }
+  // phones: the 17-day strip scrolls sideways, so keep the day being counted in view
+  glFollow() { const root = this.glRef.current, sc = root && root.querySelector('[data-m="gl-scroll"]'); if (!sc || !sc.firstElementChild) return;
+    const grid = sc.firstElementChild.children[2], cell = grid && grid.children[clampN(this.state.gs, 0, 16)]; if (!cell) return;
+    const cr = cell.getBoundingClientRect(), sr = sc.getBoundingClientRect(), left = Math.max(0, sc.scrollLeft + (cr.left - sr.left) - (sc.clientWidth - cr.width) / 2);
+    if (Math.abs(left - sc.scrollLeft) > 2) sc.scrollTo({ left, behavior: this.state.gs < 0 ? 'auto' : 'smooth' }); }
   heroIntro() {
     const root = this.heroRef.current; if (!root) return;
     const q = s => Array.from(root.querySelectorAll('[data-h="' + s + '"]'));
@@ -788,7 +794,7 @@ class HomePage extends React.Component {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:"24px",flexWrap:"wrap"}}>
                   <div style={{display:"flex",flexDirection:"column",gap:"12px",maxWidth:"640px"}}>
                     <div style={{fontSize:"14px",fontWeight:"700",color:"#386641"}}>{countsCopy.howMarketdeyCountsAn}</div>
-                    <div style={{fontSize:"40px",fontWeight:"900",letterSpacing:"-.035em",lineHeight:"1.04",textWrap:"balance"}}>{countsCopy.everyEighthDayWhatever}</div>
+                    <div data-m="gl-title" style={{fontSize:"40px",fontWeight:"900",letterSpacing:"-.035em",lineHeight:"1.04",textWrap:"balance"}}>{countsCopy.everyEighthDayWhatever}</div>
                     <div style={{fontSize:"17px",lineHeight:"1.5",color:"#403d39",textWrap:"pretty"}}>{countsCopy.thisIsAnExample}</div>
                     </div>
                   <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
@@ -796,7 +802,7 @@ class HomePage extends React.Component {
                     <button className="scph1" onClick={v.glReplay} style={{height:"36px",padding:"0 14px 0 10px",borderRadius:"18px",border:"1px solid rgba(37,36,34,.14)",background:"#fff",color:"#252422",fontSize:"14px",fontWeight:"700",display:"inline-flex",alignItems:"center",gap:"6px",cursor:"pointer"}}><i className="ri-restart-line"></i>{countsCopy.replay}</button>
                     </div>
                   </div>
-                <div style={{overflowX:"auto",margin:"0 -40px",padding:"0 40px 4px"}}>{' '}
+                <div data-m="gl-scroll" style={{overflowX:"auto",margin:"0 -40px",padding:"0 40px 4px"}}>{' '}
                   <div style={{minWidth:"960px",display:"flex",flexDirection:"column"}}>
                     <div style={{position:"relative",height:"44px"}}>{' '}
                       <div style={{position:"absolute",top:"0",left:`${v.glCur.left}`,transform:`translateX(${v.glCur.tx})`,opacity:`${v.glCur.op}`,display:"flex",flexDirection:"column",alignItems:"center",transition:"left .32s cubic-bezier(.4,0,.2,1),transform .32s,opacity .3s"}}>

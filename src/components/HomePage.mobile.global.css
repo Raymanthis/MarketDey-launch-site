@@ -33,6 +33,18 @@
   [data-screen-label="02 Who it's for"] button { padding: 0 11px 0 11px !important; }
   [data-screen-label="02 Who it's for"] button + button { margin-top: 0; }
   [data-screen-label="02 Who it's for"] > div > div:last-child { right: 0 !important; top: 84px !important; transform: none !important; gap: 8px !important; }
+
+  /* ---------- 03 Alerts, 04 How it counts, 05 Offline and privacy ---------- */
+  [data-screen-label="03 Alerts"] { padding-top: 72px !important; }
+  [data-screen-label="04 How it counts"] { padding: 72px 0 80px !important; }
+  [data-screen-label="05 Offline and privacy"] { padding-bottom: 96px !important; }
+  [data-screen-label="03 Alerts"] > div, [data-screen-label="05 Offline and privacy"] > div { padding-left: 20px !important; padding-right: 20px !important; gap: 36px !important; }
+  [data-screen-label="04 How it counts"] > div { padding-left: 20px !important; padding-right: 20px !important; }
+  [data-screen-label="03 Alerts"] h2, [data-screen-label="05 Offline and privacy"] h2 { font-size: clamp(34px, 9.4vw, 52px) !important; }
+  [data-m="gl-title"] { font-size: clamp(30px, 8.4vw, 40px) !important; }
+  [data-screen-label="04 How it counts"] button { height: 44px !important; padding: 0 18px 0 14px !important; }
+  [data-m="gl-scroll"] { margin: 0 -20px !important; padding: 0 20px 6px !important; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x proximity; }
+  [data-m="gl-scroll"]::-webkit-scrollbar { display: none; }
 }
 @media (max-width: 599px) {
   [data-m="hero-phones"] { zoom: .56; margin-top: 28px !important; }
@@ -40,4 +52,17 @@
 @media (max-width: 399px) {
   [data-m="hero-nav"] > a:last-child { font-size: 14px; gap: 6px !important; padding-left: 12px !important; padding-right: 13px !important; }
   [data-m="hero-phones"] { zoom: .5; }
+}
+@media (min-width: 600px) and (max-width: 899px) {
+  [data-screen-label="03 Alerts"] > div > div:last-child, [data-screen-label="05 Offline and privacy"] > div > div:last-child { margin: 0 auto; }
+}
+@media (max-width: 599px) {
+  /* the two phones sit side by side and overlap a little, scaled to the screen width */
+  [data-screen-label="03 Alerts"] > div > div:last-child, [data-screen-label="05 Offline and privacy"] > div > div:last-child { gap: 0 !important; }
+  [data-screen-label="03 Alerts"] > div > div:last-child > div > div, [data-screen-label="05 Offline and privacy"] > div > div:last-child > div > div { zoom: .46 !important; }
+  [data-screen-label="03 Alerts"] > div > div:last-child > div + div, [data-screen-label="05 Offline and privacy"] > div > div:last-child > div + div { margin-left: -26px; margin-top: 36px !important; }
+}
+@media (max-width: 399px) {
+  [data-screen-label="03 Alerts"] > div > div:last-child > div > div, [data-screen-label="05 Offline and privacy"] > div > div:last-child > div > div { zoom: .4 !important; }
+  [data-screen-label="03 Alerts"] > div > div:last-child > div + div, [data-screen-label="05 Offline and privacy"] > div > div:last-child > div + div { margin-left: -22px; margin-top: 30px !important; }
 }
