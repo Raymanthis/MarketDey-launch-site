@@ -161,8 +161,8 @@ class MarketSearchSection extends React.Component {
     const v = { ...this.props, ...this.renderVals() };
     return (
       <div className="sc-host" data-sc-name="Market Search Section">
-        <div ref={v.rootRef} data-screen-label="05 Explore" style={{ position: 'relative', height: '720vh', background: '#161513', fontFamily: "'Lato',ui-sans-serif,system-ui,sans-serif", color: '#fff' }}>
-          <div style={{ position: 'sticky', top: '0', height: '100vh', overflow: 'hidden' }}>
+        <div ref={v.rootRef} data-m="ms-root" data-screen-label="05 Explore" style={{ position: 'relative', height: '720vh', background: '#161513', fontFamily: "'Lato',ui-sans-serif,system-ui,sans-serif", color: '#fff' }}>
+          <div data-m="ms-stage" style={{ position: 'sticky', top: '0', height: '100vh', overflow: 'hidden' }}>
             <div ref={v.glRef} style={{ position: 'absolute', inset: '0', cursor: 'grab', touchAction: 'pan-y' }}></div>
             <div style={{ position: 'absolute', inset: '0', pointerEvents: 'none', background: 'radial-gradient(120% 90% at 65% 55%,rgba(22,21,19,0) 40%,rgba(22,21,19,.85) 100%)' }}></div>
             {v.labs.map((l, i) => <React.Fragment key={i}>
@@ -171,7 +171,7 @@ class MarketSearchSection extends React.Component {
               </div>
             </React.Fragment>)}
             <div ref={v.ringLabRef} style={{ position: 'absolute', left: '0', top: '0', opacity: '0', pointerEvents: 'none', height: '26px', padding: '0 10px', borderRadius: '13px', background: '#a7c957', color: '#252422', display: 'inline-flex', alignItems: 'center', fontSize: '13px', fontWeight: '900', whiteSpace: 'nowrap', willChange: 'transform' }}><span className="sc-interp">{v.rdLabel}</span></div>
-            <div ref={v.uiRef} style={{ position: 'relative', zIndex: '2', height: '100%', boxSizing: 'border-box', maxWidth: '1264px', margin: '0 auto', padding: 'clamp(48px,11vh,120px) 32px 32px', pointerEvents: 'none' }}>
+            <div ref={v.uiRef} data-m="ms-ui" style={{ position: 'relative', zIndex: '2', height: '100%', boxSizing: 'border-box', maxWidth: '1264px', margin: '0 auto', padding: 'clamp(48px,11vh,120px) 32px 32px', pointerEvents: 'none' }}>
               <div style={{ width: 'min(100%,440px)', display: 'flex', flexDirection: 'column', gap: 'clamp(14px,2.4vh,22px)' }}>
                 <div style={{ display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: '8px', height: '32px', padding: '0 14px 0 10px', borderRadius: '16px', background: 'rgba(167,201,87,.14)', color: '#a7c957', fontSize: '14px', fontWeight: '900' }}><i className="ri-search-line" style={{ fontSize: '16px' }}></i>{content.badge}</div>
                 <h2 style={{ margin: '0', fontSize: 'clamp(34px,4.4vw,56px)', fontWeight: '900', letterSpacing: '-.04em', lineHeight: '1', textWrap: 'balance' }}>{content.headline}</h2>
@@ -184,28 +184,28 @@ class MarketSearchSection extends React.Component {
                     </div>
                   </React.Fragment>)}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', borderRadius: '20px', background: 'rgba(37,36,34,.78)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(10px)' }}>
+                <div data-m="ms-panel" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', borderRadius: '20px', background: 'rgba(37,36,34,.78)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(10px)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}><div style={{ fontSize: '13px', fontWeight: '900', color: '#ccc5b9', letterSpacing: '.04em' }}>{content.panel.distanceHeading}</div><div style={{ fontSize: '15px', fontWeight: '900', color: '#a7c957' }}>{`${content.panel.within} `}<span className="sc-interp">{v.rdLabel}</span></div></div>
                   <div style={{ position: 'relative', height: '20px' }}>
                     <div style={{ position: 'absolute', left: '0', right: '0', top: '8px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,.12)' }}></div>
                     <div style={{ position: 'absolute', left: '0', top: '8px', height: '4px', borderRadius: '2px', background: '#a7c957', width: `${v.slPct}` }}></div>
                     <div style={{ position: 'absolute', top: '1px', left: `${v.slPct}`, width: '18px', height: '18px', marginLeft: '-9px', borderRadius: '9px', background: '#fff', boxShadow: '0 0 0 4px rgba(167,201,87,.35)' }}></div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <div data-m="ms-pills" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {v.pills.map((p, i) => <React.Fragment key={i}>
                       <span style={{ height: '30px', padding: '0 12px', borderRadius: '15px', background: `${p.bg}`, color: `${p.fg}`, display: 'inline-flex', alignItems: 'center', fontSize: '13px', fontWeight: '900', transition: 'background .3s,color .3s' }}><span className="sc-interp">{p.label}</span></span>
                     </React.Fragment>)}
                   </div>
                   <div style={{ height: '1px', background: 'rgba(255,255,255,.08)' }}></div>
                   <div style={{ fontSize: '13px', fontWeight: '900', color: '#ccc5b9', letterSpacing: '.04em' }}>{content.panel.goodsHeading}</div>
-                  <div ref={v.chipRef} style={{ display: 'flex', gap: '6px', flexWrap: `${v.chipWrap}`, scrollBehavior: 'smooth', overflowX: 'auto', scrollbarWidth: 'none' }}>
+                  <div ref={v.chipRef} data-m="ms-chips" style={{ display: 'flex', gap: '6px', flexWrap: `${v.chipWrap}`, scrollBehavior: 'smooth', overflowX: 'auto', scrollbarWidth: 'none' }}>
                     {v.chips.map((c, i) => <React.Fragment key={i}>
                       <span style={{ flex: 'none', height: '30px', padding: '0 12px 0 10px', borderRadius: '15px', background: `${c.bg}`, color: `${c.fg}`, border: `1px solid ${c.bd}`, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', transition: 'background .3s,color .3s,border-color .3s' }}><i className={c.icon} style={{ fontSize: '14px' }}></i><span className="sc-interp">{c.label}</span></span>
                     </React.Fragment>)}
                   </div>
                 </div>
               </div>
-              <div style={{ position: 'absolute', right: '32px', bottom: '32px', flex: 'none', width: 'min(calc(100% - 64px),380px)', borderRadius: '22px', background: 'rgba(37,36,34,.92)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(10px)', overflow: 'hidden' }}>
+              <div data-m="ms-results" style={{ position: 'absolute', right: '32px', bottom: '32px', flex: 'none', width: 'min(calc(100% - 64px),380px)', borderRadius: '22px', background: 'rgba(37,36,34,.92)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(10px)', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', padding: '16px 18px 12px' }}>
                   <div style={{ fontSize: '40px', fontWeight: '900', letterSpacing: '-.04em', lineHeight: '1', color: '#a7c957' }}><span className="sc-interp">{v.count}</span></div>
                   <div style={{ fontSize: '15px', fontWeight: '700', color: '#ccc5b9', lineHeight: '1.3' }}><span className="sc-interp">{v.countLabel}</span></div>

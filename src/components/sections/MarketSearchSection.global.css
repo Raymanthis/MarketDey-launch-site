@@ -1,1 +1,29 @@
 @keyframes msPulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(2.4);opacity:0}}
+
+/* ---- phones and tablets (< 900 px): desktop is untouched ---- */
+@media (max-width: 899px) {
+  [data-m="ms-root"] { height: 720svh !important; }
+  [data-m="ms-stage"] { height: 100svh !important; }
+  /* the goods strip is scroll-driven (display only): fade its edges so the clip reads as intentional */
+  [data-m="ms-chips"] { -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%); mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%); }
+}
+@media (max-width: 599px) {
+  [data-m="ms-ui"] { padding: max(18px, env(safe-area-inset-top)) 16px 14px !important; }
+  [data-m="ms-ui"] > div:first-child { gap: 10px !important; width: 100% !important; }
+  [data-m="ms-ui"] h2 { font-size: clamp(27px, 7.8vw, 36px) !important; line-height: 1.04 !important; }
+  [data-m="ms-ui"] > div:first-child > div:first-child { height: 30px !important; font-size: 13px !important; }
+  [data-m="ms-panel"] { padding: 12px 14px 14px !important; gap: 9px !important; border-radius: 18px !important; }
+  /* the five distance steps share one row */
+  [data-m="ms-pills"] { flex-wrap: nowrap !important; gap: 5px !important; }
+  [data-m="ms-pills"] > span { flex: 1 1 0; justify-content: center; padding: 0 !important; height: 32px !important; min-width: 0; }
+  [data-m="ms-chips"] > span { height: 32px !important; font-size: 14px !important; }
+  [data-m="ms-results"] { right: 16px !important; left: 16px !important; bottom: max(14px, env(safe-area-inset-bottom)) !important; width: auto !important; border-radius: 20px !important; }
+  [data-m="ms-results"] > div:first-child { padding: 12px 16px 8px !important; }
+  [data-m="ms-results"] > div:first-child > div:first-child { font-size: 34px !important; }
+  [data-m="ms-results"] > div:not(:first-child) { min-height: 56px !important; padding: 8px 16px !important; gap: 10px !important; }
+  [data-m="ms-results"] > div:not(:first-child) > div:nth-child(2) > div:first-child { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; font-size: 15px !important; line-height: 1.2; }
+}
+@media (max-width: 599px) and (max-height: 700px) {
+  [data-m="ms-results"] > div:nth-child(3) { display: none !important; }
+  [data-m="ms-ui"] h2 { font-size: 26px !important; }
+}
