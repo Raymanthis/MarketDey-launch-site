@@ -2,3 +2,22 @@
 .scpcno:hover{border-color:#386641 !important}
 .scpcrow:hover{background:#f1f5ea !important}
 .scpcpress:active{transform:scale(.96) !important}
+
+/* ---- phones and tablets (< 900 px) ---- */
+@media (max-width: 899px) {
+  [data-screen-label="08 Contribute"] { padding: 72px 0 !important; }
+  [data-screen-label="08 Contribute"] > div:nth-child(2) { padding-left: 20px !important; padding-right: 20px !important; }
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div { gap: 40px !important; }
+  /* text first, the two phones after it */
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div > div:first-child { order: 2 !important; margin: 0 auto; }
+}
+@media (max-width: 599px) {
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div > div:first-child { gap: 0 !important; }
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div > div:first-child > div > div { zoom: .46 !important; }
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div > div:first-child > div + div { margin-left: -26px; }
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div > div:first-child > div:first-child { margin-top: 36px !important; }
+}
+@media (max-width: 399px) {
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div > div:first-child > div > div { zoom: .4 !important; }
+  [data-screen-label="08 Contribute"] > div:nth-child(2) > div > div:first-child > div + div { margin-left: -22px; }
+}
