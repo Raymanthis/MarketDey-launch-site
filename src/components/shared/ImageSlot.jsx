@@ -133,6 +133,8 @@ function ImageSlot({
             className={styles.img}
             src={srcAttr}
             alt={alt || ''}
+            loading="lazy"
+            decoding="async"
             draggable="false"
             style={{
               display: 'block',
