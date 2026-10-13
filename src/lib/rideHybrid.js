@@ -33,32 +33,30 @@ export function fatLines(THREE, mods, positions, material) {
   return l;
 }
 
-// A canopy: a cluster of jittered puffs (low icospheres pushed in and out by smooth noise), so
-// the ink pass draws an organic scalloped outline with a few interior strokes where puffs overlap.
-// Unit-sized around (0, 0, 0); the section scales and places it per tree.
+// An almond (umbrella) tree crown: three flat-ish horizontal tiers of foliage stepping in and up,
+// each tier a ring of leaf clumps (squashed balls) around a centre clump, so the contour is
+// scalloped from every side. The ink pass draws the outer contour and, where a clump stands in
+// front of another, a short interior stroke suggesting a leaf cluster. Unit-sized: tiers span
+// x, z in [-1, 1] (x = across the road, z = along it), bottom tier at y = 0, top near 1.
 export function canopyGeometry(THREE, mergeGeometries, seed) {
   let s = seed >>> 0 || 1;
   const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
-  const parts = [], n = 6 + Math.floor(rnd() * 3);
-  const puff = (x, y, z, r) => {
-    const g = new THREE.IcosahedronGeometry(1, 3), p = g.attributes.position, ph = rnd() * 6.28, ph2 = rnd() * 6.28;
-    for (let i = 0; i < p.count; i++) {
-      const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), a = Math.atan2(vz, vx);
-      const k = 1 + 0.06 * Math.sin(a * 3 + ph) + 0.04 * Math.sin(vy * 4 + ph2) - (vy < -0.3 ? 0.22 * (-vy - 0.3) : 0);
-      p.setXYZ(i, x + vx * r * k, y + vy * r * 0.78 * k, z + vz * r * k);
-    }
+  const parts = [];
+  const clump = (x, y, z, rx, ry, rz) => {
+    const g = new THREE.IcosahedronGeometry(1, 2), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const vy = p.getY(i); p.setXYZ(i, x + p.getX(i) * rx, y + vy * ry * (vy > 0 ? 1 : 0.6), z + p.getZ(i) * rz); }
     g.deleteAttribute('normal'); g.deleteAttribute('uv');
     parts.push(g);
   };
-  puff(0, 0.2, 0, 0.55);
-  for (let i = 0; i < n + 2; i++) { // lower ring: scalloped outline
-    const a = i / (n + 2) * Math.PI * 2 + rnd() * 0.4, d = 0.52 + rnd() * 0.14, r = 0.3 + rnd() * 0.13;
-    puff(Math.cos(a) * d, -0.08 + rnd() * 0.18, Math.sin(a) * d, r);
-  }
-  for (let i = 0; i < 3; i++) { // crown
-    const a = i / 3 * Math.PI * 2 + rnd(), d = 0.2 + rnd() * 0.15, r = 0.3 + rnd() * 0.1;
-    puff(Math.cos(a) * d, 0.48 + rnd() * 0.12, Math.sin(a) * d, r);
-  }
+  const tier = (y, R, T) => {
+    clump((rnd() - 0.5) * 0.1, y + T * 0.15, (rnd() - 0.5) * 0.1, R * 0.62, T, R * 0.62);
+    const n = 6 + Math.floor(rnd() * 3), a0 = rnd() * 6.28;
+    for (let i = 0; i < n; i++) { const a = a0 + i / n * Math.PI * 2 + (rnd() - 0.5) * 0.4, d = R * (0.62 + rnd() * 0.12), c = R * (0.3 + rnd() * 0.1);
+      clump(Math.cos(a) * d, y + (rnd() - 0.5) * T * 0.5, Math.sin(a) * d, c, T * (0.75 + rnd() * 0.3), c); }
+  };
+  tier(0, 0.92, 0.22);
+  tier(0.5, 0.72, 0.2);
+  tier(0.9, 0.46, 0.2);
   const g = mergeGeometries(parts, false);
   parts.forEach(x => x.dispose());
   return g;
