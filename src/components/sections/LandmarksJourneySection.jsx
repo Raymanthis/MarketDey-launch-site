@@ -236,16 +236,20 @@ class LandmarksJourneySection extends React.Component {
       [-1.1, -0.4, 0.4, 1.1].forEach(o => seg('ink', x + o, 8.66, 0, x + o, 8.92, 0)); seg('fine', x - 0.9, 7.84, 0, x, 7.0, 0); seg('fine', x + 0.9, 7.84, 0, x, 7.0, 0);
       if (rnd() < 0.35) { solid('ink', x + 0.45, 5.6, 0, 0.6, 0.9, 0.6); seg('fine', x + 0.45, 6.5, 0, x + 0.4, 8.5, 0); }
       if (rnd() < 0.5) rectX('fine', x - 0.12, -0.25, 0.25, 2.0, 2.7); };
-    // hybrid tree: tapered trunk, a forked crown and a clustered canopy (drawn by the ink pass);
-    // it draws the same random numbers as the live tree, so everything placed after it is unchanged
-    const treeHy = x => { const hh = 2.4 + rnd() * 0.8, r = 1.6 + rnd() * 0.6, cy = hh + r * 0.65; for (let i = 0; i < 78; i++) rnd();
-      const h = Math.abs(Math.sin(TX * 12.9898 + TZ * 78.233)) * 43758.5453 % 1, sd = h < 0.5 ? -1 : 1;
-      const lb = x - 0.17, rb = x + 0.17, lt = x - 0.1 + 0.08 * sd, rt = x + 0.1 + 0.08 * sd; // slightly leaning, tapered trunk
-      poly(B, [[lb - 0.08, 0, 0], [lb, 0.18, 0], [lt, hh * 0.78, 0], [lt - 0.55 * sd, hh + 0.5, 0.15]]);
-      poly(B, [[rb + 0.08, 0, 0], [rb, 0.18, 0], [rt, hh * 0.72, 0], [rt + 0.6 * sd, hh + 0.4, -0.12]]);
-      poly('ink', [[(lt + rt) / 2, hh * 0.86, 0], [(lt + rt) / 2 + 0.15 * sd, hh + 0.7, 0.1]]); seg('fine', lb, 0.5, 0, lb + 0.04, 0.95, 0);
-      const cx = x - Math.sign(x) * 0.35; // canopy leans over the road, clear of the facades behind
-      TREES.push([TX + cx * TC, cy, TZ + cx * TS, r * 0.86, h * 6.283, Math.floor(h * 4)]); };
+    // hybrid tree: an almond (umbrella) tree, the common Nigerian street tree: a tapered trunk with
+    // whorled branches reaching out along the road into three flat tiers (the tiers are drawn by
+    // the ink pass, rideHybrid.canopyGeometry). The crown is narrow across the road and leans over
+    // it, so it stays clear of the balconies. Same random draws as the live tree, so nothing placed
+    // after it moves.
+    const treeHy = x => { const hh = 2.4 + rnd() * 0.8, r = 1.6 + rnd() * 0.6; for (let i = 0; i < 78; i++) rnd();
+      const h = Math.abs(Math.sin(TX * 12.9898 + TZ * 78.233)) * 43758.5453 % 1, cx = x - Math.sign(x) * 0.75;
+      const lat = Math.min(1.3, r * 0.7), al = r * 1.05, ty = r * 0.95, y0 = hh + 0.25, yt = y0 + 0.9 * ty, bx = y => x + (cx - x) * clamp(y / yt, 0, 1) * 0.7;
+      poly(B, [[x - 0.22, 0, 0], [x - 0.15, 0.25, 0], [bx(yt) - 0.07, yt, 0]]);
+      poly(B, [[x + 0.22, 0, 0], [x + 0.15, 0.25, 0], [bx(yt) + 0.07, yt, 0]]);
+      [[0, 0.92], [0.5, 0.72], [0.9, 0.46]].forEach(([k, R], j) => { const yb = y0 + k * ty, b0 = bx(yb - 0.5);
+        [-1, 1].forEach(dz => poly(j === 0 ? B : 'ink', [[b0, yb - 0.5, 0], [b0 + (cx - b0) * 0.5, yb - 0.2, dz * al * R * 0.45], [cx, yb - 0.02, dz * al * R * 0.85]])); });
+      seg('fine', x - 0.15, 0.6, 0, x - 0.12, 1.1, 0);
+      TREES.push([TX + cx * TC, y0, TZ + cx * TS, lat, ty, al, -TR + (h - 0.5) * 0.3, Math.floor(h * 4)]); };
     const tree = x => HY ? treeHy(x) : treeLive(x);
     const treeLive = x => { const hh = 2.4 + rnd() * 0.8; seg('ink', x - 0.1, 0, 0, x - 0.07, hh, 0); seg('ink', x + 0.1, 0, 0, x + 0.07, hh, 0); ring('fine', x, 0.05, 0, 0.5, 8);
       const r = 1.6 + rnd() * 0.6, cy = hh + r * 0.65; fill('sph', x, cy, 0, r, r * 0.8, r);
@@ -387,8 +391,8 @@ class LandmarksJourneySection extends React.Component {
       hy.all = [mats.bold, mats.ink, mats.green, mats.fine, hy.vmats.bold, hy.vmats.ink, hy.vmats.green, hy.vmats.fine];
       // canopies: 4 puff-cluster variants, instanced; on the inked layer (3) so the ink pass outlines them
       const o3t = new THREE.Object3D();
-      for (let v = 0; v < 4; v++) { const list = TREES.filter(t => t[5] === v); if (!list.length) continue; const g = canopyGeometry(THREE, LX.mergeGeometries, 101 + v * 37);
-        const im = new THREE.InstancedMesh(g, hy.puffMat, list.length); list.forEach((t, i) => { o3t.position.set(t[0], t[1], t[2]); o3t.rotation.set(0, t[4], 0); o3t.scale.setScalar(t[3] * 0.95); o3t.updateMatrix(); im.setMatrixAt(i, o3t.matrix); });
+      for (let v = 0; v < 4; v++) { const list = TREES.filter(t => t[7] === v); if (!list.length) continue; const g = canopyGeometry(THREE, LX.mergeGeometries, 101 + v * 37);
+        const im = new THREE.InstancedMesh(g, hy.puffMat, list.length); list.forEach((t, i) => { o3t.position.set(t[0], t[1], t[2]); o3t.rotation.set(0, t[6], 0); o3t.scale.set(t[3], t[4], t[5]); o3t.updateMatrix(); im.setMatrixAt(i, o3t.matrix); });
         im.layers.set(3); hy.puffs.push(im); city.add(im); }
     } else
       for (const k in SEG) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(SEG[k], 3)); city.add(new THREE.LineSegments(g, mats[k])); }
@@ -444,13 +448,23 @@ class LandmarksJourneySection extends React.Component {
       const face = new THREE.MeshBasicMaterial({ map: tx }), edge = new THREE.MeshBasicMaterial({ color: '#a7c957' });
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 40), [edge, face, face]); m.rotation.x = Math.PI / 2;
       const g = new THREE.Group(); g.add(m); g.userData.coin = true; return g; };
+    // hybrid: the numbered pins become coins like the end pin (same bounce + spin), face drawn like
+    // pinTex (both caps share it; the number reads upright from either side)
+    const coinNum = n => { const face = () => { const c = document.createElement('canvas'); c.width = 256; c.height = 256; const k = c.getContext('2d');
+        k.translate(128, 128); k.rotate(-Math.PI / 2); k.translate(-128, -128);
+        k.fillStyle = '#fbfaf6'; k.beginPath(); k.arc(128, 128, 126, 0, Math.PI * 2); k.fill(); k.fillStyle = GREEN; k.beginPath(); k.arc(128, 128, 100, 0, Math.PI * 2); k.fill();
+        k.strokeStyle = INK; k.lineWidth = 8; k.beginPath(); k.arc(128, 128, 112, 0, Math.PI * 2); k.stroke();
+        k.fillStyle = '#fbfaf6'; k.font = '900 120px Lato'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText(String(n), 128, 136);
+        const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4; return new THREE.MeshBasicMaterial({ map: tx }); };
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 40), [new THREE.MeshBasicMaterial({ color: GREEN }), ...(f => [f, f])(face())]); m.rotation.x = Math.PI / 2;
+      const g = new THREE.Group(); g.add(m); g.userData.num = true; return g; };
     const boards = [], pins = []; let boardPort = false; const BOARD_LAT = 5.9, BOARD_LAT_PORTRAIT = 4.4, BOARD_SCALE_PORTRAIT = 0.8;
     const postG = new THREE.BoxGeometry(0.16, 2.9, 0.16), postE = new THREE.EdgesGeometry(postG);
     LM.forEach((l, i) => { const sd = LSD[i], grp = new THREE.Group();
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 3.0), new THREE.MeshBasicMaterial({ map: boardTex(i + 1, l), transparent: true })); pl.position.y = 4.1; grp.add(pl);
       [-1.7, 1.7].forEach(x => { const m = new THREE.Mesh(postG, fillMat); m.position.set(x, 1.45, -0.06); grp.add(m); const e = new THREE.LineSegments(postE, lineMat(INK)); e.position.copy(m.position); grp.add(e); });
       const [bx, bz] = W(SB[i], sd * 5.9); grp.position.set(bx, -8, bz); grp.rotation.y = -fr(SB[i])[2] + (sd > 0 ? -0.5 : 0.5); scene.add(grp); boards.push({ grp, s: SB[i], i, sd });
-      const [px, pz] = W(MK[i][2], MK[i][0]); const sp = i === 4 ? (() => { const g = coinPin(), [cx, cz] = W(245, -5.2); g.userData.at = [cx, cz]; return g; })() : new THREE.Sprite(new THREE.SpriteMaterial({ map: pinTex(i + 1), transparent: true })); sp.position.set(px, MK[i][1], pz); sp.scale.set(2.2, 2.2, 1); scene.add(sp); pins.push(sp); });
+      const [px, pz] = W(MK[i][2], MK[i][0]); const sp = i === 4 ? (() => { const g = coinPin(), [cx, cz] = W(245, -5.2); g.userData.at = [cx, cz]; return g; })() : HY ? coinNum(i + 1) : new THREE.Sprite(new THREE.SpriteMaterial({ map: pinTex(i + 1), transparent: true })); sp.position.set(px, MK[i][1], pz); if (HY) sp.userData.base = [px, MK[i][1], pz]; sp.scale.set(2.2, 2.2, 1); scene.add(sp); pins.push(sp); });
     // ?ride=model: the Blender street replaces the procedural one inside `city` once the glb is in
     // (until then the procedural street stands in). Layers: 0 = the model (fills + ink edges),
     // 2 = wires (fills only), 1 = overlays drawn after the ink pass, depth-tested against the model:
@@ -508,7 +522,7 @@ class LandmarksJourneySection extends React.Component {
         const modelOn = !!(M && M.ready), layered = HY || modelOn;
         if (M) { // same skip-if-unchanged rule as below, without building a key string per frame
           const mk = M.k, sk = st.f; let same = keyS === M && Math.abs(mk[0] - k) < 5e-5 && Math.abs(mk[1] - e) < 5e-5 && Math.abs(mk[2] - q) < 5e-5 && Math.abs(mk[3] - hdS) < 5e-5 && Math.abs(mk[4] - sk) < 5e-5;
-          if (same && !(hy && hy.fading) && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS;
+          if (same && !(hy && (hy.fading || hy.anim || e >= 1)) && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS;
           mk[0] = k; mk[1] = e; mk[2] = q; mk[3] = hdS; mk[4] = sk; keyS = M; ltS = t;
           if (layered) { if (M.lastT && t - M.lastT < 100) { M.acc += Math.min(34, t - M.lastT); M.n++; if (t - M.lastT < M.minDt) M.minDt = t - M.lastT; } M.lastT = t; }
         }
@@ -526,6 +540,7 @@ class LandmarksJourneySection extends React.Component {
         city.scale.y = 0.02 + 0.98 * up;
         if (modelOn && !HY) { M.cityU.uMapK.value = 1 - sstep(0.3, 1, e); M.groundU.uMapK.value = 1 - sstep(0.2, 0.9, e); }
         fillMat.color.copy(C_BLOCK).lerp(C_PAPER, sstep(0.3, 1, e)); groundMat.color.copy(C_BG).lerp(C_PAPER, sstep(0.2, 0.9, e)); sceneBg.copy(groundMat.color);
+        if (hy) hy.anim = false;
         if (hy) { // fat lines at full strength; procedural vehicles cross-fade to the Blender figures over 0.3 s
           const vm = hy.vmats, a = M.ready ? clamp((t - hy.t0) / 300, 0, 1) : 0; hy.fading = M.ready && a < 1;
           mats.bold.opacity = mats.ink.opacity = mats.green.opacity = lineK; mats.fine.opacity = 0.9 * lineK; mats.bold.visible = lineK > 0.002;
@@ -543,12 +558,19 @@ class LandmarksJourneySection extends React.Component {
             camera.position.fromArray(c.pos); camera.quaternion.fromArray(c.quat); camera.fov = shownFrame.fov; camera.aspect = shownFrame.w / shownFrame.h;
             camera.setViewOffset(shownFrame.drawW, shownFrame.drawH, shownFrame.offX, shownFrame.offY, W, H); viewSet = true; }
           else if (viewSet) { camera.fov = 58; camera.aspect = host.clientWidth / host.clientHeight; camera.clearViewOffset(); viewSet = false; } }
-        if (layered) for (let i = 0; i < boards.length; i++) { // standing boards fade in within ~45 m ahead
+        if (HY) for (let i = 0; i < boards.length; i++) { // boards slide up out of the ground within ~45 m ahead (0.7 s, small settle), sink when left behind or scrolled back
+          const b = boards[i], d = b.s - sc, want = e >= 1 && d < 45 && d > -25 ? 1 : 0, dt = b.lt ? clamp((t - b.lt) / 700, 0, 0.1) : 0; b.lt = t;
+          if (b.a !== 1) { b.a = 1; for (let j = 0; j < b.mats.length; j++) b.mats[j].opacity = 1; }
+          b.k = clamp((b.k || 0) + (want ? dt : -dt), 0, 1); const u = b.k - 1, ease = 1 + 1.6 * u * u * u + 0.6 * u * u; // easeOutBack, ~2 % overshoot
+          b.grp.position.y = -6.4 * (1 - ease); b.grp.visible = b.k > 0.001; hy.anim = hy.anim || (b.k > 0 && b.k < 1) || want !== (b.k >= 1 ? 1 : 0); }
+        else if (layered) for (let i = 0; i < boards.length; i++) { // standing boards fade in within ~45 m ahead
           const b = boards[i], a = e >= 1 ? sstep(45, 35, b.s - sc) : 0; b.grp.position.y = 0; b.grp.visible = a > 0.003;
           if (a !== b.a) { b.a = a; for (let j = 0; j < b.mats.length; j++) b.mats[j].opacity = a; } }
         else boards.forEach(b => { const d = b.s - sc, rise = sstep(70, 34, d); b.grp.position.y = -8 * (1 - rise); b.grp.visible = e >= 1; });
         const step = stepFor(q);
-        pins.forEach((sp, i) => { sp.visible = e >= 1; if (sp.userData.coin) { const at = sp.userData.at; sp.position.set(at[0], 1.25 + Math.sin(t / 520) * 0.18, at[1]); sp.rotation.y = t / 650; sp.scale.set(1.6, 1.6, 1.6); return; } const cur = step === i + 1; const s2 = cur ? 3 + Math.sin(t / 280) * 0.15 : 2.1; sp.scale.set(s2, s2, 1); });
+        pins.forEach((sp, i) => { sp.visible = e >= 1;
+          if (sp.userData.num) { const b = sp.userData.base, s2 = step === i + 1 ? 3 : 2.2; sp.position.set(b[0], b[1] + Math.sin(t / 520) * 0.18, b[2]); sp.rotation.y = t / 650; sp.scale.set(s2, s2, s2); return; } // same motion as the end pin
+          if (sp.userData.coin) { const at = sp.userData.at; sp.position.set(at[0], 1.25 + Math.sin(t / 520) * 0.18, at[1]); sp.rotation.y = t / 650; sp.scale.set(1.6, 1.6, 1.6); return; } const cur = step === i + 1; const s2 = cur ? 3 + Math.sin(t / 280) * 0.15 : 2.1; sp.scale.set(s2, s2, 1); });
         if (layered) {
           // depth precision for the high map view: push the near plane out while the camera is high
           const near = e < 1 ? clamp((camera.position.y - 35) * 0.5, 0.1, 30) : 0.1;
