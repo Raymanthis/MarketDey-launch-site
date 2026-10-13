@@ -23,7 +23,7 @@
   [data-m="ms-results"] > div:not(:first-child) { min-height: 56px !important; padding: 8px 16px !important; gap: 10px !important; }
   [data-m="ms-results"] > div:not(:first-child) > div:nth-child(2) > div:first-child { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; font-size: 15px !important; line-height: 1.2; }
 }
-@media (max-width: 599px) and (max-height: 700px) {
+@media (max-width: 599px) and (max-height: 780px) {
   [data-m="ms-results"] > div:nth-child(3) { display: none !important; }
   [data-m="ms-ui"] h2 { font-size: 26px !important; }
 }
