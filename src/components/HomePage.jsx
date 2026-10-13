@@ -6,6 +6,8 @@ import AudiencesSection from '@/components/sections/AudiencesSection';
 import MarketSearchSection from '@/components/sections/MarketSearchSection';
 import LandmarksJourneySection from '@/components/sections/LandmarksJourneySection';
 import ContributorsSection from '@/components/sections/ContributorsSection';
+import RidePreloader from '@/components/RidePreloader';
+import { rideSource } from '@/components/sections/RideFrames';
 import { lmMapBuild } from '@/lib/lmMapBuild';
 import { CityLife } from '@/lib/cityLife';
 import heroCopy from '@/content/home/hero.json';
@@ -55,7 +57,7 @@ const SIGN_FLICK_WIN = 200, SIGN_FLICK_MIN = 400, SIGN_FLICK_K = 0.3, SIGN_FLICK
 class HomePage extends React.Component {
   static defaultProps = { startMarket: 'ogwashi', launchMode: false };
   state = { gs: -1, sel: null, platform: footerCopy.waitlist.platforms[0], moves: [], submitted: false, forMarket: '', faq: 0, ph: 0, enter: true, mounted: false };
-  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef(); signRef = React.createRef(); signRopeLayerRef = React.createRef(); signNodeRef = React.createRef(); signRopeRef = React.createRef(); signRopeFrontRef = React.createRef(); signBodyRef = React.createRef(); signFrontRef = React.createRef(); signBackRef = React.createRef(); badgesRef = React.createRef();
+  faqRef = React.createRef(); bannerRef = React.createRef(); heroRef = React.createRef(); cityRef = React.createRef(); footCityRef = React.createRef(); footHeadRef = React.createRef(); footCardRef = React.createRef(); footRuleRef = React.createRef(); signRef = React.createRef(); signRopeLayerRef = React.createRef(); signNodeRef = React.createRef(); signRopeRef = React.createRef(); signRopeFrontRef = React.createRef(); signBodyRef = React.createRef(); signFrontRef = React.createRef(); signBackRef = React.createRef(); badgesRef = React.createRef(); rideLoadRef = React.createRef();
   buildCity(el0, fl0, sky) {
     const el = el0 || this.cityRef.current; if (!el) return; const hero = !el0, W = Math.max(320, el.clientWidth || window.innerWidth), G = 292, r = mulberry(hero ? 5 : 19), on = hero ? !!this.cityOn : true; let out = [];
     const S = 'rgba(255,255,255,.55)', SF = 'rgba(255,255,255,.28)', SFAR = 'rgba(167,201,87,.4)', SFAR2 = 'rgba(167,201,87,.2)', FL = fl0 || '#386641';
@@ -242,11 +244,16 @@ class HomePage extends React.Component {
       at(ST + 7 * STEP, () => this.cityShow());
       const done = ST + (tx.length + 3) * STEP + 700;
       at(done, () => { letters.forEach(solid); svg.remove(); });
-      at(done + 250, () => { if (hint) { hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } if (sign) this.signShow(); this.introReady = true; if (this.cityLifeHero && this.cityLifeHero.sunIn) this.cityLifeHero.sunIn(); }); };
+      at(done + 250, () => { if (hint) { if (this.rideReady || this.props.launchMode) this.hintShow(); else this.rideLoadShow(true); at(30000, () => this.onRideReady()); } if (sign) this.signShow(); this.introReady = true; if (this.cityLifeHero && this.cityLifeHero.sunIn) this.cityLifeHero.sunIn(); }); };
     let started = false; const go1 = () => { if (!started) { started = true; run(); } };
     if (document.fonts && document.fonts.load) document.fonts.load('900 28px Lato').then(go1, go1); else go1(); at(1500, go1);
-    this.introGo = () => { if (this.props.launchMode || !this.introReady || this.introGone) return; this.introGone = true; if (this.cityLifeHero && this.cityLifeHero.setSplash) this.cityLifeHero.setSplash(false); window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
+    // the ride frames preload under the wordmark ("Loading 47%"); the scroll-up hint replaces it once they
+    // are ready (or after 30 s, so a slow connection never traps the visitor on the splash)
+    this.hintShow = () => { if (this.introGone) return; this.rideLoadShow(false); if (hint) { if (this.rideLoadRef.current) hint.style.top = this.rideLoadRef.current.style.top || hint.style.top; hint.style.opacity = '1'; hint.style.transform = 'translate(-50%,0px)'; hint.style.pointerEvents = 'auto'; } };
+    this.rideLoadShow = on => { const rl = this.rideLoadRef.current; if (!rl) return; if (on && hint) rl.style.top = hint.style.top || ''; rl.style.opacity = on ? '1' : '0'; };
+    this.introGo = () => { if (this.props.launchMode || !this.introReady || !this.rideReady || this.introGone) return; this.introGone = true; if (this.cityLifeHero && this.cityLifeHero.setSplash) this.cityLifeHero.setSplash(false); window.scrollTo(0, 0); at(1300, () => { this.introOff(); document.documentElement.style.overflow = ''; });
       if (hint) { hint.style.opacity = '0'; hint.style.transform = 'translate(-50%,12px)'; hint.style.pointerEvents = 'none'; }
+      this.rideLoadShow(false);
       if (logo) { logo.style.transition = 'transform 1.05s cubic-bezier(.7,0,.2,1)'; logo.style.transform = 'none'; }
       this.cityHide();
       q('nav').forEach((el, i) => at(800 + i * 80, () => show([el])));
@@ -362,6 +369,11 @@ class HomePage extends React.Component {
     if (body && !this.reducedMotion) body.style.transform = 'rotateY(' + p.theta.toFixed(3) + 'deg)';
     this.signRope(now);
   }
+  onRideReady = () => {
+    if (this.rideReady) return;
+    this.rideReady = true;
+    if (this.introReady && this.hintShow) this.hintShow();
+  };
   signShow() {
     const el = this.signRef.current; if (!el) return;
     this.signPlace();
@@ -710,6 +722,7 @@ class HomePage extends React.Component {
       <div className={`sc-host ${styles.root}`} data-sc-name="orig">
         <div style={{overflowX:"clip"}}>
           <section ref={v.heroRef} data-screen-label="01 Hero" data-launch={v.launchMode ? "1" : undefined} style={v.launchMode ? {position:"relative",background:"#386641",overflow:"hidden",height:"100vh"} : {position:"relative",background:"#386641",overflow:"hidden"}}>{' '}
+            {!v.launchMode && this.state.mounted ? <div ref={this.rideLoadRef} data-h="rideload" style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,0)",opacity:"0",transition:"opacity .5s ease",pointerEvents:"none"}}><RidePreloader manifest={rideSource(window.location.search)} onReady={this.onRideReady} /></div> : null}
             {!v.launchMode ? <div data-h="hint" onClick={v.introGo} style={{position:"fixed",left:"50%",top:"calc(50% + 64px)",zIndex:"6",transform:"translate(-50%,12px)",opacity:"0",transition:"opacity .6s ease,transform .6s ease",pointerEvents:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"6px",color:"#fff",fontSize:"15px",fontWeight:"700"}}><i className="ri-arrow-up-line" style={{fontSize:"22px",animation:"mdHint 1.6s ease-in-out infinite"}}></i><span>{heroCopy.scrollUp}</span></div> : <>{/* launch sign: rope layer (z1, under the wordmark) and card layer (z3, over it) share one transform */}<div data-h="rope" ref={this.signRopeLayerRef} aria-hidden="true" style={{position:"fixed",left:"50%",top:"0",width:"0",height:"0",transformOrigin:"0px 0px",transform:"translate(0px,0px) rotate(0deg)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease",zIndex:"1"}}><svg data-rope="back" ref={this.signRopeRef} style={{position:"absolute",left:"0",top:"0",width:"1px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div><div data-h="sign" ref={this.signRef} style={{position:"fixed",left:"50%",top:"0",width:"0",height:"0",transformOrigin:"0px 0px",transform:"translate(0px,0px) rotate(0deg)",opacity:"0",pointerEvents:"none",transition:"opacity .5s ease",zIndex:"3"}}><div ref={this.signNodeRef} style={{position:"absolute",top:this.signTop||0,left:"0",transform:"translateX(-50%)"}}><div style={{perspective:"900px"}}><div ref={this.signBodyRef} onPointerDown={v.signDown} onPointerMove={v.signMove} onPointerUp={v.signUp} onPointerCancel={v.signUp} style={{position:"relative",display:"grid",transformStyle:"preserve-3d",transform:"rotateY(0deg)",cursor:"grab",userSelect:"none",touchAction:"none",willChange:"transform"}}><div ref={this.signFrontRef} data-face="front" style={sFace}>{heroCopy.launchingSoon}<span data-eyelet="1" style={sEyelet}></span></div><div ref={this.signBackRef} data-face="back" style={{...sFace,background:"#ffffff",color:"#111111",transform:"rotateY(180deg)"}}>{heroCopy.launchingSoonBack}<span data-eyelet="1" style={sEyelet}></span></div></div></div></div><svg data-rope="front" ref={this.signRopeFrontRef} style={{position:"absolute",left:"0",top:"0",width:"1px",height:"1px",overflow:"visible",pointerEvents:"none"}}><path d="M0 0 L0 0" stroke="#6e5532" strokeWidth="4" strokeLinecap="round" fill="none"></path><path d="M0 0 L0 0" stroke="#b39463" strokeWidth="2.4" strokeDasharray="2.5 3.5" strokeLinecap="round" fill="none"></path></svg></div>{(() => { const b = heroCopy.storeBadges; return <div ref={this.badgesRef} data-h="badges" style={{position:"fixed",left:"50%",top:"70%",zIndex:"9",display:"flex",gap:"clamp(22px, 6vw, 30px)",alignItems:"center",transform:"translate(-50%,10px)",opacity:"0",pointerEvents:"none",transition:"opacity .7s ease,transform .7s ease"}}><img src="/images/badges/apple-logo.svg" alt={b.appStoreAlt} style={{height:"clamp(30px, 8vw, 36px)",width:"auto",display:"block"}} /><img src="/images/badges/google-play-icon.svg" alt={b.googlePlayAlt} style={{height:"clamp(28px, 7.5vw, 34px)",width:"auto",display:"block"}} /></div>; })()}</>}{' '}
             <div ref={v.cityRef} style={{position:"absolute",left:"0",right:"0",bottom:"0",height:"320px",zIndex:"0",pointerEvents:"none",transform:"translateY(100%)",transition:"transform 1.3s cubic-bezier(.2,.8,.2,1)"}}></div>{' '}
             <div style={{position:"relative",zIndex:v.launchMode ? "2" : "1",maxWidth:"1200px",margin:"0 auto",padding:"0 32px"}}>{' '}
