@@ -29,6 +29,51 @@ sys.path.insert(0, HERE)
 import export_glb as E  # noqa: E402
 
 VEHICLES = ("veh", "xp", "ok")
+# Fills sit close to paper so the figures read as line drawings like the buildings, with the ink
+# outline doing the work. People get their own near-paper palette (6-12 % darker than paper at most,
+# a warm tint for skin so it never reads as bare paper); vehicles keep 40 % of their tone.
+PAPER = np.array([0xF7, 0xF5, 0xEF], np.float32) / 255
+TONE_KEEP = {"vehicles": 0.4}
+PEOPLE_TONES = {
+    "skin": "#e4d8c8", "hair": "#d8d4cb", "shoes": "#d8d4cb", "top": "#f7f5ef", "cloth_light": "#f2f0e8",
+    "bottom": "#e6e4dd", "cloth_dark": "#e1dfd7", "basin": "#ebe7dc", "goods": "#e6e0d1",
+}
+
+
+def bake_people(me):
+    """Per-face people tone (PEOPLE_TONES by material, unknown -> paper) with a very soft sun term."""
+    n = len(me.polygons)
+    nr = np.empty(n * 3, np.float32)
+    me.polygons.foreach_get("normal", nr)
+    mi = np.empty(n, np.int32)
+    me.polygons.foreach_get("material_index", mi)
+    lt = np.empty(n, np.int32)
+    me.polygons.foreach_get("loop_total", lt)
+    tones = np.array([[int(PEOPLE_TONES.get(m.name if m else "", "#f7f5ef")[k:k + 2], 16) / 255 for k in (1, 3, 5)]
+                      for m in me.materials] or [[0.97, 0.96, 0.94]], np.float32)
+    h = 0.5 + 0.5 * (nr.reshape(n, 3) @ np.array(E.SUN, np.float32))
+    srgb = np.clip(tones[np.clip(mi, 0, len(tones) - 1)] * (0.95 + 0.05 * h)[:, None], 0, 1)
+    lin = np.where(srgb <= 0.04045, srgb / 12.92, ((srgb + 0.055) / 1.055) ** 2.4)
+    rgba = np.concatenate([lin, np.ones((n, 1), np.float32)], axis=1)
+    for a in list(me.color_attributes):
+        me.color_attributes.remove(a)
+    ca = me.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
+    ca.data.foreach_set("color", np.repeat(rgba, lt, axis=0).astype(np.float32).ravel())
+    me.color_attributes.active_color = ca
+
+
+def toward_paper(me, keep):
+    ca = me.color_attributes.get("Col")
+    if ca is None or not len(ca.data):
+        return
+    c = np.empty(len(ca.data) * 4, np.float32)
+    ca.data.foreach_get("color", c)
+    c = c.reshape(-1, 4)
+    lin = np.clip(c[:, :3], 0, 1)
+    srgb = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * np.power(lin, 1 / 2.4) - 0.055)
+    srgb = PAPER + (srgb - PAPER) * keep
+    c[:, :3] = np.where(srgb <= 0.04045, srgb / 12.92, ((srgb + 0.055) / 1.055) ** 2.4)
+    ca.data.foreach_set("color", c.ravel())
 VARIANTS = {
     # people: triangles per person mesh; vehicles: (min tris, collapse ratio) per joined vehicle
     "desktop": dict(out="figures.glb", person=4200, vehicle=(1400, 0.62)),
@@ -62,10 +107,7 @@ def build(name, cfg):
             done[key] = me
         o.data = done[key]
     for me in done.values():
-        tmp = bpy.data.objects.new("tmp_bake", me)
-        scene.collection.objects.link(tmp)
-        E.bake_colours(tmp, world=False)
-        bpy.data.objects.remove(tmp, do_unlink=True)
+        bake_people(me)
         me.materials.clear()
         me.materials.append(fill)
         me.polygons.foreach_set("material_index", np.zeros(len(me.polygons), np.int32))
@@ -77,6 +119,7 @@ def build(name, cfg):
         o.data = E.apply_decimate(o, decimate_type="DISSOLVE", angle_limit=math.radians(0.5), delimit={"MATERIAL"},
                                   use_dissolve_boundaries=False)
         E.bake_colours(o, world=True)
+        toward_paper(o.data, TONE_KEEP["vehicles"])
         E.unparent_keep(o)
         E.apply_transform(o)
         groups.setdefault(vehicle_tag(o.name), []).append(o)
