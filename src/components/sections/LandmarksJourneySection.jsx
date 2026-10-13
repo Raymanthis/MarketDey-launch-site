@@ -4,9 +4,10 @@ import React from 'react';
 import LandmarkPhone from '@/components/sections/LandmarkPhone';
 import LandmarkSheet from '@/components/sections/LandmarkSheet';
 import content from '@/content/landmarks-journey.json';
-import { RideFramesPlayer, openRide, rideSource, rideFrameStats, RIDE_MODEL } from '@/components/sections/RideFrames';
-import { modelStore, modelLite } from '@/components/sections/RideModel';
+import { RideFramesPlayer, openRide, rideSource, rideFrameStats, RIDE_MODEL, RIDE_HYBRID } from '@/components/sections/RideFrames';
+import { modelStore, figuresStore, modelLite } from '@/components/sections/RideModel';
 import { makeInkPass } from '@/lib/inkPass';
+import { dedupeSegments, fatLineMaterial, fatLines, canopyGeometry } from '@/lib/rideHybrid';
 import { MAP_END, RIDE_START, RIDE_END, REVEAL, clamp, sstep, S0, PX, PZ, SMAX, fr, W, LS, LSD, SB, MK, TS0, TS1, headS, makeRideCamera } from '@/lib/rideCamera';
 import './LandmarksJourneySection.global.css';
 
@@ -88,18 +89,23 @@ class LandmarksJourneySection extends React.Component {
   async init3D() {
     const host = this.glRef.current; if (!host) return;
     let THREE;
-    // ?ride=model: start the glb download now (shared with the hero preloader, so never twice)
-    const modelMode = this.rideSrc === RIDE_MODEL, lite = modelMode && modelLite(), modelP = modelMode ? modelStore().load() : null;
+    // ?ride=model / ?ride=hybrid: start the glb download now (shared with the hero preloader, so never twice)
+    const modelMode = this.rideSrc === RIDE_MODEL, HY = this.rideSrc === RIDE_HYBRID, lite = (modelMode || HY) && modelLite();
+    const modelP = modelMode ? modelStore().load() : HY ? figuresStore().load() : null;
     if (modelP) modelP.catch(() => {});
     const rideP = openRide(this.rideSrc);
     try { THREE = await import('three'); } catch (e) { this.setState({ glFail: true }); return; }
+    // hybrid: fat anti-aliased lines + geometry merging for the line-art canopies
+    let LX = null;
+    if (HY) { try { const [a, b, c, d] = await Promise.all([import('three/examples/jsm/lines/LineSegments2.js'), import('three/examples/jsm/lines/LineSegmentsGeometry.js'), import('three/examples/jsm/lines/LineMaterial.js'), import('three/examples/jsm/utils/BufferGeometryUtils.js')]);
+      LX = { LineSegments2: a.LineSegments2, LineSegmentsGeometry: b.LineSegmentsGeometry, LineMaterial: c.LineMaterial, mergeGeometries: d.mergeGeometries }; } catch (e) { this.setState({ glFail: true }); return; } }
     try { await Promise.all([document.fonts.load('900 34px Lato'), document.fonts.load('400 24px Lato')]); } catch (e) {}
     if (this.dead || !this.glRef.current) return;
     let renderer;
     const ride = await rideP; if (this.dead || !this.glRef.current) return;
     try { renderer = new THREE.WebGLRenderer(ride ? { antialias: true, alpha: true } : { antialias: true }); } catch (e) { this.setState({ glFail: true }); return; }
     const basePR = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 1.5);
-    renderer.setPixelRatio(modelMode ? basePR : Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setPixelRatio(modelMode || HY ? basePR : Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%';
     host.appendChild(renderer.domElement);
@@ -114,11 +120,14 @@ class LandmarksJourneySection extends React.Component {
     let TX = 0, TZ = 0, TC = 1, TS = 0, TR = 0;
     const setT = (s, lat) => { const [x, z, t] = fr(s); TC = Math.cos(t); TS = Math.sin(t); TR = t; TX = x + TC * lat; TZ = z + TS * lat; };
     const setW = () => { TX = 0; TZ = 0; TC = 1; TS = 0; TR = 0; };
-    const SEG = { ink: [], fine: [], green: [] };
-    let NOL = false; const seg = (k, x1, y1, z1, x2, y2, z2) => NOL || SEG[k].push(TX + x1 * TC - z1 * TS, y1, TZ + x1 * TS + z1 * TC, TX + x2 * TC - z2 * TS, y2, TZ + x2 * TS + z2 * TC);
+    // hybrid adds a heavier 'bold' weight (B) for silhouettes and roof edges, and keeps the
+    // procedural vehicles apart (SEGV/FILLV) so they can fade out when the Blender ones arrive
+    const SEG = HY ? { ink: [], fine: [], green: [], bold: [] } : { ink: [], fine: [], green: [] }, B = HY ? 'bold' : 'ink';
+    const SEGV = { ink: [], fine: [], green: [], bold: [] }, FILLV = { box: [], pr: [], cyl: [], cone: [], cone4: [], sph: [] }, TREES = []; let VEHON = false;
+    let NOL = false; const seg = (k, x1, y1, z1, x2, y2, z2) => NOL || (VEHON ? SEGV : SEG)[k].push(TX + x1 * TC - z1 * TS, y1, TZ + x1 * TS + z1 * TC, TX + x2 * TC - z2 * TS, y2, TZ + x2 * TS + z2 * TC);
     const poly = (k, p) => { for (let i = 0; i < p.length - 1; i++) seg(k, p[i][0], p[i][1], p[i][2], p[i + 1][0], p[i + 1][1], p[i + 1][2]); };
     const FILL = { box: [], pr: [], cyl: [], cone: [], cone4: [], sph: [] };
-    const fill = (k, x, y, z, sx, sy, sz, r) => FILL[k].push([TX + x * TC - z * TS, y, TZ + x * TS + z * TC, sx, sy, sz, -TR + (r || 0)]);
+    const fill = (k, x, y, z, sx, sy, sz, r) => (VEHON ? FILLV : FILL)[k].push([TX + x * TC - z * TS, y, TZ + x * TS + z * TC, sx, sy, sz, -TR + (r || 0)]);
     const boxE = (k, x, y, z, w, hh, d) => { const A = x - w / 2, B = x + w / 2, C = y + hh, E = z - d / 2, F = z + d / 2;
       seg(k,A,y,E,B,y,E); seg(k,A,C,E,B,C,E); seg(k,A,y,F,B,y,F); seg(k,A,C,F,B,C,F); seg(k,A,y,E,A,y,F); seg(k,B,y,E,B,y,F);
       seg(k,A,C,E,A,C,F); seg(k,B,C,E,B,C,F); seg(k,A,y,E,A,C,E); seg(k,B,y,E,B,C,E); seg(k,A,y,F,A,C,F); seg(k,B,y,F,B,C,F); };
@@ -160,8 +169,8 @@ class LandmarksJourneySection extends React.Component {
       const np = Math.max(2, Math.round((z1 - z0) / 2.6)); for (let i = 0; i <= np; i++) { const z = z0 + 0.15 + (z1 - z0 - 0.3) * i / np; seg('ink', xo + sd * 0.08, 0, z, xo + sd * 0.08, yo - 0.12, z); seg('fine', xo + sd * 0.16, 0, z, xo + sd * 0.16, yo - 0.12, z); } };
     const zincRoof = (xa, xb, y, z0, z1, rise, sd, det) => { const x0 = Math.min(xa, xb), x1 = Math.max(xa, xb), xm = (x0 + x1) / 2, yr = y + rise, xe = sd > 0 ? x0 : x1;
       fill('pr', xm, y, (z0 + z1) / 2, x1 - x0, rise, z1 - z0);
-      seg('ink', x0, y, z0, x0, y, z1); seg('ink', x1, y, z0, x1, y, z1); seg('ink', xm, yr, z0, xm, yr, z1);
-      poly('ink', [[x0, y, z1], [xm, yr, z1], [x1, y, z1]]); poly('ink', [[x0, y, z0], [xm, yr, z0], [x1, y, z0]]);
+      seg(B, x0, y, z0, x0, y, z1); seg(B, x1, y, z0, x1, y, z1); seg(B, xm, yr, z0, xm, yr, z1);
+      poly(B, [[x0, y, z1], [xm, yr, z1], [x1, y, z1]]); poly(B, [[x0, y, z0], [xm, yr, z0], [x1, y, z0]]);
       seg('fine', xe, y - 0.2, z0, xe, y - 0.2, z1); seg('fine', xe, y - 0.2, z1, xe, y, z1);
       const st = det ? 0.36 : 0.9; for (let z = z0 + st; z < z1 - 0.05; z += st) seg('fine', xe, y, z, xm, yr, z);
       poly('fine', [[x0 + 0.25, y + 0.05, z1 + 0.03], [xm, yr - 0.22, z1 + 0.03], [x1 - 0.25, y + 0.05, z1 + 0.03]]);
@@ -175,7 +184,7 @@ class LandmarksJourneySection extends React.Component {
       rectX('ink', gx, zg - gw / 2, zg, 0.1, 2.05); rectX('ink', gx, zg, zg + gw / 2, 0.1, 2.05); seg('ink', gx, 1.0, zg - gw / 2, gx, 1.0, zg + gw / 2);
       if (det) { for (let z = zg - gw / 2 + 0.2; z < zg + gw / 2 - 0.1; z += 0.2) seg('fine', gx, 1.0, z, gx, 2.05, z); const sp = []; let j = 0; for (let z = zg - gw / 2; z <= zg + gw / 2 + 0.01; z += 0.2) sp.push([gx, 2.05 + (j++ % 2 ? 0.22 : 0), z]); poly('ink', sp); rectX('fine', gx, zg - gw / 2 + 0.2, zg - 0.2, 0.25, 0.85); rectX('fine', gx, zg + 0.2, zg + gw / 2 - 0.2, 0.25, 0.85); }
       const hf = 4.4, H = 3.3, za = z0 + 0.7, zb = z1 - 0.7;
-      solid('ink', X((hf + w - 0.3) / 2), 0, 0, w - hf - 0.3, H, zb - za);
+      solid(B, X((hf + w - 0.3) / 2), 0, 0, w - hf - 0.3, H, zb - za);
       solid('ink', X((2.8 + hf) / 2), 0, 0, hf - 2.8, 0.45, zb - za);
       const np = Math.max(2, Math.round((zb - za) / 2.8)); for (let i = 0; i <= np; i++) solid('ink', X(3.0), 0.45, za + 0.2 + (zb - za - 0.4) * i / np, 0.3, H - 0.45, 0.3);
       for (let i = 0; i < np; i++) { const zm = za + 0.2 + (zb - za - 0.4) * (i + 0.5) / np; if (i === Math.floor(np / 2)) doorX(X(hf), sd, zm, 0.45, 1.0, 2.2); else louvX(X(hf), sd, zm, 1.1, 1.3, 1.4, det); }
@@ -184,7 +193,7 @@ class LandmarksJourneySection extends React.Component {
       if (rnd() < 0.4) { const tx = X(w - 1.2), tz = za + 1.2; [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].forEach(([p, q]) => seg('ink', tx + p, 0, tz + q, tx + p, H + 1.9, tz + q)); seg('fine', tx - 0.5, 0.5, tz + 0.5, tx + 0.5, H + 1.4, tz + 0.5); solid('ink', tx, H + 1.9, tz, 1.3, 0.12, 1.3); ptank(tx, H + 2.02, tz); }
       else if (det && rnd() < 0.4) dish(X(w - 0.8), H + 1.4, zb - 1.4, sd); };
     const storey = (sd, xn, w, len, fl, det) => { const H = fl * 3, fx = sd * xn, xo = fx - sd * 0.03, X = d => sd * (xn + d), z0 = -len / 2, z1 = len / 2, open = rnd() < 0.4;
-      solid('ink', X(w / 2), 0, 0, w, H, len);
+      solid(B, X(w / 2), 0, 0, w, H, len);
       const bays = Math.max(2, Math.round(len / 3.3)), bw = len / bays, bal = rnd() < 0.6, eb = Math.max(1, Math.floor(w / 3));
       for (let i = 1; i < bays; i++) { const z = z0 + bw * i; seg('fine', xo, 0, z - 0.17, xo, H, z - 0.17); seg('fine', xo, 0, z + 0.17, xo, H, z + 0.17); }
       for (let f = 1; f <= fl; f++) { const y = f * 3; seg('ink', xo, y, z0, xo, y, z1); seg('fine', xo, y - 0.25, z0, xo, y - 0.25, z1); seg('ink', X(0), y, z1 + 0.03, X(w), y, z1 + 0.03); seg('fine', X(0), y - 0.25, z1 + 0.03, X(w), y - 0.25, z1 + 0.03); }
@@ -200,18 +209,18 @@ class LandmarksJourneySection extends React.Component {
       for (let i = 0; i < shops; i++) { const z = z0 + sw * (i + 0.5); if (rnd() < 0.7) shutterX(fx, sd, z, sw * 0.76, 2.25); else { doorX(fx, sd, z - sw * 0.2, 0, 0.95, 2.2); louvX(fx, sd, z + sw * 0.22, 0.9, Math.min(1.2, sw * 0.3), 1.25, det); } if (det) signX(fx, sd, z, sw * (0.6 + rnd() * 0.3), 2.42, 2.92); }
       if (!bal && det && rnd() < 0.7) leanTo(fx, sd, z0 + 0.2, z1 - 0.2, 2.35, 1.7, 0.4, det);
       if (open) { for (let i = 0; i <= bays; i++) { const z = z0 + bw * i + (i === 0 ? 0.25 : i === bays ? -0.25 : 0); [0.25, w - 0.25].forEach(q => { solid('ink', X(q), H, z, 0.35, 0.7, 0.35); for (const [a, b] of [[-0.08, -0.08], [0.08, -0.08], [0.08, 0.08], [-0.08, 0.08]]) seg('ink', X(q) + a, H + 0.7, z + b, X(q) + a * 2.2, H + 1.9, z + b * 2.2); }); } }
-      else { fill('box', X(w / 2), H + 0.45, 0, w, 0.9, len); boxE('ink', X(w / 2), H, 0, w, 0.9, len); rectY('fine', H + 0.9, X(0.22), X(w - 0.22), z0 + 0.22, z1 - 0.22); seg('fine', xo, H + 0.72, z0, xo, H + 0.72, z1); }
+      else { fill('box', X(w / 2), H + 0.45, 0, w, 0.9, len); boxE(B, X(w / 2), H, 0, w, 0.9, len); rectY('fine', H + 0.9, X(0.22), X(w - 0.22), z0 + 0.22, z1 - 0.22); seg('fine', xo, H + 0.72, z0, xo, H + 0.72, z1); }
       const ry = open ? H : H + 0.9;
       if (rnd() < 0.6) { const tx = X(w * (0.35 + rnd() * 0.3)), tz = (rnd() - 0.5) * (len - 3); solid('ink', tx, ry, tz, 1.6, 0.35, 1.6); ptank(tx, ry + 0.35, tz); }
       if (det && rnd() < 0.35) dish(X(w * 0.8), ry + 1.3, z1 - 1.2, sd); };
     const shopRow = (sd, xn, len, det) => { const d = 4.2, H = 3.0, fx = sd * (xn + 1.9), X = q => sd * (xn + q), z0 = -len / 2, z1 = len / 2;
-      solid('ink', X(1.9 + d / 2), 0, 0, d, H, len); solid('ink', X(2.0), H, 0, 0.2, 0.9, len); rectY('fine', H + 0.02, X(2.2), X(1.9 + d - 0.1), z0 + 0.15, z1 - 0.15);
+      solid(B, X(1.9 + d / 2), 0, 0, d, H, len); solid('ink', X(2.0), H, 0, 0.2, 0.9, len); rectY('fine', H + 0.02, X(2.2), X(1.9 + d - 0.1), z0 + 0.15, z1 - 0.15);
       const n = Math.max(2, Math.round(len / 2.8)), sw = len / n;
       for (let i = 0; i < n; i++) { const z = z0 + sw * (i + 0.5); shutterX(fx, sd, z, sw * 0.8, 2.3); seg('ink', fx - sd * 0.03, 0, z0 + sw * i, fx - sd * 0.03, H, z0 + sw * i);
         if (det) { signX(fx, sd, z, sw * 0.86, H + 0.1, H + 0.8); if (rnd() < 0.55) solid('ink', X(1.9 - 0.6 - rnd() * 0.5), 0, z + (rnd() - 0.5) * sw * 0.4, 0.7, 0.45 + rnd() * 0.4, 0.7); } }
       leanTo(fx, sd, z0 + 0.1, z1 - 0.1, 2.75, 1.8, 0.45, det); };
     const container = (sd, xn, len, det) => { const w = 2.45, hh = 2.6, X = q => sd * (xn + q), fx = sd * xn, xo = fx - sd * 0.03, z0 = -len / 2, z1 = len / 2;
-      solid('ink', X(w / 2), 0.2, 0, w, hh, len); [z0 + 0.4, z1 - 0.4].forEach(z => solid('ink', X(w / 2), 0, z, w - 0.2, 0.2, 0.4));
+      solid(B, X(w / 2), 0.2, 0, w, hh, len); [z0 + 0.4, z1 - 0.4].forEach(z => solid('ink', X(w / 2), 0, z, w - 0.2, 0.2, 0.4));
       for (let z = z0 + 0.25; z < z1 - 0.1; z += 0.25) { if (Math.abs(z) < 1.45) continue; seg('fine', xo, 0.3, z, xo, hh + 0.1, z); }
       rectX('ink', xo, -1.4, 1.4, 0.75, 2.4); for (let y = 1.2; y < 2.4; y += 0.45) seg('fine', xo + sd * 0.4, y, -1.35, xo + sd * 0.4, y, 1.35);
       leanTo(fx, sd, -1.7, 1.7, hh + 0.1, 1.4, 0.35, det);
@@ -227,7 +236,18 @@ class LandmarksJourneySection extends React.Component {
       [-1.1, -0.4, 0.4, 1.1].forEach(o => seg('ink', x + o, 8.66, 0, x + o, 8.92, 0)); seg('fine', x - 0.9, 7.84, 0, x, 7.0, 0); seg('fine', x + 0.9, 7.84, 0, x, 7.0, 0);
       if (rnd() < 0.35) { solid('ink', x + 0.45, 5.6, 0, 0.6, 0.9, 0.6); seg('fine', x + 0.45, 6.5, 0, x + 0.4, 8.5, 0); }
       if (rnd() < 0.5) rectX('fine', x - 0.12, -0.25, 0.25, 2.0, 2.7); };
-    const tree = x => { const hh = 2.4 + rnd() * 0.8; seg('ink', x - 0.1, 0, 0, x - 0.07, hh, 0); seg('ink', x + 0.1, 0, 0, x + 0.07, hh, 0); ring('fine', x, 0.05, 0, 0.5, 8);
+    // hybrid tree: tapered trunk, a forked crown and a clustered canopy (drawn by the ink pass);
+    // it draws the same random numbers as the live tree, so everything placed after it is unchanged
+    const treeHy = x => { const hh = 2.4 + rnd() * 0.8, r = 1.6 + rnd() * 0.6, cy = hh + r * 0.65; for (let i = 0; i < 78; i++) rnd();
+      const h = Math.abs(Math.sin(TX * 12.9898 + TZ * 78.233)) * 43758.5453 % 1, sd = h < 0.5 ? -1 : 1;
+      const lb = x - 0.17, rb = x + 0.17, lt = x - 0.1 + 0.08 * sd, rt = x + 0.1 + 0.08 * sd; // slightly leaning, tapered trunk
+      poly(B, [[lb - 0.08, 0, 0], [lb, 0.18, 0], [lt, hh * 0.78, 0], [lt - 0.55 * sd, hh + 0.5, 0.15]]);
+      poly(B, [[rb + 0.08, 0, 0], [rb, 0.18, 0], [rt, hh * 0.72, 0], [rt + 0.6 * sd, hh + 0.4, -0.12]]);
+      poly('ink', [[(lt + rt) / 2, hh * 0.86, 0], [(lt + rt) / 2 + 0.15 * sd, hh + 0.7, 0.1]]); seg('fine', lb, 0.5, 0, lb + 0.04, 0.95, 0);
+      const cx = x - Math.sign(x) * 0.35; // canopy leans over the road, clear of the facades behind
+      TREES.push([TX + cx * TC, cy, TZ + cx * TS, r * 0.86, h * 6.283, Math.floor(h * 4)]); };
+    const tree = x => HY ? treeHy(x) : treeLive(x);
+    const treeLive = x => { const hh = 2.4 + rnd() * 0.8; seg('ink', x - 0.1, 0, 0, x - 0.07, hh, 0); seg('ink', x + 0.1, 0, 0, x + 0.07, hh, 0); ring('fine', x, 0.05, 0, 0.5, 8);
       const r = 1.6 + rnd() * 0.6, cy = hh + r * 0.65; fill('sph', x, cy, 0, r, r * 0.8, r);
       seg('ink', x, hh, 0, x + 0.6, hh + 0.8, 0.2); seg('ink', x, hh, 0, x - 0.5, hh + 0.9, -0.3);
       for (let i = 0; i < 26; i++) { const u = rnd() * 2 - 1, t = rnd() * Math.PI * 2, q = Math.sqrt(1 - u * u), px = x + q * Math.cos(t) * r * 1.02, py = cy + u * r * 0.82, pz = q * Math.sin(t) * r * 1.02, d = t + 1.57 + (rnd() - 0.5);
@@ -246,7 +266,7 @@ class LandmarksJourneySection extends React.Component {
       solid('ink', 0, 1.9, 0.15, 1.42, 0.12, 2.3); seg('fine', -0.35, 2.02, -0.95, -0.35, 2.02, 1.3); seg('fine', 0.35, 2.02, -0.95, 0.35, 2.02, 1.3);
       rectZ('fine', -0.88, -0.55, 0.55, 1.05, 1.8); seg('fine', -0.66, 0.7, -0.3, -0.66, 0.7, 1.2); seg('fine', 0.66, 0.7, -0.3, 0.66, 0.7, 1.2);
       circX('ink', -0.67, 0.3, 0.75, 0.3, 14); circX('ink', 0.67, 0.3, 0.75, 0.3, 14); circX('ink', 0, 0.28, -1.05, 0.28, 14); circX('fine', -0.68, 0.3, 0.75, 0.12, 8); circX('fine', 0.68, 0.3, 0.75, 0.12, 8); };
-    const veh = (s, lat, flip, fn) => { setT(s, lat); if (flip) { TC = -TC; TS = -TS; TR += Math.PI; } fn(); };
+    const veh = (s, lat, flip, fn) => { setT(s, lat); if (flip) { TC = -TC; TS = -TS; TR += Math.PI; } VEHON = HY; fn(); VEHON = false; };
     // landmarks, boards and their clearances go in first
     // LS, LSD, SB, MK: src/lib/rideCamera.js
     [[40, 4.6, 20, -14, 14], [100, -20, -4.6, -9, 9], [160, 4.6, 10, -11, 11], [215, -22, -4.6, -9.5, 9.5], [245, -62, -4.6, -16, 16]].forEach(([s, a, b, c, d]) => { setT(s, 0); FOOT.push(quad(a, b, c, d)); });
@@ -257,7 +277,7 @@ class LandmarksJourneySection extends React.Component {
       NOL = s < -48; seg('ink', sd * 5.25, 0.02, -3.6, sd * 80, 0.02, -3.6); seg('ink', sd * 5.25, 0.02, 3.6, sd * 80, 0.02, 3.6); for (let x = 8; x < 78; x += 7) seg('green', sd * x, 0.03, 0, sd * (x + 3), 0.03, 0); NOL = false; });
     // 1 filling station (right)
     setT(40, 0); { const x = 11, z = 0;
-      solid('ink', x, 4.85, z, 11, 0.75, 7); [5.1, 5.35].forEach(y => { seg('fine', x - 5.5, y, z + 3.53, x + 5.5, y, z + 3.53); seg('fine', x - 5.53, y, z - 3.5, x - 5.53, y, z + 3.5); });
+      solid(B, x, 4.85, z, 11, 0.75, 7); [5.1, 5.35].forEach(y => { seg('fine', x - 5.5, y, z + 3.53, x + 5.5, y, z + 3.53); seg('fine', x - 5.53, y, z - 3.5, x - 5.53, y, z + 3.5); });
       [[-4.5, -2.8], [4.5, -2.8], [-4.5, 2.8], [4.5, 2.8]].forEach(([p, q]) => solid('ink', x + p, 0, z + q, 0.4, 4.85, 0.4));
       solid('ink', x, 0, z, 6, 0.25, 1.4);
       [-1.8, 1.8].forEach(o => { solid('ink', x + o, 0.25, z, 0.8, 1.7, 0.6); rectZ('fine', z + 0.33, x + o - 0.28, x + o + 0.28, 1.25, 1.75); rectZ('fine', z + 0.33, x + o - 0.2, x + o + 0.2, 0.6, 1.0); poly('ink', [[x + o + 0.42, 1.5, z], [x + o + 0.62, 0.9, z + 0.2], [x + o + 0.56, 0.45, z + 0.4]]); });
@@ -284,13 +304,13 @@ class LandmarksJourneySection extends React.Component {
       solid('ink', x, 0, z, 1.4, 0.8, 0.9); seg('fine', x - 0.7, 0.6, z + 0.46, x + 0.7, 0.6, z + 0.46); [-0.4, 0, 0.4].forEach(o => ring('fine', x + o, 0.82, z, 0.17, 10)); solid('ink', x + 0.35, 0.8, z - 0.2, 0.3, 0.25, 0.3); }
     setT(160, 0); shopRow(1, 10.4, 18, true); FOOT.push(quad(10.4, 16.6, -9.3, 9.3));
     // 4 St Paul's church (left)
-    setT(215, 0); { const x = -14, z = 0; solid('ink', x, 0, z, 8, 5, 12);
+    setT(215, 0); { const x = -14, z = 0; solid(B, x, 0, z, 8, 5, 12);
       fill('pr', x, 5, z, 8.6, 3.2, 12.6);
-      [z - 6.3, z + 6.3].forEach(zz => poly('ink', [[x - 4.3, 5, zz], [x, 8.2, zz], [x + 4.3, 5, zz]])); seg('ink', x, 8.2, z - 6.3, x, 8.2, z + 6.3); [-4.3, 4.3].forEach(o => seg('ink', x + o, 5, z - 6.3, x + o, 5, z + 6.3));
+      [z - 6.3, z + 6.3].forEach(zz => poly(B, [[x - 4.3, 5, zz], [x, 8.2, zz], [x + 4.3, 5, zz]])); seg(B, x, 8.2, z - 6.3, x, 8.2, z + 6.3); [-4.3, 4.3].forEach(o => seg(B, x + o, 5, z - 6.3, x + o, 5, z + 6.3));
       for (let zz = z - 6.1; zz < z + 6.2; zz += 0.42) seg('fine', x + 4.3, 5, zz, x, 8.2, zz);
       for (let zz = z - 4.5; zz <= z + 4.6; zz += 2.25) { archX('fine', x + 4.03, zz, 1.2, 0.9, 2.4); seg('ink', x + 4.12, 1.14, zz - 0.55, x + 4.12, 1.14, zz + 0.55); }
       archZ('fine', z + 6.03, x - 1.5, 1.5, 1, 2.2); archZ('fine', z + 6.03, x - 3.0, 1.5, 1, 2.2);
-      const tx = x + 3.6, tz = z + 5.2; solid('ink', tx, 0, tz, 2.6, 9, 2.6); [5, 7.6].forEach(y => { seg('fine', tx + 1.33, y, tz - 1.3, tx + 1.33, y, tz + 1.3); seg('fine', tx - 1.3, y, tz + 1.33, tx + 1.3, y, tz + 1.33); });
+      const tx = x + 3.6, tz = z + 5.2; solid(B, tx, 0, tz, 2.6, 9, 2.6); [5, 7.6].forEach(y => { seg('fine', tx + 1.33, y, tz - 1.3, tx + 1.33, y, tz + 1.3); seg('fine', tx - 1.3, y, tz + 1.33, tx + 1.3, y, tz + 1.33); });
       archX('ink', tx + 1.33, tz, 5.8, 1, 1.5); archZ('ink', tz + 1.33, tx, 5.8, 1, 1.5); archZ('ink', tz + 1.33, tx, 0, 1.3, 2.6); seg('fine', tx, 0, tz + 1.34, tx, 1.95, tz + 1.34); archX('fine', tx + 1.33, tz, 2.6, 0.6, 1.4);
       fill('cone4', tx, 10.3, tz, 1.84, 2.6, 1.84, Math.PI / 4);
       [[-1.3, -1.3], [1.3, -1.3], [1.3, 1.3], [-1.3, 1.3]].forEach(([p, q]) => seg('ink', tx, 11.6, tz, tx + p, 9, tz + q));
@@ -353,12 +373,29 @@ class LandmarksJourneySection extends React.Component {
     for (let i = 0; i < 10; i++) { setT(rnd() * 300, (rnd() - 0.5) * 6); const r = 0.35 + rnd() * 0.55, p = []; for (let j = 0; j < 9; j++) { const t = j / 9 * Math.PI * 2, rr = r * (0.75 + rnd() * 0.5); p.push([Math.cos(t) * rr, 0.03, Math.sin(t) * rr * 1.4]); } p.push(p[0]); poly('fine', p); }
     // distant skyline beyond the market
     setT(SMAX - 10, 0); for (let i = 0; i < 14; i++) { const lat = (rnd() < 0.5 ? -1 : 1) * (16 + rnd() * 60), z = -10 - rnd() * 70, w = 7 + rnd() * 9, d = 7 + rnd() * 8, hh = 22 + rnd() * 40;
-      solid('ink', lat, 0, z, w, hh, d); for (let y = 3; y < hh; y += 3) seg('fine', lat - w / 2, y, z + d / 2 + 0.03, lat + w / 2, y, z + d / 2 + 0.03); for (let x = lat - w / 2 + 1.5; x < lat + w / 2 - 0.5; x += 1.5) seg('fine', x, 0, z + d / 2 + 0.03, x, hh, z + d / 2 + 0.03); if (rnd() < 0.4) seg('ink', lat, hh, z, lat, hh + 6, z); }
-    const mats = { ink: lineMat(INK), fine: new THREE.LineBasicMaterial({ color: '#77725f', transparent: true, opacity: 0.85 }), green: lineMat(GREEN) };
+      solid(B, lat, 0, z, w, hh, d); for (let y = 3; y < hh; y += 3) seg('fine', lat - w / 2, y, z + d / 2 + 0.03, lat + w / 2, y, z + d / 2 + 0.03); for (let x = lat - w / 2 + 1.5; x < lat + w / 2 - 0.5; x += 1.5) seg('fine', x, 0, z + d / 2 + 0.03, x, hh, z + d / 2 + 0.03); if (rnd() < 0.4) seg('ink', lat, hh, z, lat, hh + 6, z); }
+    const mats = HY ? {} : { ink: lineMat(INK), fine: new THREE.LineBasicMaterial({ color: '#77725f', transparent: true, opacity: 0.85 }), green: lineMat(GREEN) };
+    // hybrid: fat lines (layer 4, CSS-px widths, round caps, alpha-to-coverage AA, fog), deduped
+    // heaviest weight first; the procedural vehicles go in their own group so they can fade out
+    let hy = null;
+    if (HY) {
+      const WID = { bold: 1.9, ink: 1.4, green: 1.4, fine: 0.8 }, COL = { bold: INK, ink: INK, green: GREEN, fine: '#77725f' };
+      hy = { mats: [], vmats: [], procVeh: new THREE.Group(), vFill: fillMat.clone(), puffMat: new THREE.MeshBasicMaterial({ color: '#eff1e6', polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }), puffs: [], fading: false, t0: 0, cTree: new THREE.Color('#eff1e6') };
+      hy.vFill.transparent = true;
+      const build = (src, list, grp) => { const taken = new Set(); for (const k of ['bold', 'ink', 'green', 'fine']) { const m = fatLineMaterial(THREE, LX.LineMaterial, COL[k], WID[k], 1); list[k] = m; const pos = dedupeSegments(src[k], taken); if (!pos.length) continue; const l = fatLines(THREE, LX, pos, m); l.layers.set(4); grp.add(l); } };
+      build(SEG, mats, city); build(SEGV, hy.vmats, hy.procVeh); city.add(hy.procVeh);
+      hy.all = [mats.bold, mats.ink, mats.green, mats.fine, hy.vmats.bold, hy.vmats.ink, hy.vmats.green, hy.vmats.fine];
+      // canopies: 4 puff-cluster variants, instanced; on the inked layer (3) so the ink pass outlines them
+      const o3t = new THREE.Object3D();
+      for (let v = 0; v < 4; v++) { const list = TREES.filter(t => t[5] === v); if (!list.length) continue; const g = canopyGeometry(THREE, LX.mergeGeometries, 101 + v * 37);
+        const im = new THREE.InstancedMesh(g, hy.puffMat, list.length); list.forEach((t, i) => { o3t.position.set(t[0], t[1], t[2]); o3t.rotation.set(0, t[4], 0); o3t.scale.setScalar(t[3] * 0.95); o3t.updateMatrix(); im.setMatrixAt(i, o3t.matrix); });
+        im.layers.set(3); hy.puffs.push(im); city.add(im); }
+    } else
       for (const k in SEG) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(SEG[k], 3)); city.add(new THREE.LineSegments(g, mats[k])); }
       const prG = (() => { const sh = new THREE.Shape(); sh.moveTo(-0.5, 0); sh.lineTo(0.5, 0); sh.lineTo(0, 1); sh.lineTo(-0.5, 0); const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -0.5); return g; })();
       const GEO = { box: new THREE.BoxGeometry(1, 1, 1), pr: prG, cyl: new THREE.CylinderGeometry(1, 1, 1, 18), cone: new THREE.ConeGeometry(1, 1, 18), cone4: new THREE.ConeGeometry(1, 1, 4), sph: new THREE.IcosahedronGeometry(1, 2) }, o3 = new THREE.Object3D();
-      for (const k in FILL) { const arr = FILL[k]; if (!arr.length) continue; const im = new THREE.InstancedMesh(GEO[k], fillMat, arr.length); arr.forEach((v, i) => { o3.position.set(v[0], v[1], v[2]); o3.rotation.set(0, v[6], 0); o3.scale.set(v[3], v[4], v[5]); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); }); im.frustumCulled = false; city.add(im); }
+      const fills = (F, mat, grp) => { for (const k in F) { const arr = F[k]; if (!arr.length) continue; const im = new THREE.InstancedMesh(GEO[k], mat, arr.length); arr.forEach((v, i) => { o3.position.set(v[0], v[1], v[2]); o3.rotation.set(0, v[6], 0); o3.scale.set(v[3], v[4], v[5]); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); }); im.frustumCulled = false; grp.add(im); } };
+      fills(FILL, fillMat, city); if (hy) fills(FILLV, hy.vFill, hy.procVeh);
     // flat map layer drawn from the same road and footprints
     const mapGrp = new THREE.Group(); scene.add(mapGrp);
     const mkMat = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, depthWrite: false, side: THREE.DoubleSide });
@@ -418,18 +455,30 @@ class LandmarksJourneySection extends React.Component {
     // (until then the procedural street stands in). Layers: 0 = the model (fills + ink edges),
     // 2 = wires (fills only), 1 = overlays drawn after the ink pass, depth-tested against the model:
     // the map ribbons, trail, pins and signboards (so buildings hide them and no line crosses them).
+    // ?ride=hybrid uses the same layering with the procedural line art: 0 = fills (occluders in the
+    // ink pass), 4 = fat lines, 3 = inked meshes (canopies, then the Blender vehicles + people).
     let M = null;
-    if (modelMode) {
+    if (modelMode || HY) {
       mapGrp.traverse(o => o.layers.set(1)); pins.forEach(p => p.traverse(o => o.layers.set(1)));
       boards.forEach(b => { b.mats = []; b.a = -1; b.grp.traverse(o => { o.layers.set(1); if (!o.material) return; if (o.material === fillMat || o.material === LMAT[INK]) o.material = o.material.clone(); if (o.material.color && o.material !== b.grp.children[0].material && o.material.isMeshBasicMaterial) o.material.color.set(PAPER); o.material.transparent = true; b.mats.push(o.material); }); });
-      M = { ready: false, root: null, mats: [], ink: makeInkPass(THREE, renderer, INK), scale: 1, minDt: 1000, acc: 0, n: 0, t0: 0, lastT: 0, good: 0, avg: 0, size: new THREE.Vector2(), opts: { strength: 0, fogNear: 60, fogFar: 290, offD: 2, offN: 1 }, k: new Float64Array(5) };
+      M = { ready: false, root: null, mats: [], ink: makeInkPass(THREE, renderer, INK), scale: 1, minDt: 1000, acc: 0, n: 0, t0: 0, lastT: 0, good: 0, bad: 0, avg: 0, size: new THREE.Vector2(), opts: { strength: 0, fogNear: 60, fogFar: 290, offD: 2, offN: 1, occMask: HY ? 1 : null }, k: new Float64Array(5) };
       const mkFill = mapHex => { const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }), u = { uMapCol: { value: new THREE.Color(mapHex) }, uMapK: { value: 1 } };
         m.onBeforeCompile = sh => { Object.assign(sh.uniforms, u); sh.fragmentShader = 'uniform vec3 uMapCol;\nuniform float uMapK;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n\tdiffuseColor.rgb = mix(diffuseColor.rgb, uMapCol, uMapK);'); };
         M.mats.push(m); return { m, u }; };
       const lines = () => { const dpr = basePR * M.scale; M.opts.offD = Math.max(1, Math.round(1.4 * dpr)); M.opts.offN = Math.max(1, Math.round(0.7 * dpr)); };
       M.resize = () => { renderer.getDrawingBufferSize(M.size); M.ink.setSize(M.size.x, M.size.y); lines(); };
       M.setScale = sc => { M.scale = sc; renderer.setPixelRatio(basePR * sc); renderer.setSize(host.clientWidth, host.clientHeight); M.resize(); keyS = null; }; // resizing clears the canvas: draw again next frame
-      modelP.then(gltf => {
+      if (HY) modelP.then(gltf => {
+        const root = gltf.scene, fig = root.getObjectByName('figures');
+        if (this.dead || !fig) { root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); return; }
+        const ff = mkFill('#ddd6c9'), old = new Set(); M.figU = ff.u; M.figMat = ff.m; ff.m.transparent = true; ff.m.opacity = 0;
+        root.traverse(o => { if (!o.isMesh) return; if (o.material) old.add(o.material); o.material = ff.m; });
+        old.forEach(m => m.dispose());
+        root.children.slice().forEach(o => { if (o !== fig) fig.add(o); }); // instanced people lifted to the root by gltfpack
+        fig.traverse(o => o.layers.set(3));
+        city.add(fig); M.root = root; M.fig = fig; M.ready = true; hy.t0 = performance.now(); keyS = null;
+      }, () => {});
+      else modelP.then(gltf => {
         const root = gltf.scene, gCity = root.getObjectByName('city'), gGround = root.getObjectByName('ground');
         if (this.dead || !gCity) { root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); return; }
         const cf = mkFill('#ddd6c9'), gf = mkFill('#ebe8e1'); M.cityU = cf.u; M.groundU = gf.u;
@@ -445,8 +494,9 @@ class LandmarksJourneySection extends React.Component {
     }
     const self = this;
     this.three = {
-      resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); if (M) M.resize(); },
+      resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); if (M) M.resize(); if (hy) hy.all.forEach(m => { if (m) m.resolution.set(w, h); }); },
       dispose() { if (player) player.destroy();
+        if (hy) { hy.all.forEach(m => { if (m) m.dispose(); }); hy.vFill.dispose(); hy.puffMat.dispose(); hy.puffs.forEach(p => p.geometry.dispose()); city.traverse(o => { if (o.isLineSegments2) o.geometry.dispose(); }); }
         if (M) { M.ink.dispose(); M.mats.forEach(m => m.dispose()); if (M.root) M.root.traverse(o => { if (o.geometry) o.geometry.dispose(); }); boards.forEach(b => b.mats.forEach(m => m.dispose())); }
         renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); },
       render(st, t) {
@@ -455,12 +505,12 @@ class LandmarksJourneySection extends React.Component {
         { const portrait = host.clientWidth < host.clientHeight * 0.9; if (portrait !== boardPort) { boardPort = portrait; boards.forEach(b => { const [bx, bz] = W(SB[b.i], b.sd * (portrait ? BOARD_LAT_PORTRAIT : BOARD_LAT)); b.grp.position.x = bx; b.grp.position.z = bz; b.grp.scale.setScalar(portrait ? BOARD_SCALE_PORTRAIT : 1); }); } }
         const sHead = headS(k, e), th = fr(sHead)[2];
         if (hdS === undefined) hdS = th; hdS += (th - hdS) * 0.12;
-        const modelOn = !!(M && M.ready);
+        const modelOn = !!(M && M.ready), layered = HY || modelOn;
         if (M) { // same skip-if-unchanged rule as below, without building a key string per frame
           const mk = M.k, sk = st.f; let same = keyS === M && Math.abs(mk[0] - k) < 5e-5 && Math.abs(mk[1] - e) < 5e-5 && Math.abs(mk[2] - q) < 5e-5 && Math.abs(mk[3] - hdS) < 5e-5 && Math.abs(mk[4] - sk) < 5e-5;
-          if (same && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS;
+          if (same && !(hy && hy.fading) && t - ltS < (e >= 1 && stepFor(q) >= 4 ? 0 : 250)) return projS;
           mk[0] = k; mk[1] = e; mk[2] = q; mk[3] = hdS; mk[4] = sk; keyS = M; ltS = t;
-          if (modelOn) { if (M.lastT && t - M.lastT < 100) { M.acc += t - M.lastT; M.n++; if (t - M.lastT < M.minDt) M.minDt = t - M.lastT; } M.lastT = t; }
+          if (layered) { if (M.lastT && t - M.lastT < 100) { M.acc += Math.min(34, t - M.lastT); M.n++; if (t - M.lastT < M.minDt) M.minDt = t - M.lastT; } M.lastT = t; }
         }
         let fi = null, key = M ? null : [k, e, q, hdS, st.f].map(v => v.toFixed(4)).join();
         if (player) { const W = host.clientWidth, H = host.clientHeight, p = st.p;
@@ -474,8 +524,15 @@ class LandmarksJourneySection extends React.Component {
         const lineK = sstep(0.15, 0.7, e), roadK = 1 - sstep(0.35, 0.9, e), trailK = 1 - sstep(0.05, 0.4, e), up = sstep(0.25, 0.95, e);
         mats.ink.opacity = 0.92 * lineK; mats.green.opacity = 0.92 * lineK; mats.fine.opacity = 0.85 * lineK; [mats.ink, mats.green, mats.fine].forEach(m => { m.visible = lineK > 0.002; });
         city.scale.y = 0.02 + 0.98 * up;
-        if (modelOn) { M.cityU.uMapK.value = 1 - sstep(0.3, 1, e); M.groundU.uMapK.value = 1 - sstep(0.2, 0.9, e); }
+        if (modelOn && !HY) { M.cityU.uMapK.value = 1 - sstep(0.3, 1, e); M.groundU.uMapK.value = 1 - sstep(0.2, 0.9, e); }
         fillMat.color.copy(C_BLOCK).lerp(C_PAPER, sstep(0.3, 1, e)); groundMat.color.copy(C_BG).lerp(C_PAPER, sstep(0.2, 0.9, e)); sceneBg.copy(groundMat.color);
+        if (hy) { // fat lines at full strength; procedural vehicles cross-fade to the Blender figures over 0.3 s
+          const vm = hy.vmats, a = M.ready ? clamp((t - hy.t0) / 300, 0, 1) : 0; hy.fading = M.ready && a < 1;
+          mats.bold.opacity = mats.ink.opacity = mats.green.opacity = lineK; mats.fine.opacity = 0.9 * lineK; mats.bold.visible = lineK > 0.002;
+          vm.bold.opacity = vm.ink.opacity = vm.green.opacity = lineK * (1 - a); vm.fine.opacity = 0.9 * lineK * (1 - a);
+          hy.procVeh.visible = a < 1; hy.vFill.color.copy(fillMat.color); hy.vFill.opacity = 1 - a;
+          if (M.figMat) { M.figMat.opacity = a; M.figMat.transparent = a < 1; M.figU.uMapK.value = 1 - sstep(0.3, 1, e); }
+          hy.puffMat.color.copy(C_BLOCK).lerp(hy.cTree, sstep(0.3, 1, e)); }
         [casingMat, roadMat, patchMat].forEach(m => { m.opacity = roadK; m.visible = roadK > 0.002; }); trailMat.opacity = trailK; trailMat.visible = trailK > 0.002;
         scene.fog.near = 60 + (1 - e1) * 3000; scene.fog.far = 290 + (1 - e1) * 6000;
         trailMesh.geometry.setDrawRange(0, Math.max(0, Math.round((sHead - TS0) / TDS)) * 6);
@@ -486,26 +543,28 @@ class LandmarksJourneySection extends React.Component {
             camera.position.fromArray(c.pos); camera.quaternion.fromArray(c.quat); camera.fov = shownFrame.fov; camera.aspect = shownFrame.w / shownFrame.h;
             camera.setViewOffset(shownFrame.drawW, shownFrame.drawH, shownFrame.offX, shownFrame.offY, W, H); viewSet = true; }
           else if (viewSet) { camera.fov = 58; camera.aspect = host.clientWidth / host.clientHeight; camera.clearViewOffset(); viewSet = false; } }
-        if (modelOn) for (let i = 0; i < boards.length; i++) { // standing boards fade in within ~45 m ahead
+        if (layered) for (let i = 0; i < boards.length; i++) { // standing boards fade in within ~45 m ahead
           const b = boards[i], a = e >= 1 ? sstep(45, 35, b.s - sc) : 0; b.grp.position.y = 0; b.grp.visible = a > 0.003;
           if (a !== b.a) { b.a = a; for (let j = 0; j < b.mats.length; j++) b.mats[j].opacity = a; } }
         else boards.forEach(b => { const d = b.s - sc, rise = sstep(70, 34, d); b.grp.position.y = -8 * (1 - rise); b.grp.visible = e >= 1; });
         const step = stepFor(q);
         pins.forEach((sp, i) => { sp.visible = e >= 1; if (sp.userData.coin) { const at = sp.userData.at; sp.position.set(at[0], 1.25 + Math.sin(t / 520) * 0.18, at[1]); sp.rotation.y = t / 650; sp.scale.set(1.6, 1.6, 1.6); return; } const cur = step === i + 1; const s2 = cur ? 3 + Math.sin(t / 280) * 0.15 : 2.1; sp.scale.set(s2, s2, 1); });
-        if (modelOn) {
+        if (layered) {
           // depth precision for the high map view: push the near plane out while the camera is high
           const near = e < 1 ? clamp((camera.position.y - 35) * 0.5, 0.1, 30) : 0.1;
           if (near !== camera.near) { camera.near = near; camera.updateProjectionMatrix(); }
-          camera.layers.mask = 5; renderer.render(scene, camera);
-          const o = M.opts; o.strength = lineK; o.fogNear = scene.fog.near; o.fogFar = scene.fog.far; M.ink.render(scene, camera, 1, o);
+          camera.layers.mask = HY ? 25 : 5; renderer.render(scene, camera);
+          const o = M.opts; o.strength = lineK; o.fogNear = scene.fog.near; o.fogFar = scene.fog.far; M.ink.render(scene, camera, HY ? 8 : 1, o);
           const bg = scene.background; scene.background = null; camera.layers.mask = 2; renderer.autoClear = false;
           renderer.render(scene, camera); renderer.autoClear = true; scene.background = bg; camera.layers.mask = 1;
           // adaptive resolution: 1 s average frame interval while rendering continuously
           if (!M.t0) M.t0 = t;
           if (t - M.t0 >= 1000) { if (M.n >= 10) { const avg = M.avg = M.acc / M.n, upAt = Math.max(12, M.minDt * 1.12);
-              if (avg > 20) { M.good = 0; if (M.scale > 0.6 + 1e-6) M.setScale(Math.round((M.scale - 0.1) * 10) / 10); }
-              else if (avg < upAt) { if (++M.good >= 2 && M.scale < 1 - 1e-6) { M.good = 0; M.setScale(Math.round((M.scale + 0.1) * 10) / 10); } }
-              else M.good = 0; }
+              // two slow seconds in a row before stepping down (a single stall, e.g. a GC or a
+              // screenshot, must not cost resolution), two fast ones before stepping up
+              if (avg > 20) { M.good = 0; if (++M.bad >= 2 && M.scale > 0.6 + 1e-6) { M.bad = 0; M.setScale(Math.round((M.scale - 0.1) * 10) / 10); } }
+              else if (avg < upAt) { M.bad = 0; if (++M.good >= 2 && M.scale < 1 - 1e-6) { M.good = 0; M.setScale(Math.round((M.scale + 0.1) * 10) / 10); } }
+              else { M.good = 0; M.bad = 0; } }
             M.t0 = t; M.acc = 0; M.n = 0; }
         } else { if (M) camera.layers.mask = 0xffffffff; renderer.render(scene, camera); }
         prj.set(hx, 0.3, hz).project(camera); projS = [(prj.x + 1) / 2, (1 - prj.y) / 2, roll]; prj.set(gX, 3.0, gZ).project(camera); projS.push((prj.x + 1) / 2, (1 - prj.y) / 2, prj.z < 1 ? 1 : 0);
@@ -513,7 +572,7 @@ class LandmarksJourneySection extends React.Component {
       }
     };
     this.three.resize();
-    if (this.rideDebug) window.__ride = { mode: modelMode ? 'model' : player ? 'frames' : 'live', get model() { return M ? { loaded: M.ready, lite, scale: M.scale, avgMs: M.avg, basePR, offD: M.opts.offD, offN: M.opts.offN, url: modelStore().url, near: camera.near } : null; }, src: this.rideSrc, manifest: ride ? ride.manifest : null, stats: rideFrameStats, get cur() { return self.cur; }, get p() { return self.p; }, get frame() { return overlay && shownFrame ? { i: shownFrame.i, v: shownFrame.v, p: self.cur } : null; }, camera, scene, pins, boards: boards.map(b => b.grp) };
+    if (this.rideDebug) window.__ride = { mode: modelMode ? 'model' : HY ? 'hybrid' : player ? 'frames' : 'live', get model() { return M ? { loaded: M.ready, lite, scale: M.scale, avgMs: M.avg, basePR, offD: M.opts.offD, offN: M.opts.offN, url: (HY ? figuresStore() : modelStore()).url, near: camera.near } : null; }, src: this.rideSrc, manifest: ride ? ride.manifest : null, stats: rideFrameStats, get cur() { return self.cur; }, get p() { return self.p; }, get frame() { return overlay && shownFrame ? { i: shownFrame.i, v: shownFrame.v, p: self.cur } : null; }, camera, scene, renderer, get M() { return M; }, get hy() { return hy; }, pins, boards: boards.map(b => b.grp) };
   }
 
   renderVals() {
