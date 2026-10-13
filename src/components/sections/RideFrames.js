@@ -10,13 +10,14 @@
 
 export const RIDE_MANIFEST = '/media/ride/manifest.json';
 export const RIDE_STUB_MANIFEST = '/media/ride-stub/manifest.json';
-// Sentinel for ?ride=model: the live Blender street model (RideModel.js), no frames.
-export const RIDE_MODEL = 'model';
+// Sentinels for ?ride=model (the live Blender street model, RideModel.js) and ?ride=hybrid (the
+// procedural line art with the Blender vehicles and people); neither uses frames.
+export const RIDE_MODEL = 'model', RIDE_HYBRID = 'hybrid';
 // ?ride=live -> null (procedural street), ?ride=stub -> stub frames, ?ride=model -> RIDE_MODEL,
-// otherwise the real frames.
+// ?ride=hybrid -> RIDE_HYBRID, otherwise the real frames.
 export const rideSource = search => {
   const v = new URLSearchParams(search || '').get('ride');
-  return v === 'live' ? null : v === 'stub' ? RIDE_STUB_MANIFEST : v === 'model' ? RIDE_MODEL : RIDE_MANIFEST;
+  return v === 'live' ? null : v === 'stub' ? RIDE_STUB_MANIFEST : v === 'model' ? RIDE_MODEL : v === 'hybrid' ? RIDE_HYBRID : RIDE_MANIFEST;
 };
 
 const PAPER = '#f7f5ef';
@@ -144,7 +145,7 @@ export function rideStore(url) { let s = stores.get(url); if (!s) { s = new Ride
 // Manifest + format for the section, or null (-> live street, or the model in model mode) if it
 // fails or takes too long.
 export async function openRide(url, timeoutMs = 6000) {
-  if (!url || url === RIDE_MODEL) return null;
+  if (!url || url === RIDE_MODEL || url === RIDE_HYBRID) return null;
   const store = rideStore(url);
   try {
     const m = await Promise.race([store.manifest(), new Promise((_, rej) => setTimeout(() => rej(new Error('ride manifest: timeout')), timeoutMs))]);
